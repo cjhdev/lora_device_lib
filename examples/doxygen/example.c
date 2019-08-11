@@ -116,7 +116,6 @@ void app_handler(void *app, enum lora_mac_response_type type, const union lora_m
     case LORA_MAC_DATA_COMPLETE:
     case LORA_MAC_DATA_TIMEOUT:
     case LORA_MAC_DATA_NAK:
-    case LORA_MAC_RX:
     case LORA_MAC_LINK_STATUS:
     case LORA_MAC_RX1_SLOT:
     case LORA_MAC_RX2_SLOT:
