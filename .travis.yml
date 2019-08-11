@@ -1,0 +1,10 @@
+notifications:
+  email: false
+language: C
+sudo: required
+branches:
+  only:
+    - master
+script:
+  - cd test && make build_and_run
+  - $TRAVIS_BUILD_DIR/.travis-deploy.sh

@@ -1,0 +1,13 @@
+*.map
+*.elf
+*.gem
+*.o
+*.so
+*.dll
+*.sublime*
+tmp/*
+!.gitignore
+Gemfile.lock
+.yardoc
+secrets
+*/**/.git
