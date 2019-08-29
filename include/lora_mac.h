@@ -54,25 +54,6 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifndef LORA_TICKS_PER_SECOND
-    /** @ingroup ldl_optional
-     * 
-     * Redefine this to suit the System_time() source.
-     * 
-     * **Example (defined in makefile):**
-     * 
-     * @code
-     * -DLORA_TICKS_PER_SECOND=1000000U
-     * @endcode
-     * 
-     * */        
-    #define LORA_TICKS_PER_SECOND 1000000UL
-#else
-#   if LORA_TICKS_PER_SECOND > 1000000UL   
-#   error LORA_TICKS_PER_SECOND cannot be greater than 1000000
-#   endif 
-#endif
-
 #ifndef LORA_MAX_PACKET
     /** @ingroup ldl_optional
      * 
@@ -87,53 +68,6 @@ extern "C" {
      * */
     #define LORA_MAX_PACKET UINT8_MAX
     
-#endif
-
-#ifndef LORA_XTAL_ERROR
-    /** @ingroup ldl_optional
-     * 
-     * - Redefine this to account for oscillator +/- error per second
-     *   in ticks
-     * - This is used to compensate for the fastest and slowest clocks
-     *
-     * For example, if an oscillator is accurate to +/1% of nominal:
-     * 
-     * @code
-     * 
-     * F_CPU := 8000000UL
-     * PRESCALE := 64UL
-     * ERROR := 0.01
-     * 
-     * # works out to 1250 ticks
-     * -DLORA_XTAL_ERROR='( $(F_CPU) * $(ERROR) / $(PRESCALE) )'
-     * 
-     * @endcode
-     * 
-     * Note that LDL will multiply by two in order to account for the 
-     * full range of slow vs. fast.
-     * 
-     * */
-    #define LORA_XTAL_ERROR 0UL
-
-#endif
-
-#ifndef LORA_TICK_ADVANCE
-    /** @ingroup ldl_optional
-     * 
-     * - this advances RX1 and RX2 window schedule by so many system time ticks
-     * - this is likely to be negligible once XTAL error is accounted for
-     * 
-     * example:
-     * 
-     * @code
-     * 
-     * -DLORA_TICK_ADVANCE=7UL
-     * 
-     * @endcode
-     * 
-     * */
-    #define LORA_TICK_ADVANCE 0UL
-
 #endif
  
 #ifndef LORA_DEFAULT_RATE
@@ -381,6 +315,7 @@ struct lora_mac {
 
     uint32_t last_downlink;
     
+    /* the settings currently being used to TX */
     struct {
         
         uint8_t chIndex;
@@ -417,6 +352,8 @@ struct lora_mac {
     uint32_t firstJoinAttempt;
     uint32_t msUntilRetry;
     uint16_t joinTrial;
+    
+    uint8_t tx_dither;
 };
 
 /** Initialise MAC 
@@ -536,8 +473,6 @@ uint32_t LDL_MAC_ticksUntilNextChannel(const struct lora_mac *self);
 
 /** Set the transmit data rate
  * 
- * @note this will disable ADR if it is enabled
- * 
  * @param[in] self
  * @param[in] rate
  * 
@@ -557,8 +492,6 @@ bool LDL_MAC_setRate(struct lora_mac *self, uint8_t rate);
 uint8_t LDL_MAC_getRate(const struct lora_mac *self);
 
 /** Set the transmit power
- * 
-* @note this will disable ADR if it is enabled
  * 
  * @param[in] self
  * @param[in] power
@@ -582,9 +515,6 @@ uint8_t LDL_MAC_getPower(const struct lora_mac *self);
 
 /** Enable ADR mode
  * 
- * @note ADR will be disabled if the application uses LDL_MAC_setRate or 
- * LDL_MAC_setPower
- * 
  * @param[in] self
  * 
  * @retval true enabled
@@ -592,6 +522,16 @@ uint8_t LDL_MAC_getPower(const struct lora_mac *self);
  * 
  * */
 bool LDL_MAC_enableADR(struct lora_mac *self);
+
+/** Disable ADR mode
+ * 
+ * @param[in] self
+ * 
+ * @retval true enabled
+ * @retval false error, LDL_MAC_errno() will give reason
+ * 
+ * */
+bool LDL_MAC_disableADR(struct lora_mac *self);
 
 /** Is ADR mode enabled?
  * 
@@ -713,6 +653,11 @@ uint8_t LDL_MAC_mtu(const struct lora_mac *self);
  * 
  * */
 uint32_t LDL_MAC_timeSinceDownlink(struct lora_mac *self);
+
+/** Add a randomised dither to the next data transmit
+ * 
+ * */
+void LDL_MAC_setSendDither(struct lora_mac *self, uint8_t dither);
 
 #ifdef __cplusplus
 }

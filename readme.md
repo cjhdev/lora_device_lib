@@ -1,7 +1,7 @@
 LoraDeviceLib
 =============
 
-An experimental LoRaWAN 1.0.3 device implementation.
+An experimental LoRaWAN device implementation.
 
 [![Build Status](https://travis-ci.org/cjhdev/lora_device_lib.svg?branch=master)](https://travis-ci.org/cjhdev/lora_device_lib)
 
@@ -19,16 +19,14 @@ An experimental LoRaWAN 1.0.3 device implementation.
 
 ## Building
 
+- review [options](https://cjhdev.github.io/lora_device_lib_api/group__ldl__optional.html)
+- review [system interfaces](https://cjhdev.github.io/lora_device_lib_api/group__ldl__system.html)
 - add `include` folder to include search path
 - build all sources in `src`
-- if your toolchain doesn't support weak symbols you will need to omit `src/lora_system.c`
 
-## LoRaWAN Conformance
+## See Also
 
-This implementation has never been conformance tested since the test
-specification is not open.
-
-It should be more or less aligned to version 1.0.3 of the specification.
+- [LoRaMAC-Node](https://github.com/Lora-net/LoRaMac-node): Semtech reference implementation
 
 ## License
 

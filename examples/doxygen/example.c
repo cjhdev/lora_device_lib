@@ -39,10 +39,19 @@ int main(void)
      * 
      * - board connections
      * - radio type
-     * - power amplifier configuration
      *
      * */ 
     LDL_Radio_init(&radio, LORA_RADIO_SX1272, &board);
+    
+    /* This radio has two power amplifiers. The amplifier in use
+     * depends on the hardware (i.e. which pin the PCB traces connect).
+     * 
+     * You have to tell the driver which amplifier is connected:
+     * 
+     * - The Semtech MBED SX1272 shield uses LORA_RADIO_PA_RFO
+     * - The HopeRF RFM95 SX1276 module uses LORA_RADIO_PA_BOOST
+     * 
+     * */
     LDL_Radio_setPA(&radio, LORA_RADIO_PA_RFO);
 
     /* To initialise the mac layer you need:
@@ -54,10 +63,11 @@ int main(void)
      * */
     LDL_MAC_init(&mac, NULL, EU_863_870, &radio, app_handler);
 
-    /* - join if not joined
-     * - send 'hello world' if joined
-     * - do nothing if not ready (e.g. busy joining, busy sending, duty cycle limits)
-     * - run everything by polling LDL_MAC_process()
+    /* 
+     * - wait until MAC is ready to send
+     * - if not joined, initiate the join
+     * - if joined, send a message
+     * - run the MAC by polling LDL_MAC_process()
      * 
      * */
     while(true){

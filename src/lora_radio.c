@@ -485,7 +485,7 @@ static void setPower(struct lora_radio *self, int16_t dbm)
      * 
      * */
      
-     dbm /= 100U;
+     dbm /= 100L;
 
     switch(self->type){
 #ifdef LORA_ENABLE_SX1272        
@@ -493,7 +493,6 @@ static void setPower(struct lora_radio *self, int16_t dbm)
     {
         uint8_t paConfig;
         uint8_t paDac;    
-        uint8_t outputPower;
         
         paConfig = readReg(self->board, RegPaConfig);         
         paConfig &= ~(0xfU);
@@ -542,7 +541,6 @@ static void setPower(struct lora_radio *self, int16_t dbm)
     {
         uint8_t paConfig;
         uint8_t paDac;    
-        uint8_t outputPower;
         
         paConfig = readReg(self->board, RegPaConfig);         
         paConfig &= ~(0xfU);
@@ -561,6 +559,7 @@ static void setPower(struct lora_radio *self, int16_t dbm)
             paDac = readReg(self->board, 0x4d); 
                 
             paConfig |= 0x80U;
+            paConfig &= ~0x70U;
             paDac &= ~(7U);
 
             /* fixed 20dbm */
@@ -578,7 +577,7 @@ static void setPower(struct lora_radio *self, int16_t dbm)
             
             /* regpadac address == 0x4d */
             writeReg(self->board, 0x4d, paDac);
-            writeReg(self->board, RegPaConfig, paConfig);            
+            writeReg(self->board, RegPaConfig, paConfig);   
             break;
         default:
             break;        

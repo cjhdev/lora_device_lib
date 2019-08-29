@@ -1,7 +1,0 @@
-<map id="LDL" name="LDL">
-<area shape="rect" id="node2" href="$group__ldl__radio.html" title="Radio" alt="" coords="107,5,163,32"/>
-<area shape="rect" id="node3" href="$group__ldl__system.html" title="System interfaces. " alt="" coords="102,56,169,83"/>
-<area shape="rect" id="node4" href="$group__ldl__board.html" title="Board" alt="" coords="107,107,163,133"/>
-<area shape="rect" id="node5" href="$group__ldl__optional.html" title="Functions and macros which LDL depends on. " alt="" coords="100,157,171,184"/>
-<area shape="rect" id="node6" href="$group__ldl__mac.html" title="MAC" alt="" coords="109,208,161,235"/>
-</map>

@@ -104,6 +104,43 @@ uint8_t LDL_System_getBatteryLevel(void *app);
  * */
 uint8_t LDL_System_rand(void);
 
+/** How many ticks are there in one second for the time source
+ * 
+ * @return ticks per second
+ * 
+ * */
+uint32_t LDL_System_tps(void);
+
+/** XTAL error per second in ticks
+ * 
+ * For example, if an oscillator is accurate to +/1% of nominal:
+ * 
+ * @code
+ * 
+ * F_CPU := 8000000UL
+ * PRESCALE := 64UL
+ * ERROR := 0.01
+ * 
+ * # works out to 1250 ticks
+ * XTAL_ERROR := '( $(F_CPU) * $(ERROR) / $(PRESCALE) )'
+ * 
+ * @endcode
+ * 
+ * @return xtal error in ticks
+ * 
+ * */
+uint32_t LDL_System_eps(void);
+
+
+/** Advance schedule by this many ticks to compensate for delay
+ * in processing an interrupt
+ * 
+ * - advances RX1 and RX2 window schedule by so many system time ticks
+ * - this is likely to be negligible once XTAL error is accounted for
+ * 
+ * */
+uint32_t LDL_System_advance(void);
+
 /** Restore saved context
  * 
  * @note called only once during #LDL_MAC_init

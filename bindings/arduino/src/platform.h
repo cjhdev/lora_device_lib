@@ -30,24 +30,16 @@
 
 /* timing settings */
 
-/* +/- PPM (this value assumes a ceramic resonator) 
+/* +/- error as PPM
  * 
- * note. increase for less precise oscillators
+ * Assume a ceramic resonator has ~0.5% error, so
+ * 
+ * 16M * 0.005 = 80000
+ * 
+ * 80000 / 16 = 5000
  * 
  * */
-/* note that this works with more precise oscillators */
-#define XTAL_PPM (5000UL)
-
-/* RX1 and RX2 slot schedule will be advanced by this many system ticks */
-#define LORA_TICK_ADVANCE (116UL)
-
-/* timing *************************************************************/
-
-/* micros() */
-#define LORA_TICKS_PER_SECOND (1000000UL)
-
-/* XTAL PPM in system ticks */
-#define LORA_XTAL_ERROR ( (F_CPU / 1000000UL) * XTAL_PPM / (F_CPU / LORA_TICKS_PER_SECOND) )
+#define XTAL_PPM 5000
 
 /* optimisations ******************************************************/
 

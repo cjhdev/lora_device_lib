@@ -40,6 +40,23 @@ void LDL_System_getIdentity(void *receiver, struct lora_system_identity *value)
     ArduinoLDL::getIdentity(receiver, value);    
 }
 
+uint32_t LDL_System_tps(void)
+{
+    /* micros() */
+    return 1000000UL;
+}
+
+uint32_t LDL_System_advance(void)
+{
+    return 116UL;
+}
+
+uint32_t LDL_System_eps(void)
+{
+    /* since time source is 1MHz */
+    return XTAL_PPM;    
+}
+
 /* interrupt handlers *************************************************/
 
 ISR(PCINT0_vect){

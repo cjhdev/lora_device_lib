@@ -30,6 +30,9 @@ bool LDL_System_restoreContext(void *app, struct lora_mac_session *value) __attr
 void LDL_System_saveContext(void *app, const struct lora_mac_session *value) __attribute__((weak));
 void LDL_System_getIdentity(void *app, struct lora_system_identity *value) __attribute__((weak));
 uint32_t LDL_System_time(void) __attribute__((weak));
+uint32_t LDL_System_tps(void) __attribute__((weak));
+uint32_t LDL_System_eps(void) __attribute__((weak));
+uint32_t LDL_System_advance(void) __attribute__((weak));
 
 uint8_t LDL_System_rand(void)
 {
@@ -56,6 +59,21 @@ void LDL_System_getIdentity(void *app, struct lora_system_identity *value)
 }
 
 uint32_t LDL_System_time(void)
+{
+    return 0UL;
+}
+
+uint32_t LDL_System_tps(void)
+{
+    return 32768UL;
+}
+
+uint32_t LDL_System_eps(void)
+{
+    return 0UL;
+}
+
+uint32_t LDL_System_advance(void)
 {
     return 0UL;
 }

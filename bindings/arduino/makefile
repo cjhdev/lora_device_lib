@@ -47,14 +47,7 @@ output/arduino_ldl:
 
 build: $(EXAMPLES)
 
-build/arduino_ldl/examples/environment_sensor: output/arduino_ldl
-	@ echo building $@:
-	rm -rf $@
-	mkdir -p $@
-	$(ARDUINO) $(TOOLS) $(FQBN) -build-path $(abspath $@) $(HARDWARE) $(LIBS) $</$(patsubst build/arduino_ldl/%,%, $@)
-	@ echo
-
-build/arduino_ldl/examples/debug_node: output/arduino_ldl
+build/arduino_ldl/examples/%: output/arduino_ldl
 	@ echo building $@:
 	rm -rf $@
 	mkdir -p $@
