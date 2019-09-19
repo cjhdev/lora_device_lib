@@ -1287,7 +1287,16 @@ uint32_t LDL_MAC_timeSinceDownlink(struct lora_mac *self)
 
 void LDL_MAC_setSendDither(struct lora_mac *self, uint8_t dither)
 {
+    LORA_PEDANTIC(self != NULL)
+    
     self->tx_dither = dither;
+}
+
+void LDL_MAC_setAggregatedDutyCycleLimit(struct lora_mac *self, uint8_t limit)
+{
+    LORA_PEDANTIC(self != NULL)
+    
+    self->ctx.maxDutyCycle = limit & 0xfU;
 }
 
 /* static functions ***************************************************/
@@ -1431,8 +1440,12 @@ static bool dataCommand(struct lora_mac *self, bool confirmed, uint8_t port, con
         _random = LDL_System_rand();
         _random <<= 8;
         _random |= LDL_System_rand();
+        _random <<= 8;
+        _random |= LDL_System_rand();
+        _random <<= 8;
+        _random |= LDL_System_rand();
         
-        send_delay = (_random % (self->tx_dither*1000UL)) * (LDL_System_tps()/1000UL);
+        send_delay = (_random % ((uint32_t)self->tx_dither*LDL_System_tps()));
         
         self->tx_dither = 0U;
     }
@@ -1924,7 +1937,7 @@ static void registerTime(struct lora_mac *self, uint32_t freq, uint32_t airTime)
     if(self->ctx.maxDutyCycle > 0U){
         
         self->band_ready &= ~(1 << (LORA_EVENT_BAND_COMBINED - LORA_EVENT_BAND1));
-        LDL_Event_setTimer(&self->events, LORA_EVENT_BAND_COMBINED, ( airTime * ( 2U << (self->ctx.maxDutyCycle & 0xf))));
+        LDL_Event_setTimer(&self->events, LORA_EVENT_BAND_COMBINED, ( airTime * ( 1UL << (self->ctx.maxDutyCycle & 0xfU))));
     }
 }    
 
@@ -2068,31 +2081,27 @@ static uint32_t ticksUntilAvailable(const struct lora_mac *self, uint8_t chIndex
 
 static void restoreDefaults(struct lora_mac *self, bool keep)
 {
-    uint8_t rate = self->ctx.rate;
-    uint8_t power = self->ctx.power;
-    bool adr = self->ctx.adr;
-    
-    (void)memset(&self->ctx, 0, sizeof(self->ctx));
+    if(!keep){
+        
+        (void)memset(&self->ctx, 0, sizeof(self->ctx));
+        self->ctx.rate = LORA_DEFAULT_RATE;    
+        self->ctx.adr = true;        
+    }
+    else{
+        
+        self->ctx.up = 0U;
+        self->ctx.down = 0U;
+        (void)memset(self->ctx.chConfig, 0, sizeof(self->ctx.chConfig));
+        (void)memset(self->ctx.chMask, 0, sizeof(self->ctx.chMask));        
+        self->ctx.joined = false;        
+    }
     
     LDL_Region_getDefaultChannels(self->region, self, addDefaultChannel);    
     
-    self->ctx.rate = LORA_DEFAULT_RATE;
-    
     self->ctx.rx1DROffset = LDL_Region_getRX1Offset(self->region);
     self->ctx.rx1Delay = LDL_Region_getRX1Delay(self->region);
-    self->ctx.rx2Freq = LDL_Region_getRX2Freq(self->region);
     self->ctx.rx2DataRate = LDL_Region_getRX2Rate(self->region);
-    
-    self->ctx.adr = true;
-    
-    /* other fields are zero from the memset */
-    
-    if(keep){
-        
-        self->ctx.rate = rate;
-        self->ctx.power = power;
-        self->ctx.adr = adr;
-    } 
+    self->ctx.rx2Freq = LDL_Region_getRX2Freq(self->region);    
 }
 
 static bool getChannel(const struct lora_mac_channel *self, enum lora_region region, uint8_t chIndex, uint32_t *freq, uint8_t *minRate, uint8_t *maxRate)

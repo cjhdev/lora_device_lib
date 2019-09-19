@@ -70,7 +70,7 @@ struct lora_system_identity {
 
 /** Get system time (ticks)
  * 
- * @note system time must increment at a rate of #LORA_TICKS_PER_SECOND
+ * @note system time must increment at a rate of LDL_System_tps()
  * @warning this function must be implemented on target for correct operation
  * 
  * @return system time
@@ -104,7 +104,7 @@ uint8_t LDL_System_getBatteryLevel(void *app);
  * */
 uint8_t LDL_System_rand(void);
 
-/** How many ticks are there in one second for the time source
+/** The number of ticks in one second
  * 
  * @return ticks per second
  * 
@@ -136,7 +136,6 @@ uint32_t LDL_System_eps(void);
  * in processing an interrupt
  * 
  * - advances RX1 and RX2 window schedule by so many system time ticks
- * - this is likely to be negligible once XTAL error is accounted for
  * 
  * */
 uint32_t LDL_System_advance(void);

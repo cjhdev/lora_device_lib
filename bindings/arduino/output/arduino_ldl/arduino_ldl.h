@@ -32,6 +32,7 @@
 
 typedef void (*get_identity_fn)(struct lora_system_identity *id);
 typedef void (*handle_rx_fn)(uint16_t counter, uint8_t port, const uint8_t *msg, uint8_t size);
+typedef void (*handle_event_fn)(enum lora_mac_response_type type, const union lora_mac_response_arg *arg);
 
 class ArduinoLDL {
 
@@ -65,6 +66,7 @@ class ArduinoLDL {
         get_identity_fn get_id;
     
         handle_rx_fn handle_rx;
+        handle_event_fn handle_event;
         
         static void radio_select(void *reciever, bool state);
         static void radio_reset(void *reciever, bool state);
@@ -73,186 +75,40 @@ class ArduinoLDL {
         void arm_dio(struct DioInput *dio);
         void unmask_pcint(uint8_t pin);        
         static ArduinoLDL *to_obj(void *ptr);
-
-#ifndef DEBUG_LEVEL
-#define DEBUG_LEVEL 0
-#endif
-        
-        static void adapter(void *receiver, enum lora_mac_response_type type, const union lora_mac_response_arg *arg)
-        {
-            /* need to seed rand on startup */
-            if(type == LORA_MAC_STARTUP){
-
-                srand(arg->startup.entropy);                        
-            }
-
-            {
-                ArduinoLDL *self = to_obj(receiver);
-
-                if((type == LORA_MAC_RX) && (self->handle_rx != NULL)){
-                    
-                    self->handle_rx(arg->rx.counter, arg->rx.port, arg->rx.data, arg->rx.size);
-                }
-            }
-
-#if DEBUG_LEVEL > 0
-            
-            const char *bw125 PROGMEM = "125";
-            const char *bw250 PROGMEM = "250";
-            const char *bw500 PROGMEM = "500";
-            
-            const char *bw[] PROGMEM = {
-                bw125,
-                bw250,
-                bw500
-            };
-
-            Serial.print('[');
-            Serial.print(time());
-            Serial.print(']');
-            
-            switch(type){
-            case LORA_MAC_STARTUP:
-                Serial.print(F("STARTUP"));
-                break;            
-            case LORA_MAC_LINK_STATUS:
-                Serial.print(F("LINK_STATUS"));
-#if DEBUG_LEVEL > 1                
-                Serial.print(F(": M="));
-                Serial.print(arg->link_status.margin);
-                Serial.print(F(" GW="));
-                Serial.print(arg->link_status.gwCount);                
-#endif                
-                break;
-            case LORA_MAC_CHIP_ERROR:
-                Serial.print(F("CHIP_ERROR"));
-                break;            
-            case LORA_MAC_RESET:
-                Serial.print(F("RESET"));
-                break;            
-            case LORA_MAC_TX_BEGIN:
-                Serial.print(F("TX_BEGIN"));
-#if DEBUG_LEVEL > 1                                
-                Serial.print(F(": SZ="));
-                Serial.print(arg->tx_begin.size);
-                Serial.print(F(" F="));
-                Serial.print(arg->tx_begin.freq);
-                Serial.print(F(" SF="));
-                Serial.print((uint8_t)arg->tx_begin.sf);
-                Serial.print(F(" BW="));
-                Serial.print(bw[arg->tx_begin.bw]);                
-                Serial.print(F(" P="));
-                Serial.print(arg->tx_begin.power);
-#endif                
-                break;
-            case LORA_MAC_TX_COMPLETE:
-                Serial.print(F("TX_COMPLETE"));        
-                break;
-            case LORA_MAC_RX1_SLOT:
-            case LORA_MAC_RX2_SLOT:
-                Serial.print((type == LORA_MAC_RX1_SLOT) ? F("RX1_SLOT") : F("RX2_SLOT"));
-#if DEBUG_LEVEL > 1                
-                Serial.print(F(": F="));
-                Serial.print(arg->rx_slot.freq);
-                Serial.print(F(" SF="));
-                Serial.print((uint8_t)arg->rx_slot.sf);
-                Serial.print(F(" BW="));
-                Serial.print(bw[arg->rx_slot.bw]);                
-#endif                
-                break;
-            case LORA_MAC_DOWNSTREAM:
-                Serial.print(F("DOWNSTREAM"));
-#if DEBUG_LEVEL > 1                
-                Serial.print(F(": SZ="));
-                Serial.print(arg->downstream.size);
-                Serial.print(F(" RSSI="));
-                Serial.print(arg->downstream.rssi);
-                Serial.print(F(" SNR="));
-                Serial.print(arg->downstream.snr);                
-#endif                
-                break;
-            case LORA_MAC_JOIN_COMPLETE:
-                Serial.print(F("JOIN_COMPLETE"));
-                break;
-            case LORA_MAC_JOIN_TIMEOUT:
-                Serial.print(F("JOIN_TIMEOUT"));
-#if DEBUG_LEVEL > 1                
-                Serial.print(F(": RETRY_MS="));
-                Serial.print(arg->join_timeout.retry_ms);
-#endif                
-                break;
-            case LORA_MAC_RX:
-                Serial.print(F("RX"));
-#if DEBUG_LEVEL > 1                
-                Serial.print(F(": PORT="));
-                Serial.print(arg->rx.port);
-                Serial.print(F(" COUNT="));
-                Serial.print(arg->rx.counter);
-                Serial.print(F(" SZ="));
-                Serial.print(arg->rx.size);
-#endif                
-                break;
-            case LORA_MAC_DATA_COMPLETE:
-                Serial.print(F("DATA_COMPLETE"));
-                break;
-            case LORA_MAC_DATA_TIMEOUT:
-                Serial.print(F("DATA_TIMEOUT"));
-                break;
-            case LORA_MAC_DATA_NAK:
-                Serial.print(F("DATA_NAK"));
-                break;            
-            default:
-                break;
-            }        
-            
-            Serial.print('\n');
-#endif   
-
-        }
+        static void adapter(void *receiver, enum lora_mac_response_type type, const union lora_mac_response_arg *arg);
         
     public:
 
         ArduinoLDL(const ArduinoLDL&) = delete;
         void operator=(const ArduinoLDL&) = delete;
         
-        ArduinoLDL(get_identity_fn get_id, enum lora_region region, enum lora_radio_type radio_type, enum lora_radio_pa pa, uint8_t nreset, uint8_t nselect, uint8_t dio0, uint8_t dio1) :
-            dio0(dio0, 0, mac), dio1(dio1, 1, mac), nreset(nreset), nselect(nselect), get_id(get_id)
-        {
-            handle_rx = NULL;
-            
-            pinMode(nreset, INPUT);
-            pinMode(nselect, OUTPUT);
-            digitalWrite(nselect, HIGH);
-            
-            arm_dio(&this->dio0);
-            arm_dio(&this->dio1);
-            
-            SPI.begin();
-            
-            LDL_Board_init(&board,
-                this, 
-                radio_select, 
-                radio_reset,
-                radio_write,
-                radio_read
-            );
-            
-            LDL_Radio_init(&radio, radio_type, &board);
-            LDL_Radio_setPA(&radio, pa);
-            LDL_MAC_init(&mac, this, region, &radio, adapter);
-            
-            /* works for AVR only */
-            PCICR |= _BV(PCIE0) |_BV(PCIE1) |_BV(PCIE2);  
-        }
-        
         static void interrupt();
         static void getIdentity(void *ptr, struct lora_system_identity *value);
         static uint32_t time();        
-           
-        /* the API */
-           
+        
+        /* create an instance 
+         * 
+         * @param[in] get_id    this function will return the identity structure
+         * @param[in] region
+         * @param[in] radio_type
+         * @param[in] pa        which power amplifier is physically connected?
+         * @param[in] nreset    pin connected to the radio reset line
+         * @param[in] nselect   pin connected to the radio select line
+         * @param[in] dio0      pin connected to the radio dio0 line
+         * @param[in] dio1      pin connected to the radio dio0 line
+         * 
+         * */
+        ArduinoLDL(get_identity_fn get_id, enum lora_region region, enum lora_radio_type radio_type, enum lora_radio_pa pa, uint8_t nreset, uint8_t nselect, uint8_t dio0, uint8_t dio1);
+             
+        /* print event information to serial */
+        static void eventDebug(enum lora_mac_response_type type, const union lora_mac_response_arg *arg);
+        
+        /* print more event information to serial */
+        static void eventDebugVerbose(enum lora_mac_response_type type, const union lora_mac_response_arg *arg);
+             
         /* send unconfirmed data */
         bool unconfirmedData(uint8_t port, const void *data, uint8_t len);        
+        bool unconfirmedData(uint8_t port);        
         
         /* initiate join */
         bool otaa();     
@@ -263,36 +119,81 @@ class ArduinoLDL {
         /* cancel current operation */
         void cancel();
         
-        /* note. setting a rate will disable ADR */
+        /* manage data rate setting */
         bool setRate(uint8_t rate);
         uint8_t getRate();
         
-        /* note. setting power will disable ADR */
+        /* manage power setting */
         bool setPower(uint8_t power);        
         uint8_t getPower();
         
+        /* manage ADR (note. ADR is active by default) */
         void enableADR();
+        void disableADR();
         
         /* is ADR enabled? */
         bool adr();        
         
         /* get the last error code */
-        enum lora_mac_errno get_errno();                
+        enum lora_mac_errno getErrno();                
         
         /* is stack joined to a network? */
         bool joined();
         
-        /* is stack ready (i.e. not busy) */
+        /* is stack ready to send */
         bool ready();
         
+        /* current operation */
         enum lora_mac_operation getOP();
+        
+        /* current state */
         enum lora_mac_state getState();
         
         /* set a callback for receiving downstream data messages */
-        void on_rx(handle_rx_fn handler);
+        void onRX(handle_rx_fn handler);
+        
+        /* set a callback for handling any event 
+         * 
+         * note if you simply want to print event information
+         * you can use the 
+         * 
+         * */
+        void onEvent(handle_event_fn handler);
         
         /* call (repeatedly) to make stack work */
-        void process();        
+        void process();
+        
+        /* system ticks until next LDL event */
+        uint32_t ticksUntilNextEvent();        
+        
+        /* system ticks until next channel is available */
+        uint32_t ticksUntilNextChannel();              
+        
+        /* system ticks per second */  
+        uint32_t ticksPerSecond();
+        
+        /* system ticks per millisecond */  
+        uint32_t ticksPerMilliSecond();
+        
+        /* dither send time by (0..dither) seconds for next message 
+         * 
+         * note. this applies ONLY to the next message sent
+         * 
+         *  */
+        void setSendDither(uint8_t dither);
+        
+        /* Have LDL limit the aggregated duty cycle
+         * 
+         * This is useful for enforcing things like fair access policies
+         * that are more restrictive than region limit.
+         * 
+         * limit = 1 / (2 ^ limit) 
+         * 
+         * This is set to 12 by default
+         * 
+         * */
+        void setAggregatedDutyCycleLimit(uint8_t limit);
+     
 };
 
 #endif

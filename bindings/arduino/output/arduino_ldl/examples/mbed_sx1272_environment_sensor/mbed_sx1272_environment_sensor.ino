@@ -19,24 +19,19 @@
  *
  * */
 
-//#define DEBUG_LEVEL 2
-#include "arduino_ldl.h"
+#include <arduino_ldl.h>
 #include "src/Grove_Temperature_And_Humidity_Sensor/DHT.h"
 
 static void get_identity(struct lora_system_identity *id)
 {
     static const struct lora_system_identity _id = {
         .appEUI = {0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U},
-        .devEUI = {0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U},
+        .devEUI = {0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x01U},
         .appKey = {0x2bU,0x7eU,0x15U,0x16U,0x28U,0xaeU,0xd2U,0xa6U,0xabU,0xf7U,0x15U,0x88U,0x09U,0xcfU,0x4fU,0x3cU}
     };
     
     memcpy(id, &_id, sizeof(*id));
 }
-
-const uint32_t push_interval = 10UL*60UL*1000UL;
-bool push;
-uint32_t push_timer;
 
 ArduinoLDL& get_ldl()
 {
@@ -59,15 +54,7 @@ DHT dht(
     DHT11               /* sensor type */
 );
 
-bool expired(uint32_t to)
-{
-    uint32_t time = millis();    
-    uint32_t delta = (to <= time) ? (time - to) : (UINT32_MAX - to + time);
-    
-    return (delta <= INT32_MAX);
-}
-
-static void on_rx(uint32_t counter, uint8_t port, const uint8_t *data, uint8_t size)
+static void on_rx(uint16_t counter, uint8_t port, const uint8_t *data, uint8_t size)
 {
     // do something with this information
 }
@@ -79,34 +66,24 @@ void setup()
  
     ArduinoLDL& ldl = get_ldl();
 
-    ldl.on_rx(on_rx);
+    ldl.onRX(on_rx);
+    ldl.onEvent(ldl.eventDebug);
 }
 
 void loop() 
 {  
     ArduinoLDL& ldl = get_ldl();
     
-    if(expired(push_timer)){
-    
-        push = true;
-        push_timer = millis() + push_interval;
-    }
-    
     if(ldl.ready()){
     
         if(ldl.joined()){
+                
+            float buf[] = {
+                dht.readTemperature(),
+                dht.readHumidity()
+            };
             
-            if(push){
-                
-                float buf[] = {
-                    dht.readTemperature(),
-                    dht.readHumidity()
-                };
-                
-                ldl.unconfirmedData(1U, buf, sizeof(buf));
-                
-                push = false;
-            }
+            ldl.unconfirmedData(1U, buf, sizeof(buf));
         }
         else{
         

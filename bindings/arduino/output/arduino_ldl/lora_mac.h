@@ -641,7 +641,7 @@ void LDL_MAC_interrupt(struct lora_mac *self, uint8_t n, uint32_t time);
  * - rate
  * - pending mac commands
  * 
- * @param self[in]
+ * @param[in] self
  * @retval payload size in bytes
  * 
  * */
@@ -649,15 +649,37 @@ uint8_t LDL_MAC_mtu(const struct lora_mac *self);
 
 /** Seconds since last downlink message
  * 
+ * @param[in] self
  * @return seconds since last downlink
  * 
  * */
 uint32_t LDL_MAC_timeSinceDownlink(struct lora_mac *self);
 
-/** Add a randomised dither to the next data transmit
+/** Add (0..dither) seconds of randomisation to the time next message
+ * is sent
+ * 
+ * @note useful for ensuring devices that transmit periodically do
+ * not always transmit at the same time
+ * 
+ * @warning applies only to the next message sent
+ * 
+ * @param[in] self
+ * @param[in] dither (0..dither) seconds
  * 
  * */
 void LDL_MAC_setSendDither(struct lora_mac *self, uint8_t dither);
+
+/** Set the aggregated duty cycle limit
+ * 
+ * duty cycle limit = 1 / (2 ^ limit)
+ * 
+ * @note useful for meeting network imposed fair access policy
+ * 
+ * @param[in] self
+ * @param[limit] limit aggregated duty cycle limit
+ * 
+ * */
+void LDL_MAC_setAggregatedDutyCycleLimit(struct lora_mac *self, uint8_t limit);
 
 #ifdef __cplusplus
 }
