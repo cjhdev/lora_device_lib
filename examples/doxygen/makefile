@@ -14,18 +14,20 @@ INCLUDES += -I$(DIR_ROOT)/include
 
 CFLAGS += $(INCLUDES)
 
-CFLAGS += -DLORA_ENABLE_SX1272
-CFLAGS += -DLORA_ENABLE_SX1276
-CFLAGS += -DLORA_DISABLE_FULL_CODEC
-CFLAGS += -DLORA_ENABLE_EU_863_870
+CFLAGS += -DLDL_ENABLE_SX1272
+CFLAGS += -DLDL_ENABLE_SX1276
+CFLAGS += -DLDL_ENABLE_EU_863_870
+
+CLFAGS += -Wall
 
 example: $(addprefix $(DIR_BUILD)/, $(OBJ))
-	$(CC) $(CFLAGS) $^ -o $@
+#	$(CC) $(CFLAGS) $^ -o $@
 
 $(DIR_BUILD)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-
 clean:
 	@ echo cleaning up objects
 	@ rm -f $(DIR_BUILD)/*
+
+.PHONY: example

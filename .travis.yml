@@ -7,4 +7,5 @@ branches:
     - master
 script:
   - cd test && make build_and_run
+  - cd examples/doxygen && make example
   - $TRAVIS_BUILD_DIR/.travis-deploy.sh
