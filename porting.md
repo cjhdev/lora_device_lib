@@ -89,17 +89,17 @@ stop joinAccept from being accepted, but it will leave LDL open to replay attack
 
 The default cryptographic implementations can be replaced with hardened implementations.
 
-LDL depends on the following modes which are integrated within the default Security Module ([lora_sm.c](src/lora_sm.c)):
+LDL depends on the following modes which are integrated within the default Security Module ([ldl_sm.c](src/ldl_sm.c)):
 
-- AES128-ECB (default: [lora_aes.c](src/lora_aes.c))
-- AES128-CTR (default: [lora_ctr.c](src/lora_aes.c))
-- AES128-CMAC (default: [lora_cmac.c](src/lora_aes.c))
+- AES128-ECB (default: [lora_aes.c](src/ldl_aes.c))
+- AES128-CTR (default: [lora_ctr.c](src/ldl_aes.c))
+- AES128-CMAC (default: [lora_cmac.c](src/ldl_aes.c))
 
 If your toolchain supports weak symbols, replacing some or all of the
 default implementations is as simple as re-implementing the function
 somewhere else.
 
-If you don't want to use weak symbols, remove lora_sm.c
+If you don't want to use weak symbols, remove ldl_sm.c
 from the build and re-implement the whole thing somewhere else. 
 The same applies to situations where a more robust security 
 module (i.e. HSM) is required.
@@ -150,7 +150,7 @@ Flash memory usage can be reduced by:
 - not enabling radio drivers which are not needed
 - not enabling regions which are not needed
 - disabling unhandled events (LDL_DISABLE_*_EVENT)
-- modifying the default Security Module ([lora_sm.c](src/lora_sm.c)) to use a hardware peripheral 
+- modifying the default Security Module ([ldl_sm.c](src/ldl_sm.c)) to use a hardware peripheral 
 
 Static RAM usage can be reduced by:
 
