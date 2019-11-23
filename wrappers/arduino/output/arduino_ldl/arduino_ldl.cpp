@@ -138,7 +138,7 @@ MAC::MAC(Radio& radio, enum ldl_region region, get_identity_fn get_id) :
     
     get_id(&id);
     
-    LDL_SM_init(&sm, id.appKey, id.nwkKey);
+    LDL_SM_init(&sm, id.nwkKey, id.nwkKey);
     
     arg.app = this;
     arg.radio = &radio.radio;

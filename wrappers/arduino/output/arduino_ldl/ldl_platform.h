@@ -252,6 +252,40 @@
      * */
      #define LDL_ENABLE_RANDOM_DEV_NONCE
      #undef  LDL_ENABLE_RANDOM_DEV_NONCE
+     
+     /**
+      * Define to remove deviceTime MAC command handling
+      * 
+      * */
+     #define LDL_DISABLE_DEVICE_TIME
+     #undef LDL_DISABLE_DEVICE_TIME
+
+    /**
+     * Define to reduce maximum number of channels from 16 to 8.
+     * 
+     * The specification requires memory for up to 16 channels to 
+     * support regions with dynamic channels.
+     * 
+     * At time of writing most (all?) gateways only give 8 channels.
+     * This build option is useful for demonstrations that are short
+     * on memory since this will claw back at least 64B.
+     * 
+     * */
+    #define LDL_DISABLE_FULL_CHANNEL_CONFIG
+    #undef LDL_DISABLE_FULL_CHANNEL_CONFIG
+        
+    /**
+     * Define to remove full handling of the DlChannelReq/Ans MAC command.
+     * 
+     * LDL will continue to parse and respond to this but it won't
+     * do anything.
+     * 
+     * This is useful only if you are desperate to recover RAM and
+     * don't need this feature.
+     * 
+     * */
+     #define LDL_DISABLE_CMD_DL_CHANNEL
+     #undef LDL_DISABLE_CMD_DL_CHANNEL
 
 #endif
 

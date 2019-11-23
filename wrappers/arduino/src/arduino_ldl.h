@@ -36,8 +36,7 @@ struct arduino_ldl_id {
     
     uint8_t joinEUI[8U];
     uint8_t devEUI[8U];
-    uint8_t appKey[16U];    
-    uint8_t nwkKey[16U];    // note in LoRaWAN 1.0 this is is appKey
+    uint8_t nwkKey[16U];    // note in LoRaWAN 1.0 this is appKey
 };
 
 typedef void (*handle_rx_fn)(uint16_t counter, uint8_t port, const uint8_t *msg, uint8_t size);

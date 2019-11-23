@@ -50,9 +50,6 @@
  *  */
 #define LDL_STARTUP_DELAY 0UL
 
-#define LDL_DISABLE_SESSION_UPDATE
-#define LDL_ENABLE_RANDOM_DEV_NONCE
-
 /* optionally disable these event callbacks */
 //#define LDL_DISABLE_MAC_RESET_EVENT
 //#define LDL_DISABLE_CHIP_ERROR_EVENT
@@ -67,10 +64,15 @@
 //#define LDL_DISABLE_DATA_CONFIRMED_EVENT
 //#define LDL_DISABLE_RX_EVENT
 
-/* optionally disable link check */
-//#define LDL_DISABLE_CHECK
-
 /* do not change ******************************************************/
+
+#define LDL_DISABLE_SESSION_UPDATE
+#define LDL_ENABLE_RANDOM_DEV_NONCE
+#define LDL_ENABLE_STATIC_RX_BUFFER
+#define LDL_DISABLE_CHECK
+#define LDL_DISABLE_DEVICE_TIME
+#define LDL_DISABLE_FULL_CHANNEL_CONFIG
+#define LDL_DISABLE_CMD_DL_CHANNEL
 
 #define LDL_ENABLE_AVR
 #define LDL_SYSTEM_ENTER_CRITICAL(APP) ATOMIC_BLOCK(ATOMIC_RESTORESTATE){

@@ -42,18 +42,17 @@ enum {
 static uint8_t extraSymbols(uint32_t xtal_error, uint32_t symbol_period);
 static bool externalDataCommand(struct ldl_mac *self, bool confirmed, uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts);
 static bool dataCommand(struct ldl_mac *self, bool confirmed, uint8_t port, const void *data, uint8_t len);
-static uint8_t processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len, bool inFopts, uint8_t *out, uint8_t max);
 static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prevChIndex, uint32_t limit, uint8_t *chIndex, uint32_t *freq);
 static void registerTime(struct ldl_mac *self, uint32_t freq, uint32_t airTime);
-static bool getChannel(const struct ldl_mac_channel *self, enum ldl_region region, uint8_t chIndex, uint32_t *freq, uint8_t *minRate, uint8_t *maxRate);
+static bool getChannel(const struct ldl_mac *self, uint8_t chIndex, uint32_t *freq, uint8_t *minRate, uint8_t *maxRate);
 static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rate, uint32_t limit);
 static uint32_t transmitTime(enum ldl_signal_bandwidth bw, enum ldl_spreading_factor sf, uint8_t size, bool crc);
 static void restoreDefaults(struct ldl_mac *self, bool keep);
-static bool setChannel(struct ldl_mac_channel *self, enum ldl_region region, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate);
-static bool maskChannel(uint8_t *self, enum ldl_region region, uint8_t chIndex);
-static bool unmaskChannel(uint8_t *self, enum ldl_region region, uint8_t chIndex);
-static void unmaskAllChannels(uint8_t *self, enum ldl_region region);
-static bool channelIsMasked(const uint8_t *self, enum ldl_region region, uint8_t chIndex);
+static bool setChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate);
+static bool maskChannel(uint8_t *mask, uint8_t max, enum ldl_region region, uint8_t chIndex);
+static bool unmaskChannel(uint8_t *mask, uint8_t max, enum ldl_region region, uint8_t chIndex);
+static void unmaskAllChannels(uint8_t *mask, uint8_t max);
+static bool channelIsMasked(const uint8_t *mask, uint8_t max, enum ldl_region region, uint8_t chIndex);
 static uint32_t symbolPeriod(enum ldl_spreading_factor sf, enum ldl_signal_bandwidth bw);
 static bool msUntilAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rate, uint32_t *ms);
 static bool rateSettingIsValid(enum ldl_region region, uint8_t rate);
@@ -644,6 +643,9 @@ void LDL_MAC_process(struct ldl_mac *self)
             struct ldl_radio_packet_metadata meta;            
             uint8_t cmd_len = 0U;
             
+            const uint8_t *fopts;
+            uint8_t foptsLen;
+            
             LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
             LDL_MAC_timerClear(self, LDL_TIMER_WAITB);
             
@@ -721,12 +723,22 @@ void LDL_MAC_process(struct ldl_mac *self)
                     self->dlChannelAns_pending = false;
                     self->rxtimingSetupAns_pending = false;
                     self->adrAckReq = false;
+                        
+                    fopts = frame.opts;
+                    foptsLen = frame.optsLen;
                                         
-                    if(frame.data != NULL){
-            
-                        if(frame.port > 0U){
-
-                            cmd_len = processCommands(self, frame.opts, frame.optsLen, true, buffer, LDL_MAX_PACKET);      
+                    if((frame.data != NULL) && (frame.port == 0U)){
+                    
+                        if(frame.port == 0U){
+                    
+                            fopts = frame.data;
+                            foptsLen = frame.dataLen;                        
+                        }
+                        else{
+                            
+                            /* this MUST come before processing MAC commands
+                             * because the MAC command response will clobber
+                             * the RX buffer (i.e. what frame.data points to) */
 #ifndef LDL_DISABLE_RX_EVENT                                            
                             arg.rx.counter = frame.counter;
                             arg.rx.port = frame.port;
@@ -734,18 +746,486 @@ void LDL_MAC_process(struct ldl_mac *self)
                             arg.rx.size = frame.dataLen;                                            
                             
                             self->handler(self->app, LDL_MAC_RX, &arg);                                        
-#endif                                                                                        
-                        }
-                        else{
-                        
-                            cmd_len = processCommands(self, frame.data, frame.dataLen, false, buffer, LDL_MAX_PACKET);                                              
+#endif                                                   
                         }
                     }
-                    else{
+                    
+                    /* Process MAC commands
+                     * 
+                     * This MUST come after handling LDL_MAC_RX or else
+                     * you will clobber the RX buffer with the MAC response.
+                     * 
+                     * Yes it seems crazy to dump this here instead
+                     * of shifting it to a static function. Trying this
+                     * out because constrained targets are running
+                     * out of stack.
+                     * 
+                     * */
+                    if(foptsLen > 0U){
                         
-                        cmd_len = processCommands(self, frame.opts, frame.optsLen, true, buffer, LDL_MAX_PACKET);      
-                    }
+                        uint8_t pos = 0U;
+                        
+                        struct ldl_stream s_in;
+                        struct ldl_stream s_out;
+                        
+                        /* rollback cache */
+                        uint8_t chMask[sizeof(self->ctx.chMask)];
+                        uint8_t nbTrans;
+                        uint8_t power;
+                        uint8_t rate;
+                        
+                        struct ldl_downstream_cmd cmd;                                                
+                        enum ldl_mac_cmd_type next_cmd;
+                        
+                        enum {
+                            
+                            _NO_ADR,
+                            _ADR_OK,
+                            _ADR_BAD
+                            
+                        } adr_state = _NO_ADR;
+                        
+                        /* these things can be rolled back */
+                        nbTrans = self->ctx.nbTrans;
+                        power = self->ctx.power;
+                        rate = self->ctx.rate;
+                        (void)memcpy(&chMask, self->ctx.chMask, sizeof(chMask));
+                        
+                        LDL_Stream_initReadOnly(&s_in, fopts, foptsLen);
+                        LDL_Stream_init(&s_out, buffer, LDL_MAX_PACKET);
+                        
+                        /* this is up here because adr may be spread over
+                         * multiple commands */
+                        struct ldl_link_adr_ans adr_ans;
+                        
+                        adr_ans.channelMaskOK = true;
+                        
+                        while(LDL_MAC_getDownCommand(&s_in, &cmd)){
+                            
+                            /* we use this position to ensure only whole
+                             * MAC responses are sent */
+                            pos = LDL_Stream_tell(&s_out);
+                            
+                            switch(cmd.type){
+                            default:
+                                LDL_DEBUG(self->app, "not handling type %u", cmd.type)
+                                break;     
+#ifndef LDL_DISABLE_CHECK                                   
+                            case LDL_CMD_LINK_CHECK:    
+                            {                
+                                const struct ldl_link_check_ans *ans = &cmd.fields.linkCheck;
+                                
+                                arg.link_status.margin = ans->margin;
+                                arg.link_status.gwCount = ans->gwCount;            
+                                
+                                LDL_DEBUG(self->app, "link_check_ans: margin=%u gwCount=%u", 
+                                    ans->margin,
+                                    ans->gwCount             
+                                )
+                                
+                                self->handler(self->app, LDL_MAC_LINK_STATUS, &arg);                                                             
+                            }
+                                break;
+#endif                            
+                            case LDL_CMD_LINK_ADR:              
+                            {
+                                const struct ldl_link_adr_req *req = &cmd.fields.linkADR;
+                                
+                                LDL_DEBUG(self->app, "link_adr_req: dataRate=%u txPower=%u chMask=%04x chMaskCntl=%u nbTrans=%u",
+                                    req->dataRate, req->txPower, req->channelMask, req->channelMaskControl, req->nbTrans)
+                                
+                                uint8_t i;
+                                
+                                if(LDL_Region_isDynamic(self->region)){
+                                    
+                                    switch(req->channelMaskControl){
+                                    case 0U:
+                                    
+                                        /* mask/unmask channels 0..15 */
+                                        for(i=0U; i < (sizeof(req->channelMask)*8U); i++){
+                                            
+                                            if((req->channelMask & (1U << i)) > 0U){
+                                                
+                                                (void)unmaskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->region, i);
+                                            }
+                                            else{
+                                                
+                                                (void)maskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->region, i);
+                                            }
+                                        }
+                                        break;            
+                                        
+                                    case 6U:
+                                    
+                                        unmaskAllChannels(self->ctx.chMask, sizeof(self->ctx.chMask));
+                                        break;           
+                                         
+                                    default:
+                                        adr_ans.channelMaskOK = false;
+                                        break;
+                                    }
+                                }
+                                else{
+                                    
+                                    switch(req->channelMaskControl){
+                                    case 6U:     /* all 125KHz on */
+                                    case 7U:     /* all 125KHz off */
+                                    
+                                        /* fixme: there is probably a more robust way to do this...right
+                                         * now we only support US and AU fixed channel plans so this works.
+                                         * */
+                                        for(i=0U; i < 64U; i++){
+                                            
+                                            if(req->channelMaskControl == 6U){
+                                                
+                                                (void)unmaskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->region, i);
+                                            }
+                                            else{
+                                                
+                                                (void)maskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->region, i);
+                                            }            
+                                        }                                  
+                                        break;
+                                        
+                                    default:
+                                        
+                                        for(i=0U; i < (sizeof(req->channelMask)*8U); i++){
+                                            
+                                            if((req->channelMask & (1U << i)) > 0U){
+                                                
+                                                (void)unmaskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->region, (req->channelMaskControl * 16U) + i);
+                                            }
+                                            else{
+                                                
+                                                (void)maskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->region, (req->channelMaskControl * 16U) + i);
+                                            }
+                                        }
+                                        break;
+                                    }            
+                                }
+                                
+                                if(!LDL_MAC_peekNextCommand(&s_in, &next_cmd) || (next_cmd != LDL_CMD_LINK_ADR)){
+                                 
+                                    adr_ans.dataRateOK = true;
+                                    adr_ans.powerOK = true;
+                                 
+                                    /* nbTrans setting 0 means keep existing */
+                                    if(req->nbTrans > 0U){
+                                    
+                                        self->ctx.nbTrans = req->nbTrans & 0xfU;
+                                        
+                                        if(self->ctx.nbTrans > LDL_REDUNDANCY_MAX){
+                                            
+                                            self->ctx.nbTrans = LDL_REDUNDANCY_MAX;
+                                        }
+                                    }
+                                    
+                                    /* ignore rate setting 16 */
+                                    if(req->dataRate < 0xfU){            
+                                        
+                                        // todo: need to pin out of range to maximum
+                                        if(rateSettingIsValid(self->region, req->dataRate)){
+                                        
+                                            self->ctx.rate = req->dataRate;            
+                                        }
+                                        else{
+                                                            
+                                            adr_ans.dataRateOK = false;
+                                        }
+                                    }
+                                    
+                                    /* ignore power setting 16 */
+                                    if(req->txPower < 0xfU){            
+                                        
+                                        if(LDL_Region_validateTXPower(self->region, req->txPower)){
+                                        
+                                            self->ctx.power = req->txPower;        
+                                        }
+                                        else{
+                                         
+                                            adr_ans.powerOK = false;
+                                        }        
+                                    }   
+                                 
+                                    if(adr_ans.dataRateOK && adr_ans.powerOK && adr_ans.channelMaskOK){
+                                        
+                                        adr_state = _ADR_OK;
+                                    }
+                                    else{
+                                        
+                                        adr_state = _ADR_BAD;
+                                    }
+                                   
+                                 
+                                    LDL_DEBUG(self->app, "link_adr_ans: powerOK=%s dataRateOK=%s channelMaskOK=%s",
+                                        adr_ans.dataRateOK ? "true" : "false", 
+                                        adr_ans.powerOK ? "true" : "false", 
+                                        adr_ans.channelMaskOK ? "true" : "false"
+                                    )
+                                 
+                                    LDL_MAC_putLinkADRAns(&s_out, &adr_ans);
+                                }                
+                                
+                            }
+                                break;
+                            
+                            case LDL_CMD_DUTY_CYCLE:
+                            {    
+                                const struct ldl_duty_cycle_req *req = &cmd.fields.dutyCycle;
+                                
+                                LDL_DEBUG(self->app, "duty_cycle_req: %u", req->maxDutyCycle)
+                            
+                                LDL_DEBUG(self->app, "duty_cycle_ans")
+                                
+                                self->ctx.maxDutyCycle = req->maxDutyCycle;                        
+                                LDL_MAC_putDutyCycleAns(&s_out);
+                            }
+                                break;
+                            
+                            case LDL_CMD_RX_PARAM_SETUP:     
+                            {
+                                const struct ldl_rx_param_setup_req *req = &cmd.fields.rxParamSetup;
+                                struct ldl_rx_param_setup_ans ans;
+                             
+                                LDL_DEBUG(self->app, "rx_param_setup_req: rx1DROffset=%u rx2DataRate=%u freq=%"PRIu32,
+                                    req->rx1DROffset,
+                                    req->rx2DataRate,
+                                    req->freq
+                                )
+                                
+                                // todo: validation
+                                
+                                self->ctx.rx1DROffset = req->rx1DROffset;
+                                self->ctx.rx2DataRate = req->rx2DataRate;
+                                self->ctx.rx2Freq = req->freq;
+                                
+                                ans.rx1DROffsetOK = true;
+                                ans.rx2DataRateOK = true;
+                                ans.channelOK = true;       
+                                
+                                LDL_DEBUG(self->app, "rx_param_setup_ans: rx1DROffsetOK=%s rx2DataRate=%s rx2Freq=%s",                
+                                    ans.rx1DROffsetOK ? "true" : "false",
+                                    ans.rx2DataRateOK ? "true" : "false",
+                                    ans.channelOK ? "true" : "false"       
+                                )
+                                
+                                LDL_MAC_putRXParamSetupAns(&s_out, &ans);
+                            }
+                                break;
+                            
+                            case LDL_CMD_DEV_STATUS:
+                            {
+                                LDL_DEBUG(self->app, "dev_status_req")
+                                struct ldl_dev_status_ans ans;        
+                                
+                                ans.battery = LDL_System_getBatteryLevel(self->app);
+                                ans.margin = (int8_t)self->margin;
+                                
+                                LDL_DEBUG(self->app, "dev_status_ans: battery=%u margin=%u",
+                                    ans.battery,
+                                    ans.margin
+                                )
+                                 
+                                LDL_MAC_putDevStatusAns(&s_out, &ans);
+                            }
+                                break;
+                                
+                            case LDL_CMD_NEW_CHANNEL:    
+                                        
+                                LDL_DEBUG(self->app, "new_channel_req: chIndex=%u freq=%"PRIu32" maxDR=%u minDR=%u",
+                                    cmd.fields.newChannel.chIndex,
+                                    cmd.fields.newChannel.freq,
+                                    cmd.fields.newChannel.maxDR,
+                                    cmd.fields.newChannel.minDR
+                                )
+                            
+                                if(LDL_Region_isDynamic(self->region)){
+                                
+                                    struct ldl_new_channel_ans ans;
+                                
+                                    ans.dataRateRangeOK = LDL_Region_validateRate(self->region, cmd.fields.newChannel.chIndex, cmd.fields.newChannel.minDR, cmd.fields.newChannel.maxDR);        
+                                    ans.channelFreqOK = LDL_Region_validateFreq(self->region, cmd.fields.newChannel.chIndex, cmd.fields.newChannel.freq);
+                                    
+                                    if(ans.dataRateRangeOK && ans.channelFreqOK){
+                                        
+                                        (void)setChannel(self, cmd.fields.newChannel.chIndex, cmd.fields.newChannel.freq, cmd.fields.newChannel.minDR, cmd.fields.newChannel.maxDR);                        
+                                    }            
+                                 
+                                    LDL_DEBUG(self->app, "new_channel_ans: dataRateRangeOK=%s channelFreqOK=%s", 
+                                        ans.dataRateRangeOK ? "true" : "false",
+                                        ans.channelFreqOK ? "true" : "false"
+                                    )
+                                    
+                                    LDL_MAC_putNewChannelAns(&s_out, &ans);
+                                }
+                                else{
+                                    
+                                    LDL_DEBUG(self->app, "new_channel_req not processed in this region")                
+                                }
+                                break; 
+                                       
+                            case LDL_CMD_DL_CHANNEL:            
+                                
+                                LDL_DEBUG(self->app, "dl_channel_req: chIndex=%u freq=%"PRIu32,
+                                    cmd.fields.dlChannel.chIndex,
+                                    cmd.fields.dlChannel.freq
+                                )
 
+                                if(LDL_Region_isDynamic(self->region)){
+
+                                    struct ldl_dl_channel_ans ans;
+                                    
+#ifdef LDL_DISABLE_CMD_DL_CHANNEL                            
+                                    ans.uplinkFreqOK = false;
+                                    ans.channelFreqOK = false;
+#else
+                                    ans.uplinkFreqOK = true;
+                                    ans.channelFreqOK = LDL_Region_validateFreq(self->region, cmd.fields.dlChannel.chIndex, cmd.fields.dlChannel.freq);
+                                    
+                                    LDL_DEBUG(self->app, "dl_channel_ans: uplinkFreqOK=%s channelFreqOK=%s",
+                                        ans.uplinkFreqOK ? "true" : "false",
+                                        ans.channelFreqOK ? "true" : "false"
+                                    )
+#endif                
+                                    LDL_MAC_putDLChannelAns(&s_out, &ans);            
+                                }
+                                else{
+                                    
+                                    LDL_DEBUG(self->app, "dl_channel_req not processed in this region")                
+                                }
+                                break;
+                            
+                            case LDL_CMD_RX_TIMING_SETUP:
+                            {        
+                                LDL_DEBUG(self->app, "rx_timing_setup_req: delay=%u",
+                                    cmd.fields.rxTimingSetup.delay
+                                )
+                                
+                                self->ctx.rx1Delay = cmd.fields.rxTimingSetup.delay;
+                                
+                                LDL_DEBUG(self->app, "rx_timing_setup_ans")
+                                
+                                LDL_MAC_putRXTimingSetupAns(&s_out);
+                            }
+                                break;
+                            
+                            case LDL_CMD_TX_PARAM_SETUP:        
+                                             
+                                LDL_DEBUG(self->app, "tx_param_setup_req: downlinkDwellTime=%s uplinkDwellTime=%s maxEIRP=%u",
+                                    cmd.fields.txParamSetup.downlinkDwell ? "true" : "false",
+                                    cmd.fields.txParamSetup.uplinkDwell ? "true" : "false",
+                                    cmd.fields.txParamSetup.maxEIRP
+                                )    
+                            
+                                if(LDL_Region_isDynamic(self->region)){
+                                    
+                                    LDL_DEBUG(self->app, "tx_param_setup_ans")
+                                }
+                                else{
+                                    
+                                    LDL_DEBUG(self->app, "tx_param_setup_req not processed in this region")
+                                }
+                                break;
+                             
+#ifndef LDL_DISABLE_DEVICE_TIME
+                            case LDL_CMD_DEVICE_TIME:
+                            {
+                                arg.device_time.seconds = cmd.fields.deviceTime.seconds;
+                                arg.device_time.fractions = cmd.fields.deviceTime.fractions;
+                                
+                                LDL_DEBUG(self->app, "device_time_ans: seconds=%"PRIu32" fractions=%u", 
+                                    arg.device_time.seconds,
+                                    arg.device_time.fractions             
+                                )
+                                
+                                self->handler(self->app, LDL_MAC_DEVICE_TIME, &arg);                                                                                     
+                            }
+                                break;
+#endif            
+                            case LDL_CMD_ADR_PARAM_SETUP:
+                            
+                                LDL_DEBUG(self->app, "adr_param_setup: limit_exp=%u delay_exp=%u", 
+                                    cmd.fields.adrParamSetup.limit_exp,
+                                    cmd.fields.adrParamSetup.delay_exp        
+                                )
+                                
+                                self->ctx.adr_ack_limit = (1U << cmd.fields.adrParamSetup.limit_exp);
+                                self->ctx.adr_ack_delay = (1U << cmd.fields.adrParamSetup.delay_exp);
+                                
+                                LDL_DEBUG(self->app, "adr_param_ans")
+                                
+                                LDL_MAC_putADRParamSetupAns(&s_out);
+                                break;
+                                
+                            case LDL_CMD_REKEY:
+                            
+                                LDL_DEBUG(self->app, "rekey_conf: version=%u", cmd.fields.rekey.version)
+                            
+                                /* The server version must be greater than 0 (0 is not allowed), and smaller or equal (<=) to the
+                                 * device’s LoRaWAN version. Therefore for a LoRaWAN1.1 device the only valid value is 1. If
+                                 * the server’s version is invalid the device SHALL discard the RekeyConf command and
+                                 * retransmit the RekeyInd in the next uplink frame */
+                                if(cmd.fields.rekey.version == 1U){
+                                    
+                                    self->rekeyConf_pending = false;
+                                }
+                                break;
+                                
+                            case LDL_CMD_FORCE_REJOIN:
+                                    
+                                LDL_DEBUG(self->app, "force_rejoin_req: max_retries=%u rejoin_type=%u period=% dr=%u",
+                                    cmd.fields.forceRejoin.max_retries,
+                                    cmd.fields.forceRejoin.rejoin_type,
+                                    cmd.fields.forceRejoin.period,
+                                    cmd.fields.forceRejoin.dr
+                                )
+                            
+                                /* no reply - you are meant to start doing a rejoin */
+                                    
+                                break;
+                                
+                            case LDL_CMD_REJOIN_PARAM_SETUP:
+                            
+                                LDL_DEBUG(self->app, "rejoin_param_setup_req: maxTimeN=%u maxCountN=%u",
+                                    cmd.fields.rejoinParamSetup.maxTimeN,
+                                    cmd.fields.rejoinParamSetup.maxCountN
+                                )
+                                
+                                {
+                                    struct ldl_rejoin_param_setup_ans ans;
+                                    ans.timeOK = false;
+                                    
+                                    LDL_DEBUG(self->app, "rejoin_param_setup_ans: timeOK=%s", ans.timeOK ? "true" : "false")
+                                    
+                                    LDL_MAC_putRejoinParamSetupAns(&s_out, &ans);
+                                }
+                            
+                                break;        
+                            }
+                            
+                            /* this ensures the output stream doesn't contain part of a MAC command */
+                            if(LDL_Stream_error(&s_out)){
+                                
+                                (void)LDL_Stream_seekSet(&s_out, pos);
+                            }        
+                        }
+                        
+                        /* roll back ADR request if not successful */
+                        if(adr_state == _ADR_BAD){
+                            
+                            LDL_DEBUG(self->app, "bad ADR setting; rollback")
+                            
+                            (void)memcpy(self->ctx.chMask, chMask, sizeof(self->ctx.chMask));
+                            
+                            self->ctx.rate = rate;
+                            self->ctx.power = power;
+                            self->ctx.nbTrans = nbTrans;
+                        }
+
+                        /* return the length of data written to the output buffer */
+                        cmd_len = LDL_Stream_tell(&s_out);
+                    }
+                    
                     switch(self->op){
                     default:
                     case LDL_OP_DATA_UNCONFIRMED:
@@ -1205,21 +1685,21 @@ bool LDL_MAC_addChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, ui
     
     LDL_DEBUG(self->app, "adding chIndex=%u freq=%"PRIu32" minRate=%u maxRate=%u", chIndex, freq, minRate, maxRate)
     
-    return setChannel(self->ctx.chConfig, self->region, chIndex, freq, minRate, maxRate);
+    return setChannel(self, chIndex, freq, minRate, maxRate);
 }
 
 bool LDL_MAC_maskChannel(struct ldl_mac *self, uint8_t chIndex)
 {
     LDL_PEDANTIC(self != NULL)
     
-    return maskChannel(self->ctx.chMask, self->region, chIndex);
+    return maskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->region, chIndex);
 }
 
 bool LDL_MAC_unmaskChannel(struct ldl_mac *self, uint8_t chIndex)
 {
     LDL_PEDANTIC(self != NULL)
     
-    return unmaskChannel(self->ctx.chMask, self->region, chIndex);
+    return unmaskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->region, chIndex);
 }
 
 void LDL_MAC_timerSet(struct ldl_mac *self, enum ldl_timer_inst timer, uint32_t timeout)
@@ -1535,15 +2015,19 @@ static bool dataCommand(struct ldl_mac *self, bool confirmed, uint8_t port, cons
         LDL_MAC_putRXParamSetupAns(&s, &ans);                                    
     }
     
+#ifndef LDL_DISABLE_CHECK    
     if(self->opts.check){
 
         LDL_MAC_putLinkCheckReq(&s);
     }                   
+#endif    
     
+#ifndef LDL_DISABLE_DEVICE_TIME    
     if(self->opts.getTime){
         
         LDL_MAC_putDeviceTimeReq(&s);
     }             
+#endif    
     
     LDL_Region_convertRate(self->region, self->tx.rate, &sf, &bw, &maxPayload);
     
@@ -1638,7 +2122,7 @@ static void adaptRate(struct ldl_mac *self)
                                 
                                 LDL_DEBUG(self->app, "adr: all channels unmasked")
                                 
-                                unmaskAllChannels(self->ctx.chMask, self->region);
+                                unmaskAllChannels(self->ctx.chMask, sizeof(self->ctx.chMask));
                                 
                                 self->adrAckCounter = UINT8_MAX;
                             }
@@ -1723,460 +2207,6 @@ static uint8_t extraSymbols(uint32_t xtal_error, uint32_t symbol_period)
     return (xtal_error / symbol_period) + (((xtal_error % symbol_period) > 0U) ? 1U : 0U);        
 }
 
-static uint8_t processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len, bool inFopts, uint8_t *out, uint8_t max)
-{
-    uint8_t pos = 0U;
-    
-    struct ldl_stream s_in;
-    struct ldl_stream s_out;
-    
-    struct ldl_downstream_cmd cmd;
-    struct ldl_mac_session shadow;
-    union ldl_mac_response_arg arg;
-    struct ldl_link_adr_ans adr_ans;
-    enum ldl_mac_cmd_type next_cmd;
-    
-    enum {
-        
-        _NO_ADR,
-        _ADR_OK,
-        _ADR_BAD
-        
-    } adr_state = _NO_ADR;
-    
-    (void)memset(&adr_ans, 0, sizeof(adr_ans));
-    (void)memcpy(&shadow, &self->ctx, sizeof(shadow));
-
-    LDL_Stream_initReadOnly(&s_in, in, len);
-    LDL_Stream_init(&s_out, out, max);
-    
-    adr_ans.channelMaskOK = true;
-    
-    while(LDL_MAC_getDownCommand(&s_in, &cmd)){
-        
-        /* save the position in case the output buffer becomes
-         * full partway through outputting a command */
-        pos = LDL_Stream_tell(&s_out);
-        
-        switch(cmd.type){
-        default:
-            LDL_DEBUG(self->app, "could not parse")
-            break;     
-#ifndef LDL_DISABLE_CHECK                                   
-        case LDL_CMD_LINK_CHECK:    
-        {                
-            const struct ldl_link_check_ans *ans = &cmd.fields.linkCheck;
-            
-            arg.link_status.inFOpt = inFopts;
-            arg.link_status.margin = ans->margin;
-            arg.link_status.gwCount = ans->gwCount;            
-            
-            LDL_DEBUG(self->app, "link_check_ans: margin=%u gwCount=%u", 
-                ans->margin,
-                ans->gwCount             
-            )
-            
-            self->handler(self->app, LDL_MAC_LINK_STATUS, &arg);                                                             
-        }
-            break;
-#endif                            
-
-        case LDL_CMD_LINK_ADR:              
-        {
-            const struct ldl_link_adr_req *req = &cmd.fields.linkADR;
-            
-            LDL_DEBUG(self->app, "link_adr_req: dataRate=%u txPower=%u chMask=%04x chMaskCntl=%u nbTrans=%u",
-                req->dataRate, req->txPower, req->channelMask, req->channelMaskControl, req->nbTrans)
-            
-            uint8_t i;
-            
-            if(LDL_Region_isDynamic(self->region)){
-                
-                switch(req->channelMaskControl){
-                case 0U:
-                
-                    /* mask/unmask channels 0..15 */
-                    for(i=0U; i < (sizeof(req->channelMask)*8U); i++){
-                        
-                        if((req->channelMask & (1U << i)) > 0U){
-                            
-                            (void)unmaskChannel(shadow.chMask, self->region, i);
-                        }
-                        else{
-                            
-                            (void)maskChannel(shadow.chMask, self->region, i);
-                        }
-                    }
-                    break;            
-                    
-                case 6U:
-                
-                    unmaskAllChannels(shadow.chMask, self->region);
-                    break;           
-                     
-                default:
-                    adr_ans.channelMaskOK = false;
-                    break;
-                }
-            }
-            else{
-                
-                switch(req->channelMaskControl){
-                case 6U:     /* all 125KHz on */
-                case 7U:     /* all 125KHz off */
-                
-                    /* fixme: there is probably a more robust way to do this...right
-                     * now we only support US and AU fixed channel plans so this works.
-                     * */
-                    for(i=0U; i < 64U; i++){
-                        
-                        if(req->channelMaskControl == 6U){
-                            
-                            (void)unmaskChannel(shadow.chMask, self->region, i);
-                        }
-                        else{
-                            
-                            (void)maskChannel(shadow.chMask, self->region, i);
-                        }            
-                    }                                  
-                    break;
-                    
-                default:
-                    
-                    for(i=0U; i < (sizeof(req->channelMask)*8U); i++){
-                        
-                        if((req->channelMask & (1U << i)) > 0U){
-                            
-                            (void)unmaskChannel(shadow.chMask, self->region, (req->channelMaskControl * 16U) + i);
-                        }
-                        else{
-                            
-                            (void)maskChannel(shadow.chMask, self->region, (req->channelMaskControl * 16U) + i);
-                        }
-                    }
-                    break;
-                }            
-            }
-            
-            if(!LDL_MAC_peekNextCommand(&s_in, &next_cmd) || (next_cmd != LDL_CMD_LINK_ADR)){
-             
-                adr_ans.dataRateOK = true;
-                adr_ans.powerOK = true;
-             
-                /* nbTrans setting 0 means keep existing */
-                if(req->nbTrans > 0U){
-                
-                    shadow.nbTrans = req->nbTrans & 0xfU;
-                    
-                    if(shadow.nbTrans > LDL_REDUNDANCY_MAX){
-                        
-                        shadow.nbTrans = LDL_REDUNDANCY_MAX;
-                    }
-                }
-                
-                /* ignore rate setting 16 */
-                if(req->dataRate < 0xfU){            
-                    
-                    // todo: need to pin out of range to maximum
-                    if(rateSettingIsValid(self->region, req->dataRate)){
-                    
-                        shadow.rate = req->dataRate;            
-                    }
-                    else{
-                                        
-                        adr_ans.dataRateOK = false;
-                    }
-                }
-                
-                /* ignore power setting 16 */
-                if(req->txPower < 0xfU){            
-                    
-                    if(LDL_Region_validateTXPower(self->region, req->txPower)){
-                    
-                        shadow.power = req->txPower;        
-                    }
-                    else{
-                     
-                        adr_ans.powerOK = false;
-                    }        
-                }   
-             
-                if(adr_ans.dataRateOK && adr_ans.powerOK && adr_ans.channelMaskOK){
-                    
-                    adr_state = _ADR_OK;
-                }
-                else{
-                    
-                    adr_state = _ADR_BAD;
-                }
-               
-             
-                LDL_DEBUG(self->app, "link_adr_ans: powerOK=%s dataRateOK=%s channelMaskOK=%s",
-                    adr_ans.dataRateOK ? "true" : "false", 
-                    adr_ans.powerOK ? "true" : "false", 
-                    adr_ans.channelMaskOK ? "true" : "false"
-                )
-             
-                LDL_MAC_putLinkADRAns(&s_out, &adr_ans);
-            }                
-            
-        }
-            break;
-        
-        case LDL_CMD_DUTY_CYCLE:
-        {    
-            const struct ldl_duty_cycle_req *req = &cmd.fields.dutyCycle;
-            
-            LDL_DEBUG(self->app, "duty_cycle_req: %u", req->maxDutyCycle)
-        
-            LDL_DEBUG(self->app, "duty_cycle_ans")
-            
-            shadow.maxDutyCycle = req->maxDutyCycle;                        
-            LDL_MAC_putDutyCycleAns(&s_out);
-        }
-            break;
-        
-        case LDL_CMD_RX_PARAM_SETUP:     
-        {
-            const struct ldl_rx_param_setup_req *req = &cmd.fields.rxParamSetup;
-            struct ldl_rx_param_setup_ans ans;
-         
-            LDL_DEBUG(self->app, "rx_param_setup_req: rx1DROffset=%u rx2DataRate=%u freq=%"PRIu32,
-                req->rx1DROffset,
-                req->rx2DataRate,
-                req->freq
-            )
-            
-            // todo: validation
-            
-            shadow.rx1DROffset = req->rx1DROffset;
-            shadow.rx2DataRate = req->rx2DataRate;
-            shadow.rx2Freq = req->freq;
-            
-            ans.rx1DROffsetOK = true;
-            ans.rx2DataRateOK = true;
-            ans.channelOK = true;       
-            
-            LDL_DEBUG(self->app, "rx_param_setup_ans: rx1DROffsetOK=%s rx2DataRate=%s rx2Freq=%s",                
-                ans.rx1DROffsetOK ? "true" : "false",
-                ans.rx2DataRateOK ? "true" : "false",
-                ans.channelOK ? "true" : "false"       
-            )
-            
-            LDL_MAC_putRXParamSetupAns(&s_out, &ans);
-        }
-            break;
-        
-        case LDL_CMD_DEV_STATUS:
-        {
-            LDL_DEBUG(self->app, "dev_status_req")
-            struct ldl_dev_status_ans ans;        
-            
-            ans.battery = LDL_System_getBatteryLevel(self->app);
-            ans.margin = (int8_t)self->margin;
-            
-            LDL_DEBUG(self->app, "dev_status_ans: battery=%u margin=%u",
-                ans.battery,
-                ans.margin
-            )
-             
-            LDL_MAC_putDevStatusAns(&s_out, &ans);
-        }
-            break;
-            
-        case LDL_CMD_NEW_CHANNEL:    
-                    
-            LDL_DEBUG(self->app, "new_channel_req: chIndex=%u freq=%"PRIu32" maxDR=%u minDR=%u",
-                cmd.fields.newChannel.chIndex,
-                cmd.fields.newChannel.freq,
-                cmd.fields.newChannel.maxDR,
-                cmd.fields.newChannel.minDR
-            )
-        
-            if(LDL_Region_isDynamic(self->region)){
-            
-                struct ldl_new_channel_ans ans;
-            
-                ans.dataRateRangeOK = LDL_Region_validateRate(self->region, cmd.fields.newChannel.chIndex, cmd.fields.newChannel.minDR, cmd.fields.newChannel.maxDR);        
-                ans.channelFreqOK = LDL_Region_validateFreq(self->region, cmd.fields.newChannel.chIndex, cmd.fields.newChannel.freq);
-                
-                if(ans.dataRateRangeOK && ans.channelFreqOK){
-                    
-                    (void)setChannel(shadow.chConfig, self->region, cmd.fields.newChannel.chIndex, cmd.fields.newChannel.freq, cmd.fields.newChannel.minDR, cmd.fields.newChannel.maxDR);                        
-                }            
-             
-                LDL_DEBUG(self->app, "new_channel_ans: dataRateRangeOK=%s channelFreqOK=%s", 
-                    ans.dataRateRangeOK ? "true" : "false",
-                    ans.channelFreqOK ? "true" : "false"
-                )
-                
-                LDL_MAC_putNewChannelAns(&s_out, &ans);
-            }
-            else{
-                
-                LDL_DEBUG(self->app, "new_channel_req not processed in this region")                
-            }
-            break; 
-                   
-        case LDL_CMD_DL_CHANNEL:            
-            
-            LDL_DEBUG(self->app, "dl_channel_req: chIndex=%u freq=%"PRIu32,
-                cmd.fields.dlChannel.chIndex,
-                cmd.fields.dlChannel.freq
-            )
-            
-            if(LDL_Region_isDynamic(self->region)){
-                
-                struct ldl_dl_channel_ans ans;
-                
-                ans.uplinkFreqOK = true;
-                ans.channelFreqOK = LDL_Region_validateFreq(self->region, cmd.fields.dlChannel.chIndex, cmd.fields.dlChannel.freq);
-                
-                LDL_DEBUG(self->app, "dl_channel_ans: uplinkFreqOK=%s channelFreqOK=%s",
-                    ans.uplinkFreqOK ? "true" : "false",
-                    ans.channelFreqOK ? "true" : "false"
-                )
-                
-                LDL_MAC_putDLChannelAns(&s_out, &ans);            
-            }
-            else{
-                
-                LDL_DEBUG(self->app, "dl_channel_req not processed in this region")                
-            }
-            break;
-        
-        case LDL_CMD_RX_TIMING_SETUP:
-        {        
-            LDL_DEBUG(self->app, "rx_timing_setup_req: delay=%u",
-                cmd.fields.rxTimingSetup.delay
-            )
-            
-            shadow.rx1Delay = cmd.fields.rxTimingSetup.delay;
-            
-            LDL_DEBUG(self->app, "rx_timing_setup_ans")
-            
-            LDL_MAC_putRXTimingSetupAns(&s_out);
-        }
-            break;
-        
-        case LDL_CMD_TX_PARAM_SETUP:        
-                         
-            LDL_DEBUG(self->app, "tx_param_setup_req: downlinkDwellTime=%s uplinkDwellTime=%s maxEIRP=%u",
-                cmd.fields.txParamSetup.downlinkDwell ? "true" : "false",
-                cmd.fields.txParamSetup.uplinkDwell ? "true" : "false",
-                cmd.fields.txParamSetup.maxEIRP
-            )    
-        
-            if(LDL_Region_isDynamic(self->region)){
-                
-                LDL_DEBUG(self->app, "tx_param_setup_ans")
-            }
-            else{
-                
-                LDL_DEBUG(self->app, "tx_param_setup_req not processed in this region")
-            }
-            break;
-            
-        case LDL_CMD_DEVICE_TIME:
-        
-            arg.device_time.seconds = cmd.fields.deviceTime.seconds;
-            arg.device_time.fractions = cmd.fields.deviceTime.fractions;
-            
-            LDL_DEBUG(self->app, "device_time_ans: seconds=%"PRIu32" fractions=%u", 
-                arg.device_time.seconds,
-                arg.device_time.fractions             
-            )
-            
-            self->handler(self->app, LDL_MAC_DEVICE_TIME, &arg);                                                                                     
-            break;
-            
-        case LDL_CMD_ADR_PARAM_SETUP:
-        
-            LDL_DEBUG(self->app, "adr_param_setup: limit_exp=%u delay_exp=%u", 
-                cmd.fields.adrParamSetup.limit_exp,
-                cmd.fields.adrParamSetup.delay_exp        
-            )
-            
-            shadow.adr_ack_limit = (1U << cmd.fields.adrParamSetup.limit_exp);
-            shadow.adr_ack_delay = (1U << cmd.fields.adrParamSetup.delay_exp);
-            
-            LDL_DEBUG(self->app, "adr_param_ans")
-            
-            LDL_MAC_putADRParamSetupAns(&s_out);
-            break;
-            
-        case LDL_CMD_REKEY:
-        
-            LDL_DEBUG(self->app, "rekey_conf: version=%u", cmd.fields.rekey.version)
-        
-            /* The server version must be greater than 0 (0 is not allowed), and smaller or equal (<=) to the
-             * device’s LoRaWAN version. Therefore for a LoRaWAN1.1 device the only valid value is 1. If
-             * the server’s version is invalid the device SHALL discard the RekeyConf command and
-             * retransmit the RekeyInd in the next uplink frame */
-            if(cmd.fields.rekey.version == 1U){
-                
-                self->rekeyConf_pending = false;
-            }
-            break;
-            
-        case LDL_CMD_FORCE_REJOIN:
-                
-            LDL_DEBUG(self->app, "force_rejoin_req: max_retries=%u rejoin_type=%u period=% dr=%u",
-                cmd.fields.forceRejoin.max_retries,
-                cmd.fields.forceRejoin.rejoin_type,
-                cmd.fields.forceRejoin.period,
-                cmd.fields.forceRejoin.dr
-            )
-        
-            /* no reply - you are meant to start doing a rejoin */
-                
-            break;
-            
-        case LDL_CMD_REJOIN_PARAM_SETUP:
-        
-            LDL_DEBUG(self->app, "rejoin_param_setup_req: maxTimeN=%u maxCountN=%u",
-                cmd.fields.rejoinParamSetup.maxTimeN,
-                cmd.fields.rejoinParamSetup.maxCountN
-            )
-            
-            {
-                struct ldl_rejoin_param_setup_ans ans;
-                ans.timeOK = false;
-                
-                LDL_DEBUG(self->app, "rejoin_param_setup_ans: timeOK=%s", ans.timeOK ? "true" : "false")
-                
-                LDL_MAC_putRejoinParamSetupAns(&s_out, &ans);
-            }
-        
-            break;        
-        }
-        
-        /* this ensures the output stream doesn't contain part of a MAC command */
-        if(LDL_Stream_error(&s_out)){
-            
-            (void)LDL_Stream_seekSet(&s_out, pos);
-        }        
-    }
-    
-    /* roll back ADR request if not successful */
-    if(adr_state == _ADR_BAD){
-        
-        LDL_DEBUG(self->app, "bad ADR setting; rollback")
-        
-        (void)memcpy(shadow.chMask, self->ctx.chMask, sizeof(shadow.chMask));
-        
-        shadow.rate = self->ctx.rate;
-        shadow.power = self->ctx.power;
-        shadow.nbTrans = self->ctx.nbTrans;
-    }
-
-    /* otherwise apply changes */
-    (void)memcpy(&self->ctx, &shadow, sizeof(self->ctx));  
-    
-    /* return the length of data written to the output buffer */
-    return LDL_Stream_tell(&s_out);  
-}
-
 static void registerTime(struct ldl_mac *self, uint32_t freq, uint32_t airTime)
 {
     uint8_t band;
@@ -2218,8 +2248,6 @@ static void registerTime(struct ldl_mac *self, uint32_t freq, uint32_t airTime)
     }
 }    
 
-
-
 static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prevChIndex, uint32_t limit, uint8_t *chIndex, uint32_t *freq)
 {
     bool retval = false;
@@ -2245,7 +2273,7 @@ static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prev
                 except = i;
             }
         
-            (void)maskChannel(mask, self->region, i);        
+            (void)maskChannel(mask, sizeof(mask), self->region, i);        
             available++;            
         }            
     }
@@ -2268,13 +2296,13 @@ static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prev
         
         for(i=0U; i < LDL_Region_numChannels(self->region); i++){
         
-            if(channelIsMasked(mask, self->region, i)){
+            if(channelIsMasked(mask, sizeof(mask), self->region, i)){
         
                 if(except != i){
             
                     if(selection == j){
                         
-                        if(getChannel(self->ctx.chConfig, self->region, i, freq, &minRate, &maxRate)){
+                        if(getChannel(self, i, freq, &minRate, &maxRate)){
                             
                             *chIndex = i;
                             retval = true;
@@ -2299,9 +2327,9 @@ static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rat
     uint8_t maxRate;    
     uint8_t band;
     
-    if(!channelIsMasked(self->ctx.chMask, self->region, chIndex)){
+    if(!channelIsMasked(self->ctx.chMask, sizeof(self->ctx.chMask), self->region, chIndex)){
     
-        if(getChannel(self->ctx.chConfig, self->region, chIndex, &freq, &minRate, &maxRate)){
+        if(getChannel(self, chIndex, &freq, &minRate, &maxRate)){
             
             if((rate >= minRate) && (rate <= maxRate)){
             
@@ -2329,9 +2357,9 @@ static bool msUntilAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_
     uint8_t maxRate;    
     uint8_t band;
     
-    if(!channelIsMasked(self->ctx.chMask, self->region, chIndex)){
+    if(!channelIsMasked(self->ctx.chMask, sizeof(self->ctx.chMask), self->region, chIndex)){
     
-        if(getChannel(self->ctx.chConfig, self->region, chIndex, &freq, &minRate, &maxRate)){
+        if(getChannel(self, chIndex, &freq, &minRate, &maxRate)){
             
             if((rate >= minRate) && (rate <= maxRate)){
             
@@ -2381,86 +2409,102 @@ static void restoreDefaults(struct ldl_mac *self, bool keep)
     self->ctx.adr_ack_delay = ADRAckDelay;
 }
 
-static bool getChannel(const struct ldl_mac_channel *self, enum ldl_region region, uint8_t chIndex, uint32_t *freq, uint8_t *minRate, uint8_t *maxRate)
+static bool getChannel(const struct ldl_mac *self, uint8_t chIndex, uint32_t *freq, uint8_t *minRate, uint8_t *maxRate)
 {
-    bool retval = false;
+    bool retval;
+    const struct ldl_mac_channel *chConfig;
     
-    if(LDL_Region_isDynamic(region)){
+    retval = false;
+    
+    if(LDL_Region_isDynamic(self->region)){
         
-        if(chIndex < LDL_Region_numChannels(region)){
+        if(chIndex < LDL_Region_numChannels(self->region)){
             
-            *freq = (self[chIndex].freqAndRate >> 8) * 100U;
-            *minRate = (self[chIndex].freqAndRate >> 4) & 0xfU;
-            *maxRate = self[chIndex].freqAndRate & 0xfU;
+            if(chIndex < sizeof(self->ctx.chConfig)/sizeof(*self->ctx.chConfig)){
             
-            retval = true;
+                chConfig = &self->ctx.chConfig[chIndex];
+                
+                *freq = (chConfig->freqAndRate >> 8) * 100U;
+                *minRate = (chConfig->freqAndRate >> 4) & 0xfU;
+                *maxRate = chConfig->freqAndRate & 0xfU;
+                
+                retval = true;
+            }
         }        
     }
     else{
         
-        retval = LDL_Region_getChannel(region, chIndex, freq, minRate, maxRate);                        
+        retval = LDL_Region_getChannel(self->region, chIndex, freq, minRate, maxRate);                        
     }
      
     return retval;
 }
 
-static bool setChannel(struct ldl_mac_channel *self, enum ldl_region region, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate)
+static bool setChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate)
 {
-    bool retval = false;
+    bool retval;
     
-    if(chIndex < LDL_Region_numChannels(region)){
+    retval = false;
+    
+    if(chIndex < LDL_Region_numChannels(self->region)){
         
-        self[chIndex].freqAndRate = ((freq/100U) << 8) | ((minRate << 4) & 0xfU) | (maxRate & 0xfU);
+        if(chIndex < sizeof(self->ctx.chConfig)/sizeof(*self->ctx.chConfig)){
         
-        retval = true;
+            self->ctx.chConfig[chIndex].freqAndRate = ((freq/100U) << 8) | ((minRate << 4) & 0xfU) | (maxRate & 0xfU);
+            retval = true;
+        }        
     }
     
     return retval;
 }
 
-static bool maskChannel(uint8_t *self, enum ldl_region region, uint8_t chIndex)
+static bool maskChannel(uint8_t *mask, uint8_t max, enum ldl_region region, uint8_t chIndex)
 {
     bool retval = false;
     
     if(chIndex < LDL_Region_numChannels(region)){
-    
-        self[chIndex / 8U] |= (1U << (chIndex % 8U));
-        retval = true;
-    }
-    
-    return retval;
-}
-
-static bool unmaskChannel(uint8_t *self, enum ldl_region region, uint8_t chIndex)
-{
-    bool retval = false;
-    
-    if(chIndex < LDL_Region_numChannels(region)){
-    
-        self[chIndex / 8U] &= ~(1U << (chIndex % 8U));
-        retval = true;
-    }
-    
-    return retval;
-}
-
-static void unmaskAllChannels(uint8_t *self, enum ldl_region region)
-{
-    uint8_t i;
-    
-    for(i=0U; i < LDL_Region_numChannels(region); i++){
         
-        (void)unmaskChannel(self, region, i);
-    }    
+        if(chIndex < (max*8U)){
+    
+            mask[chIndex / 8U] |= (1U << (chIndex % 8U));
+            retval = true;
+        }
+    }
+    
+    return retval;
 }
 
-static bool channelIsMasked(const uint8_t *self, enum ldl_region region, uint8_t chIndex)
+static bool unmaskChannel(uint8_t *mask, uint8_t max, enum ldl_region region, uint8_t chIndex)
 {
     bool retval = false;
     
     if(chIndex < LDL_Region_numChannels(region)){
     
-        retval = ((self[chIndex / 8U] & (1U << (chIndex % 8U))) > 0U);        
+        if(chIndex < (max*8U)){
+    
+            mask[chIndex / 8U] &= ~(1U << (chIndex % 8U));
+            retval = true;
+        }
+    }
+    
+    return retval;
+}
+
+static void unmaskAllChannels(uint8_t *mask, uint8_t max)
+{
+    (void)memset(mask, 0, max);    
+}
+
+static bool channelIsMasked(const uint8_t *mask, uint8_t max, enum ldl_region region, uint8_t chIndex)
+{
+    bool retval = false;
+    
+    if(chIndex < LDL_Region_numChannels(region)){
+        
+        if(chIndex < (max*8U)){
+        
+            retval = ((mask[chIndex / 8U] & (1U << (chIndex % 8U))) > 0U);        
+        }
     }
     
     return retval;    
@@ -2593,7 +2637,7 @@ static void downlinkMissingHandler(struct ldl_mac *self)
     uint32_t tx_time;
     uint8_t mtu;
     
-    (void)arg;
+    (void)memset(&arg, 0, sizeof(arg));
     
     if(self->opts.nbTrans > 0U){
         

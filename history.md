@@ -1,6 +1,28 @@
 Release History
 ===============
 
+# 0.2.1
+
+## features
+
+- new build options
+    - LDL_DISABLE_FULL_CHANNEL_CONFIG halves memory required for channel config
+    - LDL_DISABLE_CMD_DL_CHANNEL removes handling for this MAC command
+
+## changes
+
+- reduced stack usage during MAC command processing
+- Arduino wrapper now uses LDL_ENABLE_STATIC_RX_BUFFER
+- Arduino wrapper now uses LDL_DISABLE_CHECK
+- Arduino wrapper now uses LDL_DISABLE_DEVICE_TIME
+- Arduino wrapper now uses LDL_DISABLE_FULL_CHANNEL_CONFIG
+- Arduino wrapper now uses LDL_DISABLE_CMD_DL_CHANNEL
+
+## bugs
+
+- Arduino wrapper on ATMEGA328P was running out of stack at the point where it had to
+  process a MAC command. This is a worry because there is ~1K available for stack.
+
 # 0.2.0
 
 Warning: this update has a significant number of interface name changes. 
@@ -63,6 +85,8 @@ Warning: this update has a significant number of interface name changes.
 - changed how off-time is accounted for
 
 ## bugs
+
+none
 
 # 0.1.6
 

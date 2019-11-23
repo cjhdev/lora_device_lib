@@ -3,13 +3,23 @@ arduino_ldl
 
 An Arduino library that wraps [LDL](https://github.com/cjhdev/lora_device_lib).
 
-## Supported Targets
+This wrapper is intended for use with the ATMEGA328P.
 
-- ATMEGA328p based boards with ceramic resonators and crystal oscillators
+## Limitations
 
-## Optimisation
+A number of features have been removed from LDL to make it fit comfortably
+on the 328P.
 
-ArduinoLDL can be optimised and adapted by changing the definitions in [platform.h](platform.h).
+- Will not work with LoRaWAN 1.1 servers
+- Some MAC commands have been removed
+    - LinkCheckReq/Ans
+    - DeviceTimeReq/Ans
+    - DlSetupReq/Ans (will still respond to server but will not change state)
+- Number of channels reduced from 16 to 8
+
+## Further Optimisation
+
+The wrapper can be further optimised by changing the definitions in in [platform.h](platform.h).
 
 The full set of of build-time options are documented [here](https://cjhdev.github.io/lora_device_lib_api/group__ldl__optional.html).
 
@@ -22,8 +32,7 @@ of these connections are required for correct operation.
 
 ## Flash/RAM Usage
 
-[examples/mbed_sx1272_small_code](examples/mbed_sx1272_small_code) requires ~25KB of flash and ~900B of RAM.
-
+[examples/mbed_sx1272_small_code](examples/mbed_sx1272_small_code) requires ~24KB of flash and ~800B of RAM.
 
 ## Example
 
@@ -38,14 +47,13 @@ In this example a node will:
 
 static void get_identity(struct arduino_ldl_id *id)
 {       
-    static const struct arduino_ldl_id _id = {
-        .joinEUI = {0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U},
-        .devEUI = {0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x01U},
-        .appKey = {0x2bU,0x7eU,0x15U,0x16U,0x28U,0xaeU,0xd2U,0xa6U,0xabU,0xf7U,0x15U,0x88U,0x09U,0xcfU,0x4fU,0x3cU},
-        .nwkKey = {0x2bU,0x7eU,0x15U,0x16U,0x28U,0xaeU,0xd2U,0xa6U,0xabU,0xf7U,0x15U,0x88U,0x09U,0xcfU,0x4fU,0x3cU}
+    static const struct arduino_ldl_id _id PROGMEM = {
+        {0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U},                                                  /* joinEUI/appEUI */
+        {0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x00U,0x01U},                                                  /* devEUI */
+        {0x2bU,0x7eU,0x15U,0x16U,0x28U,0xaeU,0xd2U,0xa6U,0xabU,0xf7U,0x15U,0x88U,0x09U,0xcfU,0x4fU,0x3cU}   /* nwkKey */
     };
 
-    memcpy(id, &_id, sizeof(*id));
+    memcpy_P(id, &_id, sizeof(*id));
 }
 
 LDL::MAC& get_ldl()
@@ -93,10 +101,6 @@ void loop()
 
 More [examples](examples).
 
-## Limitations
-
-- still using a randomised devNonce which won't work well on LoRaWAN 1.1 servers (stick to 1.0)
-
 ## Hints
 
 - debug information is only printed if you configure your sketch to do it via the ArduinoLDL.onEvent() callback (see "*_debug_node" examples for how)
@@ -104,8 +108,7 @@ More [examples](examples).
 - if you are printing debug information, remember to init the Serial object
 - ArduinoLDL.eventDebug() uses less codespace than ArduinoLDL.eventDebugVerbose()
 - ArduinoLDL has ADR enabled by default (use ArduinoLDL.disableADR() to disable)
-- ArduinoLDL limits to approximately the TTN fair access policy by default (use ArduinoLDL.setAggregatedDutyCycleLimit() to change)
-- LoRaWAN 1.1 changed the name of the appKey to nwkKey, and then created a new appKey (if in doubt and using LoRaWAN 1.1 server, set both keys to the same value)
+- ArduinoLDL limits to approximately the TTN fair access policy by default (use ArduinoLDL.setMaxDCycle() to change)
 - If OTAA is timing out when it should be succeeding it might be a repeat devNonce (try resetting the Arduino)
 
 ## License

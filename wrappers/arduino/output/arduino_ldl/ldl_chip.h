@@ -43,7 +43,7 @@
  * 
  * - LDL_Radio_interrupt()
  * 
- * The @ref ldl_radio_connector must be implemented in such a way as to ensure that LDL_MAC_interrupt()
+ * The @ref ldl_radio_connector must be implemented in such a way as to ensure that LDL_Radio_interrupt()
  * will not be called before LDL_MAC_init() has been performed.
  * 
  * ## Transceiver Digital Interface

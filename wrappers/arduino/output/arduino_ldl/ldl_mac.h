@@ -246,7 +246,6 @@ union ldl_mac_response_arg {
     /** #LDL_MAC_LINK_STATUS argument */
     struct {
         
-        bool inFOpt;        /**< link status was transported in Fopt field */
         int8_t margin;      /**< SNR margin */                     
         uint8_t gwCount;    /**< number of gateways in range */
         
@@ -419,7 +418,9 @@ struct ldl_input {
 struct ldl_mac_channel {
     
     uint32_t freqAndRate;
+#ifndef LDL_DISABLE_CMD_DL_CHANNEL    
     uint32_t dlFreq;
+#endif    
 };
 
 /** session cache */
@@ -430,11 +431,14 @@ struct ldl_mac_session {
     uint16_t appDown;
     uint16_t nwkDown;
     
-    uint32_t devAddr;
-    
-    uint8_t netID;
-    
+    uint32_t devAddr;    
+    uint32_t netID;
+
+#ifdef LDL_DISABLE_FULL_CHANNEL_CONFIG    
+    struct ldl_mac_channel chConfig[8U];
+#else
     struct ldl_mac_channel chConfig[16U];
+#endif    
     
     uint8_t chMask[72U / 8U];
     
