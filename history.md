@@ -1,6 +1,21 @@
 Release History
 ===============
 
+# 0.2.2
+
+## features
+
+none
+
+## changes
+
+- changed LDL_OPS_receiveFrame() to use nwk key to decrypt and MIC join accepts
+  when they are answering a join request
+
+## bugs
+
+- was using app key instead of nwk to decrypt and MIC join accepts
+
 # 0.2.1
 
 ## features

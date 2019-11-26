@@ -91,9 +91,9 @@ The default cryptographic implementations can be replaced with hardened implemen
 
 LDL depends on the following modes which are integrated within the default Security Module ([ldl_sm.c](src/ldl_sm.c)):
 
-- AES128-ECB (default: [lora_aes.c](src/ldl_aes.c))
-- AES128-CTR (default: [lora_ctr.c](src/ldl_aes.c))
-- AES128-CMAC (default: [lora_cmac.c](src/ldl_aes.c))
+- AES128-ECB (default: [ldl_aes.c](src/ldl_aes.c))
+- AES128-CTR (default: [ldl_ctr.c](src/ldl_aes.c))
+- AES128-CMAC (default: [ldl_cmac.c](src/ldl_aes.c))
 
 If your toolchain supports weak symbols, replacing some or all of the
 default implementations is as simple as re-implementing the function

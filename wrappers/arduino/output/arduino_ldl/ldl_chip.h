@@ -84,29 +84,29 @@
  * @endcode
  * 
  * - DIOx become active to indicate events and stay active until they are cleared by LDL
- *  - The radio connector needs to detect the rising edge and call LDL_MAC_interrupt() with the line number as argument
+ *  - The radio connector needs to detect the rising edge and call LDL_Radio_interrupt() with the line number as argument
  *  - Edge detection can be by interrupt or polling
  *  - If interrupt is used, LDL_SYSTEM_ENTER_CRITICAL() and LDL_SYSTEM_LEAVE_CRITICAL() must be defined
  * - DIOx interrupt example:
  * 
  * @code{.c}
- * extern ldl_mac mac;
+ * extern ldl_radio radio;
  * 
  * void dio0_rising_edge_isr(void)
  * {
- *   LDL_Radio_interrupt(&mac, 0);
+ *   LDL_Radio_interrupt(&radio, 0);
  * }
  * void dio1_rising_edge_isr(void)
  * {
- *   LDL_Radio_interrupt(&mac, 1);
+ *   LDL_Radio_interrupt(&radio, 1);
  * }
  * void dio2_rising_edge_isr(void)
  * {
- *   LDL_Radio_interrupt(&mac, 2);
+ *   LDL_Radio_interrupt(&radio, 2);
  * }
  * void dio3_rising_edge_isr(void)
  * {
- *   LDL_Radio_interrupt(&mac, 3);
+ *   LDL_Radio_interrupt(&radio, 3);
  * }
  * @endcode
  * 

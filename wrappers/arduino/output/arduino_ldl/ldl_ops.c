@@ -216,7 +216,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                 
                 enum ldl_sm_key key;
                 
-                key = (self->op == LDL_OP_JOINING) ? LDL_SM_KEY_APP : LDL_SM_KEY_JSENC;
+                key = (self->op == LDL_OP_JOINING) ? LDL_SM_KEY_NWK : LDL_SM_KEY_JSENC;
                 
                 LDL_SM_ecb(self->sm, key, &in[1U]);
         
