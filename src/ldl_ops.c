@@ -116,7 +116,7 @@ void LDL_OPS_deriveKeys(struct ldl_mac *self)
             LDL_SM_updateSessionKey(self->sm, LDL_SM_KEY_FNWKSINT, LDL_SM_KEY_NWK, &iv);    
             
             ptr[0] = 2U;
-            LDL_SM_updateSessionKey(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_NWK, &iv);
+            LDL_SM_updateSessionKey(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_APP, &iv);
             
             ptr[0] = 3U;
             LDL_SM_updateSessionKey(self->sm, LDL_SM_KEY_SNWKSINT, LDL_SM_KEY_NWK, &iv);
