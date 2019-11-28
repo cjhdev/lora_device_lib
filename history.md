@@ -1,6 +1,12 @@
 Release History
 ===============
 
+# 0.2.3
+
+## bugs
+
+- was using nwk instead of app to derive apps key in 1.1 mode
+
 # 0.2.2
 
 ## features
