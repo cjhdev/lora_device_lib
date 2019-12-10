@@ -45,7 +45,7 @@ struct ldl_cmac_ctx {
     const struct ldl_aes_ctx *aes_ctx;
     uint8_t m[16U];
     uint8_t x[16U];
-    uint32_t size;
+    uint8_t size;
 };
 
 /** Initialise CMAC state

@@ -286,6 +286,13 @@
      * */
      #define LDL_DISABLE_CMD_DL_CHANNEL
      #undef LDL_DISABLE_CMD_DL_CHANNEL
+     
+     /**
+      * Define to optimise for little-endian targets
+      * 
+      * */
+    #define LDL_LITTLE_ENDIAN
+    #undef LDL_LITTLE_ENDIAN
 
 #endif
 

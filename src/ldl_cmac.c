@@ -69,13 +69,13 @@ void LDL_CMAC_update(struct ldl_cmac_ctx *ctx, const void *data, uint8_t len)
     LDL_PEDANTIC(ctx != NULL)
     LDL_PEDANTIC((len == 0U) || (data != NULL))
 
-    size_t part;
-    size_t i;
-    size_t blocks;
-    size_t pos = 0U;
+    uint8_t part;
+    uint8_t i;
+    uint8_t blocks;
+    uint8_t pos = 0U;
     const uint8_t *in = (const uint8_t *)data;    
     
-    part =  ctx->size % sizeof(ctx->m);
+    part =  ctx->size % (uint8_t)sizeof(ctx->m);
     
     if(len > 0U){
 
@@ -127,7 +127,7 @@ void LDL_CMAC_finish(const struct ldl_cmac_ctx *ctx, void *out, uint8_t outMax)
     
     uint8_t m_last[BLOCK_SIZE];
 
-    size_t part;
+    uint8_t part;
 
     /* generate subkeys */
     
@@ -152,7 +152,7 @@ void LDL_CMAC_finish(const struct ldl_cmac_ctx *ctx, void *out, uint8_t outMax)
 
     /* process last block (m_last) */
     
-    part = ctx->size % sizeof(ctx->m);
+    part = ctx->size % (uint8_t)sizeof(ctx->m);
 
     (void)memset(m_last, 0, sizeof(m_last));
     

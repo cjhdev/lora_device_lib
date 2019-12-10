@@ -189,10 +189,13 @@ void LDL_MAC_putRejoinParamSetupAns(struct ldl_stream *s, struct ldl_rejoin_para
 bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd)
 {
     uint8_t tag;
+    bool retval = false;
     
     if(LDL_Stream_getU8(s, &tag)){
         
-        if(tagToType(tag, &cmd->type)){
+        retval = tagToType(tag, &cmd->type);
+        
+        if(retval){
             
             switch(cmd->type){
             default:
@@ -327,7 +330,7 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
         }
     }
     
-    return !LDL_Stream_error(s);
+    return LDL_Stream_error(s) ? false : retval;
 }
 
 /* static functions ***************************************************/

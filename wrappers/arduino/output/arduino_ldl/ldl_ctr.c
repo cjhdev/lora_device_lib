@@ -20,6 +20,7 @@
  * */
 
 #include "ldl_ctr.h"
+#include "ldl_aes.h"
 #include "ldl_debug.h"
 
 #include <string.h>

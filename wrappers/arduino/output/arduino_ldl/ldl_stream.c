@@ -179,31 +179,52 @@ bool LDL_Stream_putU16(struct ldl_stream *self, uint16_t value)
 {
     LDL_PEDANTIC(self != NULL)
     
+    bool retval;
+    
+#ifdef LDL_LITTLE_ENDIAN    
+    retval = LDL_Stream_write(self, &value, 2U);
+#else
     uint8_t out[] = {
         value, 
         value >> 8        
     };
     
-    return LDL_Stream_write(self, out, sizeof(out));
+    retval = LDL_Stream_write(self, out, sizeof(out));
+#endif    
+    
+    return retval;
 }
 
 bool LDL_Stream_putU24(struct ldl_stream *self, uint32_t value)
 {
     LDL_PEDANTIC(self != NULL)
-    
+
+    bool retval;
+
+#ifdef LDL_LITTLE_ENDIAN       
+    retval = LDL_Stream_write(self, &value, 3U);
+#else
     uint8_t out[] = {
         value, 
         value >> 8,        
         value >> 16        
     };
     
-    return LDL_Stream_write(self, out, sizeof(out));
+    retval = LDL_Stream_write(self, out, sizeof(out));
+#endif    
+    
+    return retval;
 }
 
 bool LDL_Stream_putU32(struct ldl_stream *self, uint32_t value)
 {
     LDL_PEDANTIC(self != NULL)
     
+    bool retval;
+    
+#ifdef LDL_LITTLE_ENDIAN    
+    retval = LDL_Stream_write(self, &value, 4U);
+#else    
     uint8_t out[] = {
         value, 
         value >> 8,        
@@ -211,7 +232,10 @@ bool LDL_Stream_putU32(struct ldl_stream *self, uint32_t value)
         value >> 24        
     };
     
-    return LDL_Stream_write(self, out, sizeof(out));
+    retval = LDL_Stream_write(self, out, sizeof(out));
+#endif    
+    
+    return retval;
 }
 
 bool LDL_Stream_putEUI(struct ldl_stream *self, const uint8_t *value)
@@ -243,14 +267,19 @@ bool LDL_Stream_getU16(struct ldl_stream *self, uint16_t *value)
 {
     LDL_PEDANTIC(self != NULL)
     
-    uint8_t buf[2U];
     bool retval;
+    
+#ifdef LDL_LITTLE_ENDIAN    
+    retval = LDL_Stream_read(self, &value, 2U);
+#else    
+    uint8_t buf[2U];
     
     retval = LDL_Stream_read(self, buf, sizeof(buf));
     
     *value = buf[1];
     *value <<= 8;
     *value |= buf[0];
+#endif    
         
     return retval;
 }
@@ -259,9 +288,14 @@ bool LDL_Stream_getU24(struct ldl_stream *self, uint32_t *value)
 {
     LDL_PEDANTIC(self != NULL)
     
-    uint8_t buf[3U];
     bool retval;
-    
+
+#ifdef LDL_LITTLE_ENDIAN    
+    *value = 0U;
+    retval = LDL_Stream_read(self, &value, 3U);
+#else        
+    uint8_t buf[3U];
+
     retval = LDL_Stream_read(self, buf, sizeof(buf));
         
     *value = buf[2];
@@ -269,7 +303,7 @@ bool LDL_Stream_getU24(struct ldl_stream *self, uint32_t *value)
     *value |= buf[1];
     *value <<= 8;
     *value |= buf[0];
-    
+#endif    
     return retval;
 }
 
@@ -277,9 +311,13 @@ bool LDL_Stream_getU32(struct ldl_stream *self, uint32_t *value)
 {
     LDL_PEDANTIC(self != NULL)
     
-    uint8_t buf[4U];
     bool retval;
-    
+
+#ifdef LDL_LITTLE_ENDIAN    
+    retval = LDL_Stream_read(self, &value, 4U);
+#else        
+    uint8_t buf[4U];
+
     retval = LDL_Stream_read(self, buf, sizeof(buf));
         
     *value = buf[3];
@@ -289,6 +327,7 @@ bool LDL_Stream_getU32(struct ldl_stream *self, uint32_t *value)
     *value |= buf[1];
     *value <<= 8;
     *value |= buf[0];
+#endif    
     
     return retval;
 }

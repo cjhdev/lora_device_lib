@@ -30,13 +30,32 @@
 #include "ldl_mac.h"
 #include "ldl_system.h"
 #include "ldl_chip.h"
-#include "ldl_sm.h"
 
 struct arduino_ldl_id {
     
     uint8_t joinEUI[8U];
     uint8_t devEUI[8U];
     uint8_t nwkKey[16U];    // note in LoRaWAN 1.0 this is appKey
+};
+
+struct ldl_key {
+    
+    uint8_t value[16U];
+};
+
+struct ldl_sm {
+    
+    /** LDL supports 1.1 which has 8 keys in total
+     * 
+     * By limiting to 1.0 we can get away with three. They
+     * are stored here in this order: 
+     * 
+     * [0]: root key
+     * [1]: nwk session
+     * [2]: app session
+     * 
+     * */
+    struct ldl_key keys[3U];
 };
 
 typedef void (*handle_rx_fn)(uint16_t counter, uint8_t port, const uint8_t *msg, uint8_t size);

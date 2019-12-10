@@ -1,6 +1,19 @@
 Release History
 ===============
 
+# 0.2.4
+
+## features
+
+- implemented a special security module for the arduino wrapper to save
+  some memory in exchange for limiting the wrapper to LoRaWAN 1.0 servers
+- added little endian optimisation build option (LDL_LITTLE_ENDIAN)
+
+## bugs
+
+- processCommands wasn't recovering correctly from badly formatted
+  mac commands. 
+
 # 0.2.3
 
 ## bugs

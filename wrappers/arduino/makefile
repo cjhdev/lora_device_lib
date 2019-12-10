@@ -60,6 +60,8 @@ output/arduino_ldl:
 	cp $(DIR_ROOT)/src/* $@
 	cp $(DIR_ROOT)/include/* $@
 	cp $(DIR_ROOT)/LICENSE $@
+	rm $@/ldl_sm.c
+	rm $@/ldl_sm.h
 	echo $(VERSION) > $@/version
 	sed -i '/#define LDL_PLATFORM_H/a #define LDL_TARGET_INCLUDE "platform.h"' $@/ldl_platform.h
 	sed -i '/version=/s/.*/version=$(VERSION)/' $@/library.properties

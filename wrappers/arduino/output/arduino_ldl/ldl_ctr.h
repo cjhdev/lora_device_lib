@@ -34,8 +34,7 @@
 extern "C" {
 #endif
 
-#include "stdint.h"
-#include "ldl_aes.h"
+#include <stdint.h>
 
 struct ldl_aes_ctx;
 

@@ -21,6 +21,13 @@
 
 #include "arduino_ldl.h"
 
+#include "ldl_ops.h"
+#include "ldl_aes.h"
+#include "ldl_sm_internal.h"
+#include "ldl_cmac.h"
+#include "ldl_ctr.h"
+#include "ldl_debug.h"
+
 #include <SPI.h>
 #include <stdlib.h>
 
@@ -78,6 +85,104 @@ uint8_t LDL_Chip_read(void *self)
 {
     (void)self;
     return SPI.transfer(0U);
+}
+
+void *getKey(struct ldl_sm *self, enum ldl_sm_key desc)
+{
+    uint8_t i;
+    
+    switch(desc){
+    case LDL_SM_KEY_APP:
+    case LDL_SM_KEY_NWK:
+        i = 0U;
+        break;    
+    case LDL_SM_KEY_FNWKSINT:    
+    case LDL_SM_KEY_SNWKSINT:
+    case LDL_SM_KEY_NWKSENC: 
+    case LDL_SM_KEY_JSINT:   
+    case LDL_SM_KEY_JSENC:  
+        i = 2U;
+        break;        
+    case LDL_SM_KEY_APPS:
+    default:
+        i = 2U;
+        break;
+    }
+    
+    LDL_PEDANTIC(i < sizeof(self->keys)/sizeof(*self->keys))
+    
+    return self->keys[i].value;
+}
+
+void LDL_SM_init(struct ldl_sm *self, const void *nwkKey)
+{
+    (void)memcpy(getKey(self, LDL_SM_KEY_NWK), nwkKey, sizeof(struct ldl_key));     
+}
+
+void LDL_SM_beginUpdateSessionKey(struct ldl_sm *self)
+{
+    (void)self;
+}
+
+void LDL_SM_endUpdateSessionKey(struct ldl_sm *self)
+{
+    (void)self;
+}
+
+void LDL_SM_updateSessionKey(struct ldl_sm *self, enum ldl_sm_key keyDesc, enum ldl_sm_key rootDesc, const void *iv)
+{
+    struct ldl_aes_ctx ctx;
+    
+    switch(keyDesc){
+    case LDL_SM_KEY_FNWKSINT:
+    case LDL_SM_KEY_APPS:
+    case LDL_SM_KEY_SNWKSINT:
+    case LDL_SM_KEY_NWKSENC: 
+    case LDL_SM_KEY_JSINT:   
+    case LDL_SM_KEY_JSENC:  
+    
+        LDL_AES_init(&ctx, getKey(self, rootDesc));    
+        
+        (void)memcpy(getKey(self, keyDesc), iv, sizeof(*self->keys));        
+        
+        LDL_AES_encrypt(&ctx, getKey(self, keyDesc));
+        break;
+    
+    default:
+        /* not a session key*/
+        break;
+    }    
+}
+
+uint32_t LDL_SM_mic(struct ldl_sm *self, enum ldl_sm_key desc, const void *hdr, uint8_t hdrLen, const void *data, uint8_t dataLen)
+{
+    uint32_t mic;
+    struct ldl_aes_ctx aes_ctx;
+    struct ldl_cmac_ctx ctx;    
+    
+    LDL_AES_init(&aes_ctx, getKey(self, desc));
+    LDL_CMAC_init(&ctx, &aes_ctx);
+    LDL_CMAC_update(&ctx, hdr, hdrLen);
+    LDL_CMAC_update(&ctx, data, dataLen);
+    LDL_CMAC_finish(&ctx, &mic, sizeof(mic));
+  
+    return mic;
+}
+
+void LDL_SM_ecb(struct ldl_sm *self, enum ldl_sm_key desc, void *b)
+{
+    struct ldl_aes_ctx ctx;
+    
+    LDL_AES_init(&ctx, getKey(self, desc));
+    LDL_AES_encrypt(&ctx, b);
+}
+
+void LDL_SM_ctr(struct ldl_sm *self, enum ldl_sm_key desc, const void *iv, void *data, uint8_t len)
+{
+    struct ldl_aes_ctx ctx;
+
+    LDL_AES_init(&ctx, getKey(self, desc));
+    LDL_CTR_encrypt(&ctx, iv, data, data, len);
 }
 
 /* interrupt handlers *************************************************/
@@ -138,7 +243,7 @@ MAC::MAC(Radio& radio, enum ldl_region region, get_identity_fn get_id) :
     
     get_id(&id);
     
-    LDL_SM_init(&sm, id.nwkKey, id.nwkKey);
+    LDL_SM_init(&sm, id.nwkKey);
     
     arg.app = this;
     arg.radio = &radio.radio;
