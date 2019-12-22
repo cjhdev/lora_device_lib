@@ -86,7 +86,7 @@ void LDL_SM_updateSessionKey(struct ldl_sm *self, enum ldl_sm_key keyDesc, enum 
     
         LDL_AES_init(&ctx, getKey(self, rootDesc));    
         
-        (void)memcpy(getKey(self, keyDesc), iv, sizeof(*self->keys));        
+        (void)memcpy(getKey(self, keyDesc), iv, 16U);        
         
         LDL_AES_encrypt(&ctx, getKey(self, keyDesc));
         break;
@@ -94,7 +94,7 @@ void LDL_SM_updateSessionKey(struct ldl_sm *self, enum ldl_sm_key keyDesc, enum 
     default:
         /* not a session key*/
         break;
-    }    
+    }        
 }
 /**! [LDL_SM_updateSessionKey] */
 

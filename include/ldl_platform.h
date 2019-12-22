@@ -243,14 +243,14 @@
     #define LDL_ENABLE_AVR
     #undef  LDL_ENABLE_AVR
 
-    /**
-     * Define to have LDL generate devNonce from random
+    /** 
+     * Define to remove all LoRaWAN 1.1 features
      * 
-     * This should not be used with LoRaWAN 1.1 servers
+     * This must not be used with 1.1 servers
      * 
      * */
-     #define LDL_ENABLE_RANDOM_DEV_NONCE
-     #undef  LDL_ENABLE_RANDOM_DEV_NONCE
+    #define LDL_DISABLE_POINTONE
+    #undef LDL_DISABLE_POINTONE
      
      /**
       * Define to remove deviceTime MAC command handling
@@ -292,6 +292,8 @@
       * */
     #define LDL_LITTLE_ENDIAN
     #undef LDL_LITTLE_ENDIAN
+    
+    
 
 #endif
 

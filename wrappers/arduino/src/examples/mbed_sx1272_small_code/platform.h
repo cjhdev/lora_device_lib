@@ -69,7 +69,7 @@
 /* do not change ******************************************************/
 
 #define LDL_DISABLE_SESSION_UPDATE
-#define LDL_ENABLE_RANDOM_DEV_NONCE
+#define LDL_DISABLE_POINTONE
 #define LDL_ENABLE_STATIC_RX_BUFFER
 #define LDL_DISABLE_CHECK
 #define LDL_DISABLE_DEVICE_TIME

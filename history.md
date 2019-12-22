@@ -3,16 +3,18 @@ Release History
 
 # 0.2.4
 
-## features
-
+- now deriving join keys in LDL_MAC_otaa() so they are ready to check
+  joinAccept
+- fixed joinNonce comparison so that 1.1 joins are possible
 - implemented a special security module for the arduino wrapper to save
   some memory in exchange for limiting the wrapper to LoRaWAN 1.0 servers
 - added little endian optimisation build option (LDL_LITTLE_ENDIAN)
-
-## bugs
-
 - processCommands wasn't recovering correctly from badly formatted
   mac commands. 
+- added LDL_DISABLE_POINTONE option to remove 1.1 features for devices
+  that will only be used with 1.0 servers
+- removed LDL_ENABLE_RANDOM_DEV_NONCE since it is now covered by
+  LDL_DISABLE_POINTONE
 
 # 0.2.3
 

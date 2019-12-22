@@ -46,6 +46,7 @@ struct ldl_system_identity;
 
 /* derive all session keys and write to ldl_sm */
 void LDL_OPS_deriveKeys(struct ldl_mac *self);
+void LDL_OPS_deriveJoinKeys(struct ldl_mac *self);
 
 /* decode and verify a frame (depends on ldl_mac state but does not modify directly) */
 bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_t *in, uint8_t len);

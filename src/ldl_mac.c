@@ -196,10 +196,14 @@ bool LDL_MAC_otaa(struct ldl_mac *self)
         
             if(selectChannel(self, self->tx.rate, self->tx.chIndex, 0UL, &self->tx.chIndex, &self->tx.freq)){
             
+#ifndef LDL_DISABLE_POINTONE          
+                LDL_OPS_deriveJoinKeys(self);
+#endif                
+            
                 f.joinEUI = self->joinEUI;
                 f.devEUI = self->devEUI;
                 
-#ifdef LDL_ENABLE_RANDOM_DEV_NONCE
+#ifdef LDL_DISABLE_POINTONE
                 /* LoRAWAN 1.0 uses random nonce */
                 self->devNonce = rand32(self->app);
 #endif                                
@@ -693,7 +697,7 @@ void LDL_MAC_process(struct ldl_mac *self)
                     
                     self->ctx.devAddr = frame.devAddr;    
                     self->ctx.netID = frame.netID;
-                    self->joinNonce = frame.joinNonce;
+                    self->joinNonce = frame.joinNonce + 1U;
                     
                     self->ctx.version = (frame.optNeg) ? 1U : 0U;
                     

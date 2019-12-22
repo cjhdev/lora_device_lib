@@ -64,7 +64,7 @@ void LDL_OPS_syncDownCounter(struct ldl_mac *self, uint8_t port, uint16_t counte
         self->ctx.appDown = (uint16_t)(derived >> 16);
     }    
 }
-                  
+         
 void LDL_OPS_deriveKeys(struct ldl_mac *self)
 {
     LDL_PEDANTIC(self != NULL)
@@ -98,15 +98,6 @@ void LDL_OPS_deriveKeys(struct ldl_mac *self)
         else{
             
             /* ptr[0] below */ 
-            (void)putEUI(&ptr[1U], self->devEUI);
-            
-            ptr[0] = 5U;
-            LDL_SM_updateSessionKey(self->sm, LDL_SM_KEY_JSENC, LDL_SM_KEY_NWK, &iv);                
-            
-            ptr[0] = 6U;
-            LDL_SM_updateSessionKey(self->sm, LDL_SM_KEY_JSINT, LDL_SM_KEY_NWK, &iv); 
-            
-            /* ptr[0] below */ 
             pos = 1U;
             pos += putU24(&ptr[pos], self->joinNonce);
             pos += putEUI(&ptr[pos], self->joinEUI);
@@ -127,6 +118,33 @@ void LDL_OPS_deriveKeys(struct ldl_mac *self)
     }    
     LDL_SM_endUpdateSessionKey(self->sm);    
 }
+
+#ifndef LDL_DISABLE_POINTONE
+void LDL_OPS_deriveJoinKeys(struct ldl_mac *self)
+{
+    LDL_PEDANTIC(self != NULL)
+    
+    struct ldl_block iv;
+    uint8_t *ptr;
+    
+    ptr = iv.value;
+    
+    (void)memset(&iv, 0, sizeof(iv));
+    
+    LDL_SM_beginUpdateSessionKey(self->sm); 
+    {                
+        /* ptr[0] below */ 
+        (void)putEUI(&ptr[1U], self->devEUI);
+        
+        ptr[0] = 5U;
+        LDL_SM_updateSessionKey(self->sm, LDL_SM_KEY_JSENC, LDL_SM_KEY_NWK, &iv);                
+        
+        ptr[0] = 6U;
+        LDL_SM_updateSessionKey(self->sm, LDL_SM_KEY_JSINT, LDL_SM_KEY_NWK, &iv);                             
+    }    
+    LDL_SM_endUpdateSessionKey(self->sm);        
+}
+#endif
 
 uint8_t LDL_OPS_prepareData(struct ldl_mac *self, const struct ldl_frame_data *f, uint8_t *out, uint8_t max)
 {
@@ -229,7 +247,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                     
                     if(f->optNeg){
                         
-                        if(f->joinNonce > self->joinNonce){
+                        if(f->joinNonce >= self->joinNonce){
                         
                             struct ldl_block hdr;
                             uint8_t pos;
