@@ -6,6 +6,8 @@ Release History
 - now deriving join keys in LDL_MAC_otaa() so they are ready to check
   joinAccept
 - fixed joinNonce comparison so that 1.1 joins are possible
+- join nonce was being incremented before key derivation on joining which
+  produced incorrect keys in 1.1 mode
 - implemented a special security module for the arduino wrapper to save
   some memory in exchange for limiting the wrapper to LoRaWAN 1.0 servers
 - added little endian optimisation build option (LDL_LITTLE_ENDIAN)

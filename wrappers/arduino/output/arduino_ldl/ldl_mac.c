@@ -697,7 +697,7 @@ void LDL_MAC_process(struct ldl_mac *self)
                     
                     self->ctx.devAddr = frame.devAddr;    
                     self->ctx.netID = frame.netID;
-                    self->joinNonce = frame.joinNonce + 1U;
+                    self->joinNonce = frame.joinNonce;
                     
                     self->ctx.version = (frame.optNeg) ? 1U : 0U;
                     
@@ -705,6 +705,7 @@ void LDL_MAC_process(struct ldl_mac *self)
                     
                     LDL_OPS_deriveKeys(self);
                     
+                    self->joinNonce++;                    
                     self->devNonce++;
                     
 #ifndef LDL_DISABLE_JOIN_COMPLETE_EVENT                    
