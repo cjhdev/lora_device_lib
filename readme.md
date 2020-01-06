@@ -140,6 +140,7 @@ contact@stackmechanic.com
 ## See Also
 
 - [LoRaMAC-Node](https://github.com/Lora-net/LoRaMac-node): Semtech reference implementation
+- LDL vs. LoRaMac-Node: [size and complexity](https://cjh.id.au/2019/12/11/comparing-ldl-to-loramac.html)   
 
 ## License
 
