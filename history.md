@@ -17,6 +17,8 @@ Release History
   that will only be used with 1.0 servers
 - removed LDL_ENABLE_RANDOM_DEV_NONCE since it is now covered by
   LDL_DISABLE_POINTONE
+- changed the way ctr mode IV is generated so that a generic ctr implementation
+  can now be substituted
 
 # 0.2.3
 

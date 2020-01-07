@@ -387,7 +387,7 @@ static void initA(struct ldl_block *a, uint32_t devAddr, bool up, uint32_t count
     pos += putU8(&ptr[pos], up ? 0U : 1U);
     pos += putU32(&ptr[pos], devAddr);
     pos += putU32(&ptr[pos], counter);    
-    (void)putU16(&ptr[pos], 0U);    
+    (void)putU16(&ptr[pos], 0x0100U);    
 }
 
 static void initB(struct ldl_block *b, uint16_t confirmCounter, uint8_t rate, uint8_t chIndex, bool up, uint32_t devAddr, uint32_t upCounter, uint8_t len)

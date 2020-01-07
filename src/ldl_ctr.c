@@ -62,10 +62,10 @@ void LDL_CTR_encrypt(struct ldl_aes_ctx *ctx, const void *iv, const void *in, vo
         (void)memset(pld, 0, sizeof(pld));
         
         (void)memcpy(pld, &ptr_in[pos], size);
-        
-        a[15U] = i + 1U;
 
         (void)memcpy(s, a, sizeof(s));
+        
+        a[15U]++;
         
         LDL_AES_encrypt(ctx, s);
 
