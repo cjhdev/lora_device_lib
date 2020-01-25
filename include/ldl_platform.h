@@ -293,7 +293,15 @@
     #define LDL_LITTLE_ENDIAN
     #undef LDL_LITTLE_ENDIAN
     
-    
+     /**
+     * Define to use high level SPI.
+     *
+     * LDL_Chip_select will not be necessary.
+     *
+     * */
+    #define LDL_ENABLE_HIGH_LEVEL_SPI
+    #undef LDL_ENABLE_HIGH_LEVEL_SPI
+
 
 #endif
 

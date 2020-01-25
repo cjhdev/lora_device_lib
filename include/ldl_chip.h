@@ -122,6 +122,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifndef LDL_ENABLE_HIGH_LEVEL_SPI
 /** Operate select line
  * 
  * @param[in] self      board from LDL_Radio_init()
@@ -129,6 +130,7 @@ extern "C" {
  * 
  * */
 void LDL_Chip_select(void *self, bool state);
+#endif
 
 /** Operate reset line
  * 
@@ -138,21 +140,43 @@ void LDL_Chip_select(void *self, bool state);
  * */
 void LDL_Chip_reset(void *self, bool state);
 
+#ifdef LDL_ENABLE_HIGH_LEVEL_SPI
+/** Write byte array to address
+ *
+ * @param[in] self      board from LDL_Radio_init()
+ * @param[in] reg       register address
+ * @param[in] data      pointer to data array
+ * @param[in] len       length of data
+ *
+ * */
+void LDL_Chip_write(void *self, uint8_t reg, const uint8_t *data, uint8_t len);
+
+/** Read byte array from address
+ *
+ * @param[in] self      board from LDL_Radio_init()
+ * @param[in] reg       register address
+ * @param[in] data      pointer to data array
+ * @param[in] len       length of data
+ *
+ * */
+void LDL_Chip_read(void *self, uint8_t reg, const uint8_t *data, uint8_t len);
+#else
 /** Write byte
- * 
+ *
  * @param[in] self      board from LDL_Radio_init()
  * @param[in] data
- * 
+ *
  * */
 void LDL_Chip_write(void *self, uint8_t data);
 
 /** Read byte
- * 
+ *
  * @param[in] self      board from LDL_Radio_init()
  * @return data
- * 
+ *
  * */
 uint8_t LDL_Chip_read(void *self);
+#endif
 
 #ifdef __cplusplus
 }

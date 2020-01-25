@@ -746,12 +746,15 @@ static void writeReg(struct ldl_radio *self, uint8_t reg, uint8_t data)
 
 static void burstWrite(struct ldl_radio *self, uint8_t reg, const uint8_t *data, uint8_t len)
 {
+#ifdef LDL_ENABLE_HIGH_LEVEL_SPI
+    LDL_Chip_write(self->board, reg | 0x80U, data, len);
+#else
     uint8_t i;
 
     if(len > 0U){
 
         LDL_Chip_select(self->board, true);
-        
+
         LDL_Chip_write(self->board, reg | 0x80U);
 
         for(i=0; i < len; i++){
@@ -761,10 +764,14 @@ static void burstWrite(struct ldl_radio *self, uint8_t reg, const uint8_t *data,
 
         LDL_Chip_select(self->board, false);
     }
+#endif
 }
 
 static void burstRead(struct ldl_radio *self, uint8_t reg, uint8_t *data, uint8_t len)
 {
+#ifdef LDL_ENABLE_HIGH_LEVEL_SPI
+    LDL_Chip_read(self->board, reg & 0x7fU, data, len);
+#else
     uint8_t i;
 
     if(len > 0U){
@@ -780,6 +787,7 @@ static void burstRead(struct ldl_radio *self, uint8_t reg, uint8_t *data, uint8_
 
         LDL_Chip_select(self->board, false);
     }
+#endif
 }
 
 #endif
