@@ -45,7 +45,7 @@ void LDL_Chip_reset(void *self, bool state)
     _self->reset = state;    
 }
 
-void LDL_Chip_write(void *self, uint8_t data)
+void LDL_Chip_write(void *self, uint8_t addr, const void *data, uint8_t size)
 {
     struct mock_lora_chip *_self = (struct mock_lora_chip *)self;
     
@@ -55,12 +55,11 @@ void LDL_Chip_write(void *self, uint8_t data)
     check_expected(data);
 }
 
-uint8_t LDL_Chip_read(void *self)
+void LDL_Chip_read(void *self, uint8_t addr, void *data, uint8_t size)
 {
     struct mock_lora_chip *_self = (struct mock_lora_chip *)self;
     
     assert_true(_self->select);
     assert_false(_self->reset);
-    
-    return mock();    
+
 }

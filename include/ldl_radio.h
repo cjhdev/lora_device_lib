@@ -100,10 +100,10 @@ struct ldl_radio_rx_setting {
 struct ldl_radio_packet_metadata {
     
     int16_t rssi;
-    int8_t snr;
-    enum ldl_signal_bandwidth bw;
-    enum ldl_spreading_factor sf;
-    uint32_t freq;
+    int16_t snr;
+    //enum ldl_signal_bandwidth bw;
+    //enum ldl_spreading_factor sf;
+    //uint32_t freq;
 };
 
 /** Power amplifier configuration */
@@ -181,6 +181,7 @@ void LDL_Radio_sleep(struct ldl_radio *self);
 void LDL_Radio_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);
 void LDL_Radio_receive(struct ldl_radio *self, const struct ldl_radio_rx_setting *settings);
 void LDL_Radio_clearInterrupt(struct ldl_radio *self);
+int16_t LDL_Radio_minSNR(const struct ldl_radio *self, enum ldl_spreading_factor sf);
 
 #ifdef LDL_ENABLE_RADIO_TEST
 void LDL_Radio_setFreq(struct ldl_radio *self, uint32_t freq);

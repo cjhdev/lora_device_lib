@@ -1,6 +1,15 @@
 Release History
 ===============
 
+# 0.3.0
+
+- BREAKING CHANGE to ldl_chip.h interface to work with SPI transactions; see radio connector documentation or header file for more details
+- updated arduino wrapper to work with new ldl_chip.h interface
+- fixed SNR margin calculation required for DevStatus MAC command; was
+  previously returning SNR not margin
+- fixed arduino wrapper garbled payload issue (incorrect session key index from changes made at 0.2.4)
+- fopts IV now being correctly generated for 1.1 servers (i was 1 instead of 0)
+
 # 0.2.4
 
 - now deriving join keys in LDL_MAC_otaa() so they are ready to check

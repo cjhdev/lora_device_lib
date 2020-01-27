@@ -130,7 +130,7 @@ void LDL_MAC_putDevStatusAns(struct ldl_stream *s, const struct ldl_dev_status_a
 {
     (void)LDL_Stream_putU8(s, typeToTag(LDL_CMD_DEV_STATUS));
     (void)LDL_Stream_putU8(s, value->battery);
-    (void)LDL_Stream_putU8(s, value->margin);           
+    (void)LDL_Stream_putU8(s, ((uint8_t)value->margin) & 0x3fU);           
 }
 
 void LDL_MAC_putNewChannelAns(struct ldl_stream *s, const struct ldl_new_channel_ans *value)

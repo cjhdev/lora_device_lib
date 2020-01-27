@@ -497,7 +497,8 @@ struct ldl_mac {
     uint16_t devNonce;
     uint32_t joinNonce;
     
-    int16_t margin;
+    int16_t snr_min;    /* could be optimised: used to keep the snr min for the last rx settings */
+    int16_t margin;     /* margin calculated for last DevStatusReq */
 
     /* time of the last valid downlink in seconds */
     uint32_t last_valid_downlink;
@@ -632,7 +633,7 @@ struct ldl_mac_init_arg {
  * - ldl_mac_init_arg.devNonce  the next devNonce to use in OTAA
  * - ldl_mac_init_arg.joinNonce the next joinNonce to use in OTAA
  * - ldl_mac_init_arg.session   optional pointer to restored session state
- * - ldl_mac_init_arg.gain      gain compensation
+ * - ldl_mac_init_arg.gain      gain compensation dB x 10^-2  (e.g. -2.4dB == -240)
  * 
  * More members may be added in future releases and so it is 
  * recommended to clear #ldl_mac_init_arg before using. This will ensure

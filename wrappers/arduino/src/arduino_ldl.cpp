@@ -75,16 +75,31 @@ void LDL_Chip_reset(void *self, bool state)
     Radio::radioReset(self, state);
 }
 
-void LDL_Chip_write(void *self, uint8_t data)
+void LDL_Chip_write(void *self, uint8_t addr, const void *data, uint8_t size)
 {
-    (void)self;
-    SPI.transfer(data);
+    uint8_t i;
+    uint8_t *ptr = (uint8_t *)data;
+    
+    Radio::radioSelect(self, true);               
+    
+    SPI.transfer(addr | 0x80U);
+    
+    for(i=0U; i < size; i++){
+    
+        SPI.transfer(ptr[i]);    
+    }
+    
+    Radio::radioSelect(self, false);
 }
 
-uint8_t LDL_Chip_read(void *self)
+void LDL_Chip_read(void *self, uint8_t addr, void *data, uint8_t size)
 {
-    (void)self;
-    return SPI.transfer(0U);
+    Radio::radioSelect(self, true);               
+    
+    SPI.transfer(addr & 0x7fU);
+    SPI.transfer(data, size);
+        
+    Radio::radioSelect(self, false);
 }
 
 void *getKey(struct ldl_sm *self, enum ldl_sm_key desc)
@@ -101,7 +116,7 @@ void *getKey(struct ldl_sm *self, enum ldl_sm_key desc)
     case LDL_SM_KEY_NWKSENC: 
     case LDL_SM_KEY_JSINT:   
     case LDL_SM_KEY_JSENC:  
-        i = 2U;
+        i = 1U;
         break;        
     case LDL_SM_KEY_APPS:
     default:

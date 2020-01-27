@@ -272,7 +272,7 @@ uint8_t LDL_Radio_collect(struct ldl_radio *self, struct ldl_radio_packet_metada
     retval = readFIFO(self, data, max);
     
     meta->rssi = (int16_t)readReg(self, RegPktRssiValue) - 157;
-    meta->snr = (int8_t)(readReg(self, RegPktSnrValue) / 4);
+    meta->snr = ((int16_t)readReg(self, RegPktSnrValue)) * 100 / 4;
     
     return retval;
 }
@@ -403,6 +403,38 @@ void LDL_Radio_enableLora(struct ldl_radio *self)
 }
 #endif
 
+int16_t LDL_Radio_minSNR(const struct ldl_radio *self, enum ldl_spreading_factor sf)
+{
+    int16_t retval = 0;
+    
+    (void)self;
+    
+    /* applicable to 1272 and 1276 */
+    switch(sf){
+    default:
+    case LDL_SF_7:
+        retval = -750;
+        break;
+    case LDL_SF_8:
+        retval = -1000;
+        break;
+    case LDL_SF_9:
+        retval = -1250;
+        break;
+    case LDL_SF_10:
+        retval = -1500;
+        break;
+    case LDL_SF_11:
+        retval = -1750;
+        break;
+    case LDL_SF_12:
+        retval = -2000;
+        break;
+    }
+    
+    return retval;
+}
+    
 /* static functions ***************************************************/
 
 static void enableLora(struct ldl_radio *self)
@@ -701,7 +733,7 @@ static uint8_t crSetting(const struct ldl_radio *self, enum ldl_coding_rate cr)
 
 static void setFreq(struct ldl_radio *self, uint32_t freq)
 {
-    uint32_t f = (uint32_t)(((uint64_t)freq << 19U) / 32000000U);
+    uint32_t f = (uint32_t)(((uint64_t)freq << 19U) / 32000000UL);
         
     writeReg(self, RegFrfMsb, f >> 16);
     writeReg(self, RegFrfMid, f >> 8);
@@ -735,51 +767,23 @@ static void writeFIFO(struct ldl_radio *self, const uint8_t *data, uint8_t len)
 static uint8_t readReg(struct ldl_radio *self, uint8_t reg)
 {
     uint8_t data;
-    burstRead(self, reg, &data, sizeof(data));
+    LDL_Chip_read(self->board, reg, &data, sizeof(data));
     return data;
 }
 
 static void writeReg(struct ldl_radio *self, uint8_t reg, uint8_t data)
 {
-    burstWrite(self, reg, &data, sizeof(data));
+    LDL_Chip_write(self->board, reg, &data, sizeof(data));
 }
 
 static void burstWrite(struct ldl_radio *self, uint8_t reg, const uint8_t *data, uint8_t len)
 {
-    uint8_t i;
-
-    if(len > 0U){
-
-        LDL_Chip_select(self->board, true);
-        
-        LDL_Chip_write(self->board, reg | 0x80U);
-
-        for(i=0; i < len; i++){
-
-            LDL_Chip_write(self->board, data[i]);
-        }
-
-        LDL_Chip_select(self->board, false);
-    }
+    LDL_Chip_write(self->board, reg, data, len);    
 }
 
 static void burstRead(struct ldl_radio *self, uint8_t reg, uint8_t *data, uint8_t len)
 {
-    uint8_t i;
-
-    if(len > 0U){
-
-        LDL_Chip_select(self->board, true);
-
-        LDL_Chip_write(self->board, reg & 0x7fU);
-
-        for(i=0U; i < len; i++){
-
-            data[i] = LDL_Chip_read(self->board);
-        }
-
-        LDL_Chip_select(self->board, false);
-    }
+    LDL_Chip_read(self->board, reg, data, len);    
 }
 
 #endif

@@ -34,7 +34,7 @@ struct ldl_block {
 
 /* static function prototypes *****************************************/
 
-static void initA(struct ldl_block *a, uint32_t devAddr, bool up, uint32_t counter);
+static void initA(struct ldl_block *a, uint32_t devAddr, bool up, uint32_t counter, uint8_t i);
 static void initB(struct ldl_block *b, uint16_t confirmCounter, uint8_t rate, uint8_t chIndex, bool up, uint32_t devAddr, uint32_t upCounter, uint8_t len);
 
 static uint32_t deriveDownCounter(struct ldl_mac *self, uint8_t port, uint16_t counter);
@@ -161,13 +161,15 @@ uint8_t LDL_OPS_prepareData(struct ldl_mac *self, const struct ldl_frame_data *f
         {
             struct ldl_block A;
             
-            initA(&A, f->devAddr, true, f->counter);
-
             /* encrypt fopt (LoRaWAN 1.1) */
             if(self->ctx.version == 1U){
                 
+                initA(&A, f->devAddr, true, f->counter, 0U);
+                
                 LDL_SM_ctr(self->sm, LDL_SM_KEY_NWKSENC, &A, &out[off.opts], f->optsLen);            
             }
+            
+            initA(&A, f->devAddr, true, f->counter, 1U);
             
             /* encrypt data */
             LDL_SM_ctr(self->sm, (f->port == 0U) ? LDL_SM_KEY_NWKSENC : LDL_SM_KEY_APPS, &A, &out[off.data], f->dataLen);                
@@ -337,13 +339,15 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                     
                     if(mic == f->mic){
                         
-                        initA(&A, f->devAddr, false, f->counter);
-
                         /* V1.1 encrypts the opts */
                         if(self->ctx.version == 1U){
                             
+                            initA(&A, f->devAddr, false, f->counter, 0U);
+                            
                             LDL_SM_ctr(self->sm, LDL_SM_KEY_NWKSENC, &A, f->opts, f->optsLen);    
                         }
+                        
+                        initA(&A, f->devAddr, false, f->counter, 1U);
                         
                         LDL_SM_ctr(self->sm, (f->port == 0U) ? LDL_SM_KEY_NWKSENC : LDL_SM_KEY_APPS, &A, f->data, f->dataLen);
                        
@@ -377,7 +381,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
 
 /* static functions ***************************************************/
 
-static void initA(struct ldl_block *a, uint32_t devAddr, bool up, uint32_t counter)
+static void initA(struct ldl_block *a, uint32_t devAddr, bool up, uint32_t counter, uint8_t i)
 {
     uint8_t pos = 0U;
     uint8_t *ptr = a->value;
@@ -387,7 +391,8 @@ static void initA(struct ldl_block *a, uint32_t devAddr, bool up, uint32_t count
     pos += putU8(&ptr[pos], up ? 0U : 1U);
     pos += putU32(&ptr[pos], devAddr);
     pos += putU32(&ptr[pos], counter);    
-    (void)putU16(&ptr[pos], 0x0100U);    
+    pos += putU8(&ptr[pos], 0U);    
+    (void)putU8(&ptr[pos], i);    
 }
 
 static void initB(struct ldl_block *b, uint16_t confirmCounter, uint8_t rate, uint8_t chIndex, bool up, uint32_t devAddr, uint32_t upCounter, uint8_t len)

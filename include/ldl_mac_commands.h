@@ -94,7 +94,7 @@ struct ldl_rx_param_setup_ans {
 struct ldl_dev_status_ans {
     
     uint8_t battery;
-    uint8_t margin;
+    int8_t margin;
 };
 
 struct ldl_new_channel_req {

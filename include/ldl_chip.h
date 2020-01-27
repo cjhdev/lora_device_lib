@@ -36,7 +36,6 @@
  * 
  * - LDL_Chip_read()
  * - LDL_Chip_write()
- * - LDL_Chip_select()
  * - LDL_Chip_reset()
  * 
  * The following interface MUST be called when the radio signals an interrupt:
@@ -122,14 +121,6 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
-/** Operate select line
- * 
- * @param[in] self      board from LDL_Radio_init()
- * @param[in] state     **true** for hold, **false** for release
- * 
- * */
-void LDL_Chip_select(void *self, bool state);
-
 /** Operate reset line
  * 
  * @param[in] self      board from LDL_Radio_init()
@@ -138,21 +129,35 @@ void LDL_Chip_select(void *self, bool state);
  * */
 void LDL_Chip_reset(void *self, bool state);
 
-/** Write byte
+/** Write bytes to address
  * 
  * @param[in] self      board from LDL_Radio_init()
- * @param[in] data
+ * @param[in] addr      register address
+ * @param[in] data      buffer to write
+ * @param[in] size      size of buffer in bytes
+ * 
+ * This function must handle chip selection, addressing, and transferring zero
+ * or more bytes. For example:
+ * 
+ * @include examples/chip_interface/write_example.c
  * 
  * */
-void LDL_Chip_write(void *self, uint8_t data);
+void LDL_Chip_write(void *self, uint8_t addr, const void *data, uint8_t size);
 
-/** Read byte
+/** Read bytes from address
  * 
  * @param[in] self      board from LDL_Radio_init()
- * @return data
+ * @param[in] addr      register address
+ * @param[out] data     read into this buffer
+ * @param[in] size      number of bytes to read (and size of buffer in bytes)
+ * 
+ * This function must handle chip selection, addressing, and transferring zero
+ * or more bytes. For example:
+ * 
+ * @include examples/chip_interface/read_example.c
  * 
  * */
-uint8_t LDL_Chip_read(void *self);
+void LDL_Chip_read(void *self, uint8_t addr, void *data, uint8_t size);
 
 #ifdef __cplusplus
 }

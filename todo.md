@@ -9,12 +9,12 @@ Todo
 - LoRaWAN conformance test
     - need to put LDL through the test
 
-- Class A
+- Class B
     - plan for how this feature can integrate with existing patterns
     - implement mode
     - implement tooling to prove the feature works
 
-- Class B
+- Class C
     - plan for how this feature can integrate with existing patterns
     - implement mode
     - implement tooling to prove the feature works

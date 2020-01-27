@@ -565,6 +565,8 @@ void LDL_MAC_process(struct ldl_mac *self)
                 
                 /* use waitA as a guard */
                 LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (LDL_System_tps()) << 4U);                                
+            
+                self->snr_min = LDL_Radio_minSNR(self->radio, radio_setting.sf);
             }
             else{
                 
@@ -609,6 +611,8 @@ void LDL_MAC_process(struct ldl_mac *self)
                 
                 /* use waitA as a guard */
                 LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (LDL_System_tps()) << 4U);
+                
+                self->snr_min = LDL_Radio_minSNR(self->radio, radio_setting.sf);
             }
             else{
                 
@@ -666,8 +670,8 @@ void LDL_MAC_process(struct ldl_mac *self)
             
             self->handler(self->app, LDL_MAC_DOWNSTREAM, &arg);      
 #endif  
-            self->margin = meta.snr;
-                      
+            self->margin = meta.snr - self->snr_min;
+            
             if(LDL_OPS_receiveFrame(self, &frame, buffer, len)){
                 
                 self->last_valid_downlink = timeNow(self);
@@ -2009,9 +2013,19 @@ static uint8_t processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t 
             struct ldl_dev_status_ans ans;        
             
             ans.battery = LDL_System_getBatteryLevel(self->app);
-            ans.margin = (int8_t)self->margin;
             
-            LDL_DEBUG(self->app, "dev_status_ans: battery=%u margin=%u",
+            ans.margin = (int8_t)(self->margin / 100);
+            
+            if(ans.margin > 31){
+            
+                ans.margin = 31;
+            }
+            else if(ans.margin < -32){
+                
+                ans.margin = -32;
+            }
+            
+            LDL_DEBUG(self->app, "dev_status_ans: battery=%u margin=%i",
                 ans.battery,
                 ans.margin
             )
