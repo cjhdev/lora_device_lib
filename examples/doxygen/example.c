@@ -205,16 +205,12 @@ void handle_radio_interrupt_dio3(void)
 
 
 /* these must connect to SPI and GPIO */
-void LDL_Chip_select(void *self, bool state)
-{
-}
 void LDL_Chip_reset(void *self, bool state)
 {
 }
-void LDL_Chip_write(void *self, uint8_t data)
+void LDL_Chip_write(void *self, uint8_t addr, const void *data, uint8_t size)
 {
 }
-uint8_t LDL_Chip_read(void *self)
+void LDL_Chip_read(void *self, uint8_t addr, void *data, uint8_t size)
 {
-    return 0UL;
 }
