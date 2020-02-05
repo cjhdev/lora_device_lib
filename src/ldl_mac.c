@@ -717,7 +717,7 @@ void LDL_MAC_process(struct ldl_mac *self)
                     arg.join_complete.nextDevNonce = self->devNonce;
                     arg.join_complete.netID = self->ctx.netID;
                     arg.join_complete.devAddr = self->ctx.devAddr;
-                    self->handler(self->app, LDL_MAC_JOIN_COMPLETE, NULL);                    
+                    self->handler(self->app, LDL_MAC_JOIN_COMPLETE, &arg);                    
 #endif                                      
                     self->state = LDL_STATE_IDLE;           
                     self->op = LDL_OP_NONE;                                
