@@ -52,6 +52,7 @@ static void encode_unconfirmed_up(void **user)
     f.dataLen = sizeof(payload)-1;
     
     retval = LDL_OPS_prepareData(&mac, &f, buffer, sizeof(buffer));
+    LDL_OPS_micDataFrame(&mac, buffer, retval);
     
     assert_int_equal(sizeof(expected)-1U, retval);    
     assert_memory_equal(expected, buffer, retval);        
@@ -105,7 +106,11 @@ static void encode_croft_example(void **user)
     f.data = payload;
     f.dataLen = sizeof(payload)-1;
     
+    mac.ctx.devAddr = f.devAddr;
+    mac.tx.counter = f.counter;
+    
     retval = LDL_OPS_prepareData(&mac, &f, buffer, sizeof(buffer));
+    LDL_OPS_micDataFrame(&mac, buffer, retval);
     
     assert_int_equal(sizeof(expected), retval);    
     assert_memory_equal(expected, buffer, retval);    

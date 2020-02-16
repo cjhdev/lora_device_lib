@@ -1,6 +1,16 @@
 Release History
 ===============
 
+# 0.3.1
+
+- fixed LDL_MAC_JOIN_COMPLETE event to pass argument instead of NULL (thanks dzurikmiroslav)
+- transmit channel is now selected before MIC is generated to solve LoRaWAN 1.1 issues
+  caused by the chIndex being part of the MIC generation
+- MIC is now updated for redundant transmissions in LoRaWAN 1.1 mode
+- fixed implementation to reject MAC commands that would cause all
+  channels to be masked
+- refactored the way response upstream messages are produced
+
 # 0.3.0
 
 - BREAKING CHANGE to ldl_chip.h interface to work with SPI transactions; see radio connector documentation or header file for more details

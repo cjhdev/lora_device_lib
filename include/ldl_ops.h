@@ -51,11 +51,16 @@ void LDL_OPS_deriveJoinKeys(struct ldl_mac *self);
 /* decode and verify a frame (depends on ldl_mac state but does not modify directly) */
 bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_t *in, uint8_t len);
 
-/* encode a frame  (depends on ldl_mac state but does not modify directly)  */
+/* encode a frame (depends on ldl_mac state but does not modify directly)  */
 uint8_t LDL_OPS_prepareData(struct ldl_mac *self, const struct ldl_frame_data *f, uint8_t *out, uint8_t max);
 uint8_t LDL_OPS_prepareJoinRequest(struct ldl_mac *self, const struct ldl_frame_join_request *f, uint8_t *out, uint8_t max);
 
+/* apply MIC to a data frame */
+void LDL_OPS_micDataFrame(struct ldl_mac *self, void *buffer, uint8_t size);
+
 /* derive expected 32 bit downcounter from 16 least significant bits and update the copy in ldl_mac */
 void LDL_OPS_syncDownCounter(struct ldl_mac *self, uint8_t port, uint16_t counter);
+
+
 
 #endif

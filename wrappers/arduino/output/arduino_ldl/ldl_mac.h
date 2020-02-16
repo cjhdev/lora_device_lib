@@ -506,11 +506,11 @@ struct ldl_mac {
     /* the settings currently being used to TX */
     struct {
         
-        uint8_t chIndex;
         uint32_t freq;
+        uint32_t counter;
+        uint8_t chIndex;        
         uint8_t rate;
-        uint8_t power;
-        
+        uint8_t power;        
     } tx;
     
     uint32_t rx1_margin;

@@ -174,33 +174,33 @@ uint8_t LDL_OPS_prepareData(struct ldl_mac *self, const struct ldl_frame_data *f
             /* encrypt data */
             LDL_SM_ctr(self->sm, (f->port == 0U) ? LDL_SM_KEY_NWKSENC : LDL_SM_KEY_APPS, &A, &out[off.data], f->dataLen);                
         }
-
-        /* produce MIC*/
-        {
-            struct ldl_block B0;
-            struct ldl_block B1;            
-            uint32_t micS;
-            uint32_t micF;
-            
-            initB(&B0, 0U, 0U, 0U, true, f->devAddr, f->counter, retval - sizeof(micF)); 
-            initB(&B1, 0U, self->tx.rate, self->tx.chIndex, true, f->devAddr, f->counter, retval - sizeof(micS));
-
-            micF = LDL_SM_mic(self->sm, LDL_SM_KEY_FNWKSINT, &B0, sizeof(B0.value), out, retval - sizeof(micF));       
-
-            if(self->ctx.version == 1U){
-            
-                micS = LDL_SM_mic(self->sm, LDL_SM_KEY_SNWKSINT, &B1, sizeof(B1.value), out, retval - sizeof(micS));
-                
-                LDL_Frame_updateMIC(out, retval, ((micF << 16) | (micS & 0xffffUL))); 
-            } 
-            else{
-                
-                LDL_Frame_updateMIC(out, retval, micF); 
-            }
-        }
     }
      
     return retval;
+}
+
+void LDL_OPS_micDataFrame(struct ldl_mac *self, void *buffer, uint8_t size)
+{
+    struct ldl_block B0;
+    struct ldl_block B1;            
+    uint32_t micS;
+    uint32_t micF;
+    
+    initB(&B0, 0U, 0U, 0U, true, self->ctx.devAddr, self->tx.counter, size - sizeof(micF)); 
+    initB(&B1, 0U, self->tx.rate, self->tx.chIndex, true, self->ctx.devAddr, self->tx.counter, size - sizeof(micS));
+
+    micF = LDL_SM_mic(self->sm, LDL_SM_KEY_FNWKSINT, &B0, sizeof(B0.value), buffer, size - sizeof(micF));       
+
+    if(self->ctx.version == 1U){
+    
+        micS = LDL_SM_mic(self->sm, LDL_SM_KEY_SNWKSINT, &B1, sizeof(B1.value), buffer, size - sizeof(micS));
+        
+        LDL_Frame_updateMIC(buffer, size, ((micF << 16) | (micS & 0xffffUL))); 
+    } 
+    else{
+        
+        LDL_Frame_updateMIC(buffer, size, micF); 
+    }
 }
 
 uint8_t LDL_OPS_prepareJoinRequest(struct ldl_mac *self, const struct ldl_frame_join_request *f, uint8_t *out, uint8_t max)
