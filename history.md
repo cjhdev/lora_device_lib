@@ -9,7 +9,10 @@ Release History
 - MIC is now updated for redundant transmissions in LoRaWAN 1.1 mode
 - fixed implementation to reject MAC commands that would cause all
   channels to be masked
-- refactored the way response upstream messages are produced
+- upstream MAC commands are now deferred until the application sends the next upstream message
+- LDL_MAC_unconfirmedData() and LDL_MAC_confirmedData() will now indicate if they
+  have failed due to prioritising deferred MAC commands which cannot fit in
+  in the same frame
 
 # 0.3.0
 

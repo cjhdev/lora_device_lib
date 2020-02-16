@@ -123,6 +123,7 @@ extern "C" {
 #include "ldl_platform.h"
 #include "ldl_region.h"
 #include "ldl_radio.h"
+#include "ldl_mac_commands.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -344,8 +345,7 @@ enum ldl_mac_state {
     
     LDL_STATE_RX2_LOCKOUT, /**< used to ensure an out of range RX2 window is not clobbered */
     
-    LDL_STATE_WAIT_RETRY,  /**< wait to retransmit / retry */
-    LDL_STATE_WAIT_SEND
+    LDL_STATE_WAIT_RETRY   /**< wait to retry */
     
 };
 
@@ -371,7 +371,8 @@ enum ldl_mac_errno {
     LDL_ERRNO_BUSY,        /**< stack is busy; cannot process request */
     LDL_ERRNO_NOTJOINED,   /**< stack is not joined; cannot process request */
     LDL_ERRNO_POWER,       /**< power setting not valid for region */
-    LDL_ERRNO_INTERNAL     /**< implementation fault */
+    LDL_ERRNO_INTERNAL,    /**< implementation fault */
+    LDL_ERRNO_MACPRIORITY  /**< data request failed due to MAC command(s) being prioritised */
 };
 
 /* band array indices */
@@ -462,6 +463,16 @@ struct ldl_mac_session {
     
     uint16_t adr_ack_limit;
     uint16_t adr_ack_delay;
+    
+    uint16_t pending_cmds;
+    
+    struct ldl_rx_param_setup_ans rx_param_setup_ans;
+    struct ldl_dl_channel_ans dl_channel_ans;
+    
+    struct ldl_link_adr_ans link_adr_ans;
+    struct ldl_dev_status_ans dev_status_ans;
+    struct ldl_new_channel_ans new_channel_ans;    
+    struct ldl_rejoin_param_setup_ans rejoin_param_setup_ans;
 };
 
 /** data service invocation options */
@@ -531,7 +542,6 @@ struct ldl_mac {
     ldl_mac_response_fn handler;
     void *app;
     
-    bool linkCheckReq_pending;
     bool rxParamSetupAns_pending;    
     bool dlChannelAns_pending;
     bool rxtimingSetupAns_pending;
@@ -669,6 +679,19 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
  * 
  * #ldl_mac_response_fn will push #LDL_MAC_DATA_COMPLETE on completion.
  * 
+ * Be aware that pending MAC commands (i.e. MAC commands LDL is waiting to send to the server)
+ * are piggy-backed onto upstream data frames. If the pending MAC commands will
+ * not fit into the same frame as the application data, the MAC commands will be prioritised.
+ * This means that:
+ * 
+ * 1. LDL_MAC_unconfirmedData() function will return false to indicate failure to the application
+ * 2. LDL_MAC_errno() will return LDL_ERRNO_MACPRIORITY
+ * 3. LDL will become busy and send the pending MAC commands as an unconfirmed data frame (note
+ *    that this will result in all the usual event notifications coming back to the application)
+ * 
+ * The application can recover from send request failure by trying again when LDL
+ * becomes ready again.
+ * 
  * @param[in] self  #ldl_mac
  * @param[in] port  lorawan port (must be >0)
  * @param[in] data  pointer to message to send
@@ -696,6 +719,8 @@ bool LDL_MAC_unconfirmedData(struct ldl_mac *self, uint8_t port, const void *dat
  * #ldl_mac_response_fn will push #LDL_MAC_DATA_TIMEOUT on every timeout
  * #ldl_mac_response_fn will push #LDL_MAC_DATA_COMPLETE on completion
  * 
+ * MAC commands are piggy-backed and prioritised the same as they are for
+ * LDL_MAC_unconfirmedData(). 
  * 
  * @param[in] self  #ldl_mac
  * @param[in] port  lorawan port (must be >0)

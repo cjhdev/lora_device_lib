@@ -157,23 +157,22 @@ uint8_t LDL_OPS_prepareData(struct ldl_mac *self, const struct ldl_frame_data *f
 
     if(retval > 0U){
 
-        /* encrypt */
-        {
-            struct ldl_block A;
+        
+        struct ldl_block A;
+        
+        /* encrypt fopt (LoRaWAN 1.1) */
+        if(self->ctx.version == 1U){
             
-            /* encrypt fopt (LoRaWAN 1.1) */
-            if(self->ctx.version == 1U){
-                
-                initA(&A, f->devAddr, true, f->counter, 0U);
-                
-                LDL_SM_ctr(self->sm, LDL_SM_KEY_NWKSENC, &A, &out[off.opts], f->optsLen);            
-            }
+            initA(&A, f->devAddr, true, f->counter, 0U);
             
-            initA(&A, f->devAddr, true, f->counter, 1U);
-            
-            /* encrypt data */
-            LDL_SM_ctr(self->sm, (f->port == 0U) ? LDL_SM_KEY_NWKSENC : LDL_SM_KEY_APPS, &A, &out[off.data], f->dataLen);                
+            LDL_SM_ctr(self->sm, LDL_SM_KEY_NWKSENC, &A, &out[off.opts], f->optsLen);            
         }
+        
+        initA(&A, f->devAddr, true, f->counter, 1U);
+        
+        /* encrypt data */
+        LDL_SM_ctr(self->sm, (f->port == 0U) ? LDL_SM_KEY_NWKSENC : LDL_SM_KEY_APPS, &A, &out[off.data], f->dataLen);                
+        
     }
      
     return retval;
