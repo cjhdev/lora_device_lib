@@ -33,7 +33,7 @@ of these connections are required for correct operation.
 ## Flash/RAM Usage
 
 [examples/mbed_sx1272_small_code](examples/mbed_sx1272_small_code) requires ~24KB of flash and ~800B of RAM.
-
+    
 ## Example
 
 In this example a node will:

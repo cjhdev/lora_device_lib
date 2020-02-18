@@ -264,11 +264,6 @@ namespace LDL {
             void setMaxDCycle(uint8_t maxDCycle);            
             uint8_t getMaxDCycle();
             
-            /* transmission redundancy to apply to all upstream messages
-             * 
-             * */        
-            void setNbTrans(uint8_t nbTrans);            
-            uint8_t getNbTrans();
     };
     
 };

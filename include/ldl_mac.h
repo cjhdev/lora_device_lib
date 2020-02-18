@@ -95,7 +95,6 @@
  * - LDL_MAC_enableADR()
  * - LDL_MAC_disableADR()
  * - LDL_MAC_setMaxDCycle()
- * - LDL_MAC_setNbTrans()
  * 
  * Data services are not available until #ldl_mac is joined to a network.
  * The join procedure is initiated by calling LDL_MAC_otaa(). LDL_MAC_otaa() will return false if the join procedure cannot be initiated. The application
@@ -711,7 +710,6 @@ bool LDL_MAC_unconfirmedData(struct ldl_mac *self, uint8_t port, const void *dat
  * Once initiated MAC will send at most nbTrans times until a confirmation is received. NbTrans may be set:
  * 
  * - globally by the network (via LinkADRReq)
- * - globally by the application (via LDL_MAC_setNbTrans())
  * - per invocation by #ldl_mac_data_opts
  * 
  * The application can cancel the service while it is in progress by calling LDL_MAC_cancel().
@@ -1007,31 +1005,6 @@ void LDL_MAC_setMaxDCycle(struct ldl_mac *self, uint8_t maxDCycle);
  * 
  * */
 uint8_t LDL_MAC_getMaxDCycle(const struct ldl_mac *self);
-
-/** Set transmission redundancy
- *
- * - confirmed and unconfirmed uplink frames are sent nbTrans times (or until acknowledgement is received)
- * - a value of zero will leave the setting unchanged
- * - limited to 15 or LDL_REDUNDANCY_MAX (whichever is lower)
- * 
- * @param[in] self  #ldl_mac
- * @param[in] nbTrans
- * 
- * @see LoRaWAN Specification: LinkADRReq.Redundancy.NbTrans
- * 
- * */
-void LDL_MAC_setNbTrans(struct ldl_mac *self, uint8_t nbTrans);
-
-/** Get transmission redundancy
- * 
- * @param[in] self  #ldl_mac
- * 
- * @return nbTrans
- * 
- * @see LoRaWAN Specification: LinkADRReq.Redundancy.NbTrans
- * 
- * */
-uint8_t LDL_MAC_getNbTrans(const struct ldl_mac *self);
 
 /** Return true to indicate that LDL is expecting to handle
  * a time sensitive event in the next interval.

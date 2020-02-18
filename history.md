@@ -13,6 +13,8 @@ Release History
 - LDL_MAC_unconfirmedData() and LDL_MAC_confirmedData() will now indicate if they
   have failed due to prioritising deferred MAC commands which cannot fit in
   in the same frame
+- removed LDL_MAC_setNbTrans() and LDL_MAC_getNbTrans() since the per-invocation
+  override feature makes it redundant
 
 # 0.3.0
 

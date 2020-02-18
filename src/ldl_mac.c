@@ -1115,24 +1115,6 @@ uint8_t LDL_MAC_getMaxDCycle(const struct ldl_mac *self)
     return self->ctx.maxDutyCycle;
 }
 
-void LDL_MAC_setNbTrans(struct ldl_mac *self, uint8_t nbTrans)
-{
-    LDL_PEDANTIC(self != NULL)
-    
-    self->ctx.nbTrans = nbTrans & 0xfU;
-    
-#ifndef LDL_DISABLE_SESSION_UPDATE
-    pushSessionUpdate(self);     
-#endif        
-}
-
-uint8_t LDL_MAC_getNbTrans(const struct ldl_mac *self)
-{
-    LDL_PEDANTIC(self != NULL)
-    
-    return self->ctx.nbTrans;        
-}
-
 bool LDL_MAC_addChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate)
 {
     LDL_PEDANTIC(self != NULL)

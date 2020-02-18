@@ -470,16 +470,6 @@ uint8_t MAC::getMaxDCycle()
     return LDL_MAC_getMaxDCycle(&mac);
 }
 
-void MAC::setNbTrans(uint8_t nbTrans)
-{
-    LDL_MAC_setNbTrans(&mac, nbTrans);
-}
-
-uint8_t MAC::getNbTrans()
-{
-    return LDL_MAC_getNbTrans(&mac);
-}
-
 /* protected methods **************************************************/
 
 void Radio::arm_dio(struct DioInput *dio)
