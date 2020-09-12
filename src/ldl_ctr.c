@@ -1,15 +1,15 @@
-/* Copyright (c) 2019 Cameron Harper
- * 
+/* Copyright (c) 2019-2020 Cameron Harper
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
  * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
  * the Software, and to permit persons to whom the Software is furnished to do so,
  * subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
  * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
@@ -34,7 +34,7 @@ static void xor128(uint8_t *acc, const uint8_t *op);
 void LDL_CTR_encrypt(struct ldl_aes_ctx *ctx, const void *iv, const void *in, void *out, uint8_t len)
 {
     LDL_PEDANTIC(ctx != NULL)
-    
+
     uint8_t a[16U];
     uint8_t s[16U];
     uint8_t pld[16U];
@@ -47,32 +47,32 @@ void LDL_CTR_encrypt(struct ldl_aes_ctx *ctx, const void *iv, const void *in, vo
 
     /* number of blocks */
     k = (len / 16U) + (((len % 16U) != 0U) ? 1U : 0U);
-    
+
     pos = 0U;
 
     ptr_in = (const uint8_t *)in;
     ptr_out = (uint8_t *)out;
 
-    (void)memcpy(a, iv, sizeof(a)); 
+    (void)memcpy(a, iv, sizeof(a));
 
     for(i=0U; i < k; i++){
 
         size = ((len - pos) >= (uint8_t)sizeof(a)) ? (uint8_t)sizeof(a) : (len - pos);
-        
+
         (void)memset(pld, 0, sizeof(pld));
-        
+
         (void)memcpy(pld, &ptr_in[pos], size);
 
         (void)memcpy(s, a, sizeof(s));
-        
+
         a[15U]++;
-        
+
         LDL_AES_encrypt(ctx, s);
 
         xor128(pld, s);
 
         (void)memcpy(&ptr_out[pos], pld, size);
-        
+
         pos += (uint8_t)sizeof(a);
     }
 }

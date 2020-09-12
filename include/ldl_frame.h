@@ -1,15 +1,15 @@
-/* Copyright (c) 2019 Cameron Harper
- * 
+/* Copyright (c) 2019-2020 Cameron Harper
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
  * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
  * the Software, and to permit persons to whom the Software is furnished to do so,
  * subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
  * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
@@ -37,14 +37,14 @@ enum ldl_frame_type {
     FRAME_TYPE_DATA_UNCONFIRMED_UP,
     FRAME_TYPE_DATA_UNCONFIRMED_DOWN,
     FRAME_TYPE_DATA_CONFIRMED_UP,
-    FRAME_TYPE_DATA_CONFIRMED_DOWN,    
+    FRAME_TYPE_DATA_CONFIRMED_DOWN,
     FRAME_TYPE_REJOIN_REQ
 };
 
 struct ldl_frame_data {
-    
+
     enum ldl_frame_type type;
-    
+
     uint32_t devAddr;
     uint16_t counter;
     bool ack;
@@ -56,10 +56,10 @@ struct ldl_frame_data {
     uint8_t optsLen;
 
     uint8_t port;
-    
+
     const uint8_t *data;
     uint8_t dataLen;
-    
+
     uint32_t mic;
 };
 
@@ -70,33 +70,33 @@ struct ldl_frame_data_offset {
 };
 
 enum ldl_frame_rejoin_type {
-        
+
     LDL_REJOIN_TYPE_1,
     LDL_REJOIN_TYPE_2,
     LDL_REJOIN_TYPE_3
 };
 
 struct ldl_frame_rejoin_request {
-    
+
     enum ldl_frame_rejoin_type type;
     uint32_t netID;
     const uint8_t *devEUI;
-    uint16_t rjCount;    
+    uint16_t rjCount;
     uint32_t mic;
 };
 
 struct ldl_frame_join_request {
-    
+
     const uint8_t *joinEUI;
     const uint8_t *devEUI;
-    uint16_t devNonce;    
+    uint16_t devNonce;
     uint32_t mic;
 };
 
 struct ldl_frame_down {
 
     enum ldl_frame_type type;
-    
+
     /* join accept */
     uint32_t joinNonce;
     uint32_t netID;
@@ -107,7 +107,7 @@ struct ldl_frame_down {
     bool optNeg;
     uint8_t *cfList;
     uint8_t cfListLen;
-    
+
     /* data */
     /*uint32_t devAddr;*/
     uint16_t counter;
@@ -122,11 +122,11 @@ struct ldl_frame_down {
     bool dataPresent;   /* possible to have port without data */
 
     uint8_t port;       /* valid when dataPresent is true */
-    
+
     uint8_t *data;      /* NULL when not present */
     uint8_t dataLen;    /* 0 when not present */
-    
-    uint32_t mic;    
+
+    uint32_t mic;
 };
 
 /* function prototypes ************************************************/

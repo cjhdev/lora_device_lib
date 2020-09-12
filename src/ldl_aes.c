@@ -1,15 +1,15 @@
-/* Copyright (c) 2019 Cameron Harper
- * 
+/* Copyright (c) 2019-2020 Cameron Harper
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
  * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
  * the Software, and to permit persons to whom the Software is furnished to do so,
  * subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
  * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
@@ -29,7 +29,7 @@
 
 #define AES_BLOCK_SIZE 16U
 
-#define R1 0U   
+#define R1 0U
 #define R2 1U
 #define R3 2U
 #define R4 3U
@@ -44,27 +44,20 @@
 #ifdef LDL_ENABLE_AVR
 
     #include <avr/pgmspace.h>
-    
+
     #define RSBOX(C) pgm_read_byte(&rsbox[(C)])
     #define SBOX(C) pgm_read_byte(&sbox[(C)])
     #define RCON(C) pgm_read_byte(&rcon[(C)])
 
 #else
-    
+
     #define PROGMEM
-    
+
     #define SBOX(C) (sbox[(C)])
     #define RCON(C) (rcon[(C)])
     #define RSBOX(C) (rsbox[(C)])
-    
+
 #endif
-
-enum aes_key_size {
-
-    AES_KEY_128 = 16U,
-    AES_KEY_192 = 24U,
-    AES_KEY_256 = 32U
-};
 
 /* static variables ***************************************************/
 
@@ -114,7 +107,7 @@ void LDL_AES_init(struct ldl_aes_ctx *ctx, const void *key)
     uint8_t *k;
     uint8_t ks;
     uint8_t i = 1U;
-    
+
     static const uint8_t rcon[] PROGMEM = {
         0x8dU, 0x01U, 0x02U, 0x04U, 0x08U, 0x10U, 0x20U, 0x40U, 0x80U, 0x1bU, 0x36U
     };
@@ -126,13 +119,13 @@ void LDL_AES_init(struct ldl_aes_ctx *ctx, const void *key)
     b = 176U;
 
     (void)memcpy(ctx->k, key, 16U);
-    k = ctx->k;    
+    k = ctx->k;
     ks = 16U;
     p = ks;
 
     /* Rijndael key schedule */
     while(p < b){
-        
+
         swap = k[p - 4U];
         k[p     ] = SBOX( k[p - 3U] ) ^ k[p      - ks] ^ RCON(i);
         k[p + 1U] = SBOX( k[p - 2U] ) ^ k[p + 1U - ks];
@@ -153,11 +146,11 @@ void LDL_AES_init(struct ldl_aes_ctx *ctx, const void *key)
 void LDL_AES_encrypt(const struct ldl_aes_ctx *ctx, void *s)
 {
     uint8_t *_s = s;
-    uint8_t r;    
+    uint8_t r;
     uint8_t a;
     uint8_t b;
     uint8_t c;
-    uint8_t d;    
+    uint8_t d;
     uint8_t i;
     uint8_t p = 0U;
     const uint8_t *k = ctx->k;
@@ -204,10 +197,10 @@ void LDL_AES_encrypt(const struct ldl_aes_ctx *ctx, void *s)
 
                 _s[i] ^= ctx->k[p+i];
             }
-            
+
             break;
         }
-         
+
         /* mix columns */
         for(i=0U; i < 16U; i += 4U){
 
@@ -216,7 +209,7 @@ void LDL_AES_encrypt(const struct ldl_aes_ctx *ctx, void *s)
             c = _s[i + 2U];
             d = _s[i + 3U];
 
-            /* 2a + 3b + 1c + 1d 
+            /* 2a + 3b + 1c + 1d
              * 1a + 2b + 3c + 1d
              * 1a + 1b + 2c + 3d
              * 3a + 1b + 1c + 2d
@@ -229,5 +222,5 @@ void LDL_AES_encrypt(const struct ldl_aes_ctx *ctx, void *s)
         }
 
         p += 16U;
-    }   
+    }
 }

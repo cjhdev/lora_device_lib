@@ -1,15 +1,15 @@
-/* Copyright (c) 2019 Cameron Harper
- * 
+/* Copyright (c) 2019-2020 Cameron Harper
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
  * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
  * the Software, and to permit persons to whom the Software is furnished to do so,
  * subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
  * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
@@ -18,7 +18,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  * */
- 
+
 #ifndef LDL_CMAC_H
 #define LDL_CMAC_H
 
@@ -26,7 +26,7 @@
 
 /**
  * @addtogroup ldl_crypto
- * 
+ *
  * @{
  * */
 
@@ -49,28 +49,28 @@ struct ldl_cmac_ctx {
 };
 
 /** Initialise CMAC state
- * 
+ *
  * @param[in] ctx
  * @param[in] aes_ctx block cipher state
- * 
+ *
  * */
 void LDL_CMAC_init(struct ldl_cmac_ctx *ctx, const struct ldl_aes_ctx *aes_ctx);
 
 /** Update CMAC state
- * 
+ *
  * @param[in] ctx
  * @param[in] data
  * @param[in] len
- * 
+ *
  * */
 void LDL_CMAC_update(struct ldl_cmac_ctx *ctx, const void *data, uint8_t len);
 
 /** Produce CMAC output from current state
- * 
+ *
  * @param[in]   ctx
  * @param[out]  out
- * @param[in]   outMax 
- * 
+ * @param[in]   outMax
+ *
  * */
 void LDL_CMAC_finish(const struct ldl_cmac_ctx *ctx, void *out, uint8_t outMax);
 

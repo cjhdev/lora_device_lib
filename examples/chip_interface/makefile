@@ -3,7 +3,7 @@ DIR_ROOT := ../..
 DIR_BUILD := build
 DIR_BIN := bin
 
-SRC := read_example.c write_example.c
+SRC := read_example.c write_example.c set_mode_example.c
 OBJ := $(SRC:.c=.o)
 
 VPATH += .

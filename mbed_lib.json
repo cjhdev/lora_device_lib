@@ -1,0 +1,43 @@
+{
+    "name" : "ldl",
+    "macros" : [
+        "LDL_ENABLE_SX1272",
+        "LDL_ENABLE_SX1276",
+        "LDL_ENABLE_EU_863_870",
+        "LDL_ENABLE_US_902_928",
+        "LDL_ENABLE_AU_915_928",
+        "LDL_ENABLE_STATIC_RX_BUFFER"
+    ],
+    "config" : {
+        "present": 1,
+        "buffer-size" : {
+            "help" : "frame buffer size (max is 255)",
+            "macro_name" : "LDL_MAX_PACKET",
+            "value" : 255,
+            "value_max" : 255,
+            "value_min" : 64
+        },
+        "max-redundancy" : {
+            "help" : "maximum number of redundant packets allowed",
+            "macro_name" : "LDL_REDUNDANCY_MAX",
+            "value" : 3,
+            "value_max" : 15,
+            "value_min" : 0
+        },
+        "spi-frequency" : {
+            "help" : "SPI frequency for transceiver",
+            "value" : 4000000,
+            "value_max" : 10000000,
+            "value_min" : 1000000
+        },
+        "port-include" : {
+            "macro_name" : "LDL_TARGET_INCLUDE",
+            "value" : "\"mbed_ldl_port.h\""
+        },
+        "default-rate" : {
+            "help" : "The maximum data rate LDL will use",
+            "macro_name" : "LDL_DEFAULT_RATE",
+            "value" : 1
+        }
+    }
+}

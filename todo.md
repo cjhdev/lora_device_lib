@@ -32,7 +32,3 @@ Todo
     - KR_920_923
     - IN_865_867
     - RU_864_870    
-
-- MBED wrapper
-    - useful as a worked example (same as Arduino)
-    - useful as a direct comparison to LoRaMAC-Node (the built-in MBED stack)

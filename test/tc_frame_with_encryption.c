@@ -25,6 +25,7 @@ static void init_mac(struct ldl_mac *mac, const void *key, enum ldl_mac_operatio
     (void)memset(&sm, 0, sizeof(sm));    
     
     mac->sm = &sm;
+    mac->sm_interface = &LDL_SM_interface;
     mac->op = op;
     
     for(i=0; i < sizeof(sm.keys)/sizeof(*sm.keys); i++){

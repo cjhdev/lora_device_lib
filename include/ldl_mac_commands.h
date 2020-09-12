@@ -1,15 +1,15 @@
-/* Copyright (c) 2019 Cameron Harper
- * 
+/* Copyright (c) 2019-2020 Cameron Harper
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
  * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
  * the Software, and to permit persons to whom the Software is furnished to do so,
  * subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
  * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
@@ -32,7 +32,7 @@ extern "C" {
 struct ldl_stream;
 
 enum ldl_mac_cmd_type {
-    
+
     LDL_CMD_LINK_CHECK,
     LDL_CMD_LINK_ADR,
     LDL_CMD_DUTY_CYCLE,
@@ -42,7 +42,7 @@ enum ldl_mac_cmd_type {
     LDL_CMD_RX_TIMING_SETUP,
     LDL_CMD_TX_PARAM_SETUP,
     LDL_CMD_DL_CHANNEL,
-    
+
     LDL_CMD_REKEY,
     LDL_CMD_ADR_PARAM_SETUP,
     LDL_CMD_DEVICE_TIME,
@@ -51,114 +51,114 @@ enum ldl_mac_cmd_type {
 };
 
 struct ldl_link_check_ans {
-                
+
     uint8_t margin;
     uint8_t gwCount;
 };
 
 struct ldl_link_adr_req {
-    
+
     uint8_t dataRate;
     uint8_t txPower;
     uint16_t channelMask;
     uint8_t channelMaskControl;
-    uint8_t nbTrans;        
+    uint8_t nbTrans;
 };
 
 struct ldl_link_adr_ans {
-    
+
     bool powerOK;
     bool dataRateOK;
     bool channelMaskOK;
 };
 
 struct ldl_duty_cycle_req {
-    
+
     uint8_t maxDutyCycle;
 };
 
 struct ldl_rx_param_setup_req {
-    
+
     uint8_t rx1DROffset;
     uint8_t rx2DataRate;
     uint32_t freq;
 };
 
 struct ldl_rx_param_setup_ans {
-    
+
     bool rx1DROffsetOK;
     bool rx2DataRateOK;
     bool channelOK;
 };
 
 struct ldl_dev_status_ans {
-    
+
     uint8_t battery;
     int8_t margin;
 };
 
 struct ldl_new_channel_req {
-    
+
     uint8_t chIndex;
     uint32_t freq;
     uint8_t maxDR;
     uint8_t minDR;
 };
-    
+
 struct ldl_new_channel_ans {
-    
+
     bool dataRateRangeOK;
     bool channelFreqOK;
 };
 
 struct ldl_dl_channel_req {
-    
+
     uint8_t chIndex;
-    uint32_t freq;    
+    uint32_t freq;
 };
 
 struct ldl_dl_channel_ans {
-    
+
     bool uplinkFreqOK;
     bool channelFreqOK;
 };
 
 struct ldl_rx_timing_setup_req {
-    
+
     uint8_t delay;
 };
 
 struct ldl_tx_param_setup_req {
-    
+
     bool downlinkDwell;
     bool uplinkDwell;
     uint8_t maxEIRP;
 };
 
 struct ldl_rekey_ind {
-    
+
     uint8_t version;
 };
 
 struct ldl_rekey_conf {
-    
+
     uint8_t version;
 };
 
 struct ldl_adr_param_setup_req {
-    
+
     uint8_t limit_exp;
     uint8_t delay_exp;
 };
 
 struct ldl_device_time_ans {
-    
+
     uint32_t seconds;
     uint8_t fractions;
 };
 
 struct ldl_force_rejoin_req {
-    
+
     uint8_t period;
     uint8_t max_retries;
     uint8_t rejoin_type;
@@ -166,22 +166,22 @@ struct ldl_force_rejoin_req {
 };
 
 struct ldl_rejoin_param_setup_req {
-  
+
     uint8_t maxTimeN;
     uint8_t maxCountN;
 };
 
 struct ldl_rejoin_param_setup_ans {
-    
+
     uint8_t timeOK;
 };
 
 struct ldl_downstream_cmd {
-  
+
     enum ldl_mac_cmd_type type;
-  
+
     union {
-      
+
         struct ldl_link_check_ans linkCheck;
         struct ldl_link_adr_req linkADR;
         struct ldl_duty_cycle_req dutyCycle;
@@ -190,24 +190,24 @@ struct ldl_downstream_cmd {
         struct ldl_new_channel_req newChannel;
         struct ldl_dl_channel_req dlChannel;
         struct ldl_rx_timing_setup_req rxTimingSetup;
-        struct ldl_tx_param_setup_req txParamSetup;        
+        struct ldl_tx_param_setup_req txParamSetup;
         struct ldl_rekey_conf rekey;
         struct ldl_adr_param_setup_req adrParamSetup;
         struct ldl_device_time_ans deviceTime;
         struct ldl_force_rejoin_req forceRejoin;
-        struct ldl_rejoin_param_setup_req rejoinParamSetup;        
-        
-    } fields;    
+        struct ldl_rejoin_param_setup_req rejoinParamSetup;
+
+    } fields;
 };
 
 struct ldl_upstream_cmd {
-  
+
     enum ldl_mac_cmd_type type;
-  
+
     union {
-      
+
         struct ldl_link_adr_ans linkADR;
-        /* duty_cycle_ans */        
+        /* duty_cycle_ans */
         struct ldl_rx_param_setup_ans rxParamSetup;
         struct ldl_dev_status_ans devStatus;
         struct ldl_new_channel_ans newChannel;
@@ -216,8 +216,8 @@ struct ldl_upstream_cmd {
         /* tx_param_setup_ans */
         struct ldl_rekey_ind rekey;
         struct ldl_rejoin_param_setup_ans rejoinParamSetup;
-        
-    } fields;    
+
+    } fields;
 };
 
 

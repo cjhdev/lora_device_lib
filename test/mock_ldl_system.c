@@ -22,32 +22,13 @@ uint32_t LDL_System_ticks(void *app)
     return system_time;
 }
 
-uint32_t LDL_System_tps(void)
-{
-    return 1000000UL;
-}
-
-uint32_t LDL_System_eps(void)
-{
-    return 0UL;
-}
-
-uint8_t LDL_System_rand(void *app)
+uint32_t LDL_System_rand(void *app)
 {
     return mock();
 }
 
-uint8_t LDL_System_getBatteryLevel(void *receiver)
+uint32_t LDL_System_getBatteryLevel(void *receiver)
 {
-    struct mock_system_param *self = (struct mock_system_param *)receiver;    
-    return self->battery_level;    
-}
-
-bool LDL_System_restoreContext(void *receiver, struct ldl_mac_session *value)
-{
-    return false;
-}
-
-void LDL_System_saveContext(void *receiver, const struct ldl_mac_session *value)
-{
+    struct mock_system_param *self = (struct mock_system_param *)receiver;
+    return self->battery_level;
 }

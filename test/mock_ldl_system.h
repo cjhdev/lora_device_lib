@@ -7,11 +7,13 @@
 struct mock_system_param {
 
     uint8_t battery_level;
-    
+
     uint16_t upCounter;
-    uint16_t downCounter;    
+    uint16_t downCounter;
 };
 
 void mock_lora_system_init(struct mock_system_param *self);
+
+uint32_t LDL_System_ticks(void *app);
 
 #endif

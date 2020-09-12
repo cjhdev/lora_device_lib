@@ -1,15 +1,15 @@
-/* Copyright (c) 2019 Cameron Harper
- * 
+/* Copyright (c) 2019-2020 Cameron Harper
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
  * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
  * the Software, and to permit persons to whom the Software is furnished to do so,
  * subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
  * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
@@ -56,7 +56,7 @@ static void leftShift128(uint8_t *v);
 /* functions  *********************************************************/
 
 void LDL_CMAC_init(struct ldl_cmac_ctx *ctx, const struct ldl_aes_ctx *aes_ctx)
-{    
+{
     LDL_PEDANTIC(ctx != NULL)
     LDL_PEDANTIC(aes_ctx != NULL)
 
@@ -73,32 +73,32 @@ void LDL_CMAC_update(struct ldl_cmac_ctx *ctx, const void *data, uint8_t len)
     uint8_t i;
     uint8_t blocks;
     uint8_t pos = 0U;
-    const uint8_t *in = (const uint8_t *)data;    
-    
+    const uint8_t *in = (const uint8_t *)data;
+
     part =  ctx->size % (uint8_t)sizeof(ctx->m);
-    
+
     if(len > 0U){
 
         if(((part == 0U) && (ctx->size > 0U)) || ((part + len) > sizeof(ctx->m))){
 
             /* sometimes a whole extra block will already be cached, process it */
             if((part == 0U) && (ctx->size > 0U)){
-                
+
                 xor128(ctx->x, ctx->m);
                 LDL_AES_encrypt(ctx->aes_ctx, ctx->x);
             }
 
             /* number of new blocks to process */
             blocks = (part + len) / sizeof(ctx->m);
-                        
+
             /* do not process the last new block */
             if(((part + len) % sizeof(ctx->m)) == 0U){
-            
+
                 blocks -= 1U;
             }
-            
+
             /* make up the first block to process */
-            
+
             for(i=0U; i < blocks; i++){
 
                 (void)memcpy(&ctx->m[part], &in[pos], sizeof(ctx->m) - part);
@@ -107,12 +107,12 @@ void LDL_CMAC_update(struct ldl_cmac_ctx *ctx, const void *data, uint8_t len)
                 part = 0U;
 
                 xor128(ctx->x, ctx->m);
-                LDL_AES_encrypt(ctx->aes_ctx, ctx->x);                
+                LDL_AES_encrypt(ctx->aes_ctx, ctx->x);
             }
         }
-                    
+
         (void)memcpy(&ctx->m[part], &in[pos], len - pos);
-        ctx->size += len;        
+        ctx->size += len;
     }
 }
 
@@ -121,19 +121,19 @@ void LDL_CMAC_finish(const struct ldl_cmac_ctx *ctx, void *out, uint8_t outMax)
     LDL_PEDANTIC(ctx != NULL)
 
     uint8_t k[BLOCK_SIZE];
-    
+
     uint8_t k1[BLOCK_SIZE];
     uint8_t k2[BLOCK_SIZE];
-    
+
     uint8_t m_last[BLOCK_SIZE];
 
     uint8_t part;
 
     /* generate subkeys */
-    
+
     (void)memset(k, 0, sizeof(k));
     LDL_AES_encrypt(ctx->aes_ctx, k);
-    
+
     (void)memcpy(k1, k, sizeof(k1));
     leftShift128(k1);
 
@@ -151,19 +151,19 @@ void LDL_CMAC_finish(const struct ldl_cmac_ctx *ctx, void *out, uint8_t outMax)
     }
 
     /* process last block (m_last) */
-    
+
     part = ctx->size % (uint8_t)sizeof(ctx->m);
 
     (void)memset(m_last, 0, sizeof(m_last));
-    
+
     if((ctx->size == 0U) || (part > 0U)){
 
         (void)memcpy(m_last, ctx->m, part);
 
         m_last[part] = 0x80U;
-        xor128(m_last, k2);        
+        xor128(m_last, k2);
     }
-    else{        
+    else{
 
         (void)memcpy(m_last, ctx->m, sizeof(m_last));
 
@@ -185,7 +185,7 @@ static void leftShift128(uint8_t *v)
     uint8_t tt;
     uint8_t carry;
     uint8_t i;
-    
+
     carry = 0U;
 
     for(i=16U; i > 0U; i--){
@@ -218,5 +218,5 @@ static void xor128(uint8_t *acc, const uint8_t *mask)
     acc[12] ^= mask[12];
     acc[13] ^= mask[13];
     acc[14] ^= mask[14];
-    acc[15] ^= mask[15];        
+    acc[15] ^= mask[15];
 }

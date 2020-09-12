@@ -12,3 +12,6 @@ Gemfile.lock
 secrets
 */**/.git
 doxygen/deploy
+BUILD
+mbed-os
+.mbed

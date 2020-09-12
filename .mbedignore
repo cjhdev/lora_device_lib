@@ -1,0 +1,7 @@
+doxygen/*
+pclint/*
+secrets/*
+test/*
+vendor/*
+wrappers/arduino/*
+examples/*

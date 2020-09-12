@@ -1,7 +1,59 @@
 Release History
 ===============
 
-# 0.3.1
+## 0.4.0
+
+In this release effort has gone into making it easier to evaluate
+a working version of this project on MBED.
+
+Effort has also gone into simplifying porting. This was to the detriment
+of the Arduino wrapper which depended on various strange things
+to get around the severe lack of memory on the 328P. The Arduino wrapper
+has been removed from the project to save on maintenance. It can be resurrected
+if missed, but the memory requirements have increased slightly so it may
+no longer work.
+
+There are many breaking changes in this version. If you are updating
+from an earlier version you will likely need to make some changes to your
+port.
+
+- decoupled MAC from SM by way of struct ldl_sm_interface
+- decoupled MAC from Radio by way of struct ldl_radio_interface
+- decoupled Radio from Chip Interface by way of struct ldl_chip_interface
+- LDL_Radio_setEventCallback() must now be set by the application during
+  initialisation (after LDL_MAC_init())
+- removed LDL_DISABLE_CMD_DL_CHANNEL option
+- removed LDL_DISABLE_FULL_CHANNEL option
+- removed all options for disabling MAC callback events
+- session keys are now always re-derived as part of LDL_MAC_init (so
+  only session and root keys need to persist)
+- antenna gain compensation moved from MAC to Radio
+- refactored Radio interfaces and simplified MAC-Radio interaction
+- refactored MAC states (made some states into operations)
+- removed weak symbols since they are no longer required
+- added TXCO configuration option to Radio
+- added 'chip_set_mode' to the chip interface to combine reset
+  line control with accessory line control
+- added session_version field to MAC session so that MAC can detect
+  when the session structure has changed between firmware versions
+- removed Arduino wrapper
+- added MBED wrapper
+- added MBED examples for RTOS and baremetal profiles
+- added LDL_MAC_radioEventWithTicks() to work better with OSes that
+  need to defer processing an event with a tick value sampled
+  closer to the event
+- removed LDL_MAC_errno() since this information is now be returned
+  by functions that used to set errno
+- replaced LDL_System_eps() and LDL_System_advance() with ldl_mac.a and ldl_mac.advance. These
+  must be initialised at LDL_MAC_init()
+- defined timer compensation formula to be (compensation = 2*ldl_mac.a*ldl_mac.tps + ldl_mac.b)
+- added section on timing compensation to API documentation and porting guide
+- LDL_System_ticks replaced by function pointer ldl_mac.ticks
+- LDL_System_getBatteryLevel replaced by function pointer ldl_mac.get_battery_level
+- LDL_System_rand replaced by function pointer ldl_mac.rand
+- optimised radio timeout to avoid adding extra symbols when large spreading factors are used
+
+## 0.3.1
 
 - fixed LDL_MAC_JOIN_COMPLETE event to pass argument instead of NULL (thanks dzurikmiroslav)
 - transmit channel is now selected before MIC is generated to solve LoRaWAN 1.1 issues
@@ -16,7 +68,7 @@ Release History
 - removed LDL_MAC_setNbTrans() and LDL_MAC_getNbTrans() since the per-invocation
   override feature makes it redundant
 
-# 0.3.0
+## 0.3.0
 
 - BREAKING CHANGE to ldl_chip.h interface to work with SPI transactions; see radio connector documentation or header file for more details
 - updated arduino wrapper to work with new ldl_chip.h interface
@@ -25,7 +77,7 @@ Release History
 - fixed arduino wrapper garbled payload issue (incorrect session key index from changes made at 0.2.4)
 - fopts IV now being correctly generated for 1.1 servers (i was 1 instead of 0)
 
-# 0.2.4
+## 0.2.4
 
 - now deriving join keys in LDL_MAC_otaa() so they are ready to check
   joinAccept
@@ -36,7 +88,7 @@ Release History
   some memory in exchange for limiting the wrapper to LoRaWAN 1.0 servers
 - added little endian optimisation build option (LDL_LITTLE_ENDIAN)
 - processCommands wasn't recovering correctly from badly formatted
-  mac commands. 
+  mac commands.
 - added LDL_DISABLE_POINTONE option to remove 1.1 features for devices
   that will only be used with 1.0 servers
 - removed LDL_ENABLE_RANDOM_DEV_NONCE since it is now covered by
@@ -44,36 +96,36 @@ Release History
 - changed the way ctr mode IV is generated so that a generic ctr implementation
   can now be substituted
 
-# 0.2.3
+## 0.2.3
 
-## bugs
+### bugs
 
 - was using nwk instead of app to derive apps key in 1.1 mode
 
-# 0.2.2
+## 0.2.2
 
-## features
+### features
 
 none
 
-## changes
+### changes
 
 - changed LDL_OPS_receiveFrame() to use nwk key to decrypt and MIC join accepts
   when they are answering a join request
 
-## bugs
+### bugs
 
 - was using app key instead of nwk to decrypt and MIC join accepts
 
-# 0.2.1
+## 0.2.1
 
-## features
+### features
 
 - new build options
     - LDL_DISABLE_FULL_CHANNEL_CONFIG halves memory required for channel config
     - LDL_DISABLE_CMD_DL_CHANNEL removes handling for this MAC command
 
-## changes
+### changes
 
 - reduced stack usage during MAC command processing
 - Arduino wrapper now uses LDL_ENABLE_STATIC_RX_BUFFER
@@ -82,16 +134,16 @@ none
 - Arduino wrapper now uses LDL_DISABLE_FULL_CHANNEL_CONFIG
 - Arduino wrapper now uses LDL_DISABLE_CMD_DL_CHANNEL
 
-## bugs
+### bugs
 
 - Arduino wrapper on ATMEGA328P was running out of stack at the point where it had to
   process a MAC command. This is a worry because there is ~1K available for stack.
 
-# 0.2.0
+## 0.2.0
 
-Warning: this update has a significant number of interface name changes. 
+Warning: this update has a significant number of interface name changes.
 
-## features
+### features
 
 - LoRaWAN 1.1 support
 - encryption and key management is now the domain of the Security Module (SM)
@@ -113,7 +165,7 @@ Warning: this update has a significant number of interface name changes.
 - antenna gain/loss can now be compensated for at LDL_MAC_init()
 - improved doxygen interface documentation
 
-## changes
+### changes
 
 - changed all source files to use 'ldl' prefix instead of 'lora'
 - added   'LDL' and 'ldl' prefixes to all enums that were not yet prefixed
@@ -148,11 +200,11 @@ Warning: this update has a significant number of interface name changes.
 - changed LORA_ERROR() to accept argument (app pointer)
 - changed how off-time is accounted for
 
-## bugs
+### bugs
 
 none
 
-# 0.1.6
+## 0.1.6
 
 - arduino wrapper improvements
     - debug messages now included/excluded by code in the the event callback handler

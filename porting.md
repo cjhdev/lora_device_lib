@@ -19,32 +19,45 @@ Porting Guide
 
 2. Implement the following system functions
 
-    - LDL_System_ticks()
-    - LDL_System_tps()
-    - LDL_System_eps()
+    - `ldl_mac_init_arg.ticks()`
+    - `ldl_mac_init_arg.rand()`
 
-3. Define the following macros (if interrupt-safe functions are called from ISRs)
+3. Tell LDL the rate at which `ldl_mac_init_arg.ticks()` increments
+   by setting `ldl_mac_init_arg.tps` to that rate
+
+4. Define the following macros (if interrupt-safe functions are called from ISRs)
 
     - LDL_SYSTEM_ENTER_CRITICAL()
     - LDL_SYSTEM_LEAVE_CRITICAL()
 
-4. Define at least one region via build options
+5. Define at least one region via build options
 
     - LDL_ENABLE_EU_863_870
     - LDL_ENABLE_US_902_928
     - LDL_ENABLE_AU_915_928
     - LDL_ENABLE_EU_433
 
-5. Define at least one radio driver via build options
+6. Define at least one radio driver via build options
 
     - LDL_ENABLE_SX1272
     - LDL_ENABLE_SX1276
 
-6. Implement the radio connector
+7. Implement the chip interface
 
-    - See [radio connector](https://cjhdev.github.io/lora_device_lib_api/group__ldl__radio__connector.html)
+    - See [chip interface](https://cjhdev.github.io/lora_device_lib_api/group__ldl__chip__interfaces.html)
 
-7. Integrate with your application
+8. Initialise in correct order
+
+    MAC depends on Radio to be initialised first, and Radio should be
+    set to callback to MAC only after MAC has been initialised.
+
+    In other words:
+
+    1. LDL_Radio_init() and LDL_SM_init()
+    2. LDL_MAC_init()
+    3. LDL_Radio_setEventCallback()
+
+9. Integrate with your application
 
     - See [main()](examples/doxygen/example.c)
 
@@ -55,6 +68,67 @@ Porting Guide
 - build all sources in `src`
 
 ## Advanced Topics
+
+### Timing
+
+LDL tracks time by calling `ldl_mac_init_arg.ticks()`. The value returned is a 32 bit integer that
+increments at a rate `ldl_mac_init_arg.tps` ticks per second (i.e. Hz).
+
+e.g.
+
+~~~
+extern uint32_t your_system_ticks(void *app);
+
+struct ldl_mac_init_arg arg = {0};
+
+arg.ticks = your_system_ticks;
+arg.tps = 1000000UL;    // 1MHz
+
+// ...
+
+LDL_MAC_init(&mac, LDL_EU_863_870, &arg);
+~~~
+
+### Compensating for Timing Error
+
+LDL tracks time by calling `ldl_mac_init_arg.ticks()`. This value will be
+incremented by some clock source on the target, and that clock
+source will have a +/- uncertainty (error).
+
+If the uncertainty is significant (i.e. large enough to cause LDL to miss RX windows) then
+LDL must compensate by opening RX windows ealier and increasing the symbol timeout.
+
+LDL calculates the amount of compensation using this formula:
+
+~~~
+compensation = (delay_seconds * ldl_mac_init_arg.a * 2UL) + ldl_mac_init_arg.b;
+~~~
+
+- delay seconds is the delay from the end of TX to the beginning of RX (anywhere in the range 1 to 7 seconds)
+- `ldl_mac_init_arg.a` is clock error per second measured in ticks
+- `ldl_mac_init_arg.b` is a constant value
+
+`ldl_mac_init_arg.tps` is faster than 1KHz (e.g. 1MHz) it may be possible to measure
+uncertainty in whole ticks. Compensation values may look like this:
+
+| type    | value  |
+| ------- | ------ |
+| a       | 10     |
+| b       | 0      |
+
+If `ldl_mac_init_arg.tps` is around 1KHz, `ldl_mac_init_arg.a` will be a fraction of a tick.
+At 1KHz there will be a constant error of +/- 500us at the point where the timestamp
+is recorded and again where the scheduler opens the window.
+
+You could round `ldl_mac_init_arg.a` up to 1, but this would overcompensate
+for windows that open later than one second. In this situation it makes
+sense to set `ldl_mac_init_arg.b` like so:
+
+| type    | value  |
+| ------- | ------ |
+| a       | 0      |
+| b       | 2      |
+
 
 ### Managing Device Nonce (devNonce)
 
@@ -87,40 +161,42 @@ stop joinAccept from being accepted, but it will leave LDL open to replay attack
 
 ### Modifying the Security Module
 
-The default cryptographic implementations can be replaced with hardened implementations.
+There are several ways to augment or replace the default security module and
+cipher modes.
 
-LDL depends on the following modes which are integrated within the default Security Module ([ldl_sm.c](src/ldl_sm.c)):
+One option might be to replace the default modes with hardened implementations.
+This would be achived by removing the files containing the default modes
+from the build and reimplementing the interfaces.
+The defalt modes are implemented in the following files:
 
 - AES128-ECB (default: [ldl_aes.c](src/ldl_aes.c))
 - AES128-CTR (default: [ldl_ctr.c](src/ldl_aes.c))
 - AES128-CMAC (default: [ldl_cmac.c](src/ldl_aes.c))
 
-If your toolchain supports weak symbols, replacing some or all of the
-default implementations is as simple as re-implementing the function
-somewhere else.
+The same approach can be applied to the default security module ([ldl_sm.c](src/ldl_sm.c))
+code which calls into these implementations.
 
-If you don't want to use weak symbols, remove ldl_sm.c
-from the build and re-implement the whole thing somewhere else. 
-The same applies to situations where a more robust security 
-module (i.e. HSM) is required.
+It is also possible to redirect to a different security module at run-time by changing
+the ldl_mac_init_arg.sm_interface structure which MAC uses to call into SM.
+
+This feature was added to make it possible to upgrade the SM by subclassing
+in C++ projects. An example of this can be seen in the [MBED wrapper](wrappers/mbed).
 
 ### Persistent Sessions
 
 To implement persistent sessions the application must:
 
 - be able to cache session state passed with the LDL_MAC_SESSION_UPDATED event
-- be able to cache session keys updated as part of the LDL_MAC_JOIN_COMPLETE event
-- be able to restore session keys prior to calling LDL_MAC_init()
 - be able to restore session state prior to calling LDL_MAC_init()
 - be able to pass a pointer to the restored session state to LDL_MAC_init()
-- ensure the integrity of state and keys
-    - this also means ensuring that session keys are actually valid for session state
+- ensure the integrity of state and root keys
 
 Note that:
 
 - session state does not contain sensitive information
 - session state is best treated as opaque data
 - loading invalid/corrupt session state may result in undefined behaviour
+- LDL is able to detect and reset incompatible state moving between firmware versions
 
 ### Sleep Mode
 
@@ -149,8 +225,7 @@ Flash memory usage can be reduced by:
 
 - not enabling radio drivers which are not needed
 - not enabling regions which are not needed
-- disabling unhandled events (LDL_DISABLE_*_EVENT)
-- modifying the default Security Module ([ldl_sm.c](src/ldl_sm.c)) to use a hardware peripheral 
+- reimplementing the default Security Module ([ldl_sm.c](src/ldl_sm.c)) to use a hardware peripheral 
 
 Static RAM usage can be reduced by:
 
@@ -163,7 +238,11 @@ Automatic RAM usage can be reduced by:
 - shifting the frame receive buffer from stack to bss by defining LDL_ENABLE_STATIC_RX_BUFFER
     - this will reduce stack usage during LDL_MAC_process()
 
-### Compensating For Gain
+### Compensating For Antenna Gain
 
-Gain can be compensated by setting the ldl_mac_init_arg.gain prior to calling LDL_MAC_init().
-This value will be added to the dBm setting requested from the Radio at transmit time.
+Initialise Radio with ldl_radio_init_arg.tx_gain set to a value you wish to boost
+or attenuate by.
+
+Note the value here is (dB x 10-2) so 2.4dB would be 240.
+
+

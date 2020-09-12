@@ -1,0 +1,8 @@
+ldl
+BUILD
+mbed-os
+.mbed
+upload_flash.jlink
+.gdbinit
+
+

@@ -12,10 +12,22 @@ Below is an abridged example showing how to:
 - send an empty data frame periodically
 
 ~~~ C
+#include "ldl_mac.h"
+#include "ldl_radio.h"
+
 extern const void *app_key_ptr;
 extern const void *nwk_key_ptr;
 
+extern const void *dev_eui_ptr;
+extern const void *join_eui_ptr;
+
+extern void chip_set_mode(void *self, enum ldl_chip_mode mode);
+extern void chip_read(void *self, uint8_t addr, void *data, uint8_t size);
+extern void chip_write(void *self, uint8_t addr, const void *data, uint8_t size);
+
 extern void your_app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg);
+extern uint32_t your_ticks(void *app);
+extern uint32_t your_rand(void *app);
 
 struct ldl_sm sm;
 struct ldl_radio radio;
@@ -24,44 +36,74 @@ struct ldl_mac mac;
 void main(void)
 {
     LDL_SM_init(&sm, app_key_ptr, nwk_key_ptr);
-    
-    LDL_Radio_init(&radio, LDL_RADIO_SX1272, NULL);
-    LDL_Radio_setPA(&radio, LDL_RADIO_PA_RFO);
-    
-    struct ldl_mac_init_arg arg = {0};
-    
-    arg.radio = &radio;
-    arg.handler = your_app_handler;    
-    arg.sm = &sm;
-    
-    LDL_MAC_init(&mac, LDL_EU_863_870, &arg);
-    
-    LDL_MAC_setMaxDCycle(&mac, 12U);
-    
+
+    /* init the radio */
+    {
+        struct ldl_radio_init_arg arg = {0};
+
+        arg.type = LDL_RADIO_SX1272;
+
+        arg.chip_set_mode = chip_set_mode;
+        arg.chip_write = chip_write;
+        arg.chip_read = chip_read;
+
+        LDL_Radio_init(&radio, &arg);
+    }
+
+    /* init the mac */
+    {
+        struct ldl_mac_init_arg arg = {0};
+
+        arg.ticks = your_ticks;
+        arg.tps = 32768UL;
+        arg.a = 20UL;
+        arg.rand = your_rand;
+
+        arg.radio = &radio;
+        arg.handler = your_app_handler;
+        arg.sm = &sm;
+
+        arg.joinEUI = join_eui_ptr;
+        arg.devEUI = dev_eui_ptr;
+
+        LDL_MAC_init(&mac, LDL_EU_863_870, &arg);
+
+        LDL_Radio_setEventCallback(&radio, &mac, LDL_MAC_radioEvent);
+
+        LDL_MAC_setMaxDCycle(&mac, 12U);
+    }
+
     __enable_irq();
-    
+
     for(;;){
-    
+
         if(LDL_MAC_ready(&mac)){
-           
+
             if(LDL_MAC_joined(&mac)){
-                
+
                 LDL_MAC_unconfirmedData(&mac, 1U, NULL, 0U, NULL);
             }
             else{
-                
+
                 LDL_MAC_otaa(&mac);
-            }            
+            }
         }
-        
-        LDL_MAC_process(&mac);            
-    }    
+
+        LDL_MAC_process(&mac);
+    }
 }
 ~~~
 
-Behind the scenes you will need to implement the [radio connector](https://cjhdev.github.io/lora_device_lib_api/group__ldl__radio__connector.html), 
-find somewhere to keep your root keys, and implement `your_app_handler()`. 
-More information can be found in the [porting guide](porting.md).
+Behind the scenes you will need to implement:
+
+- [chip interface](https://cjhdev.github.io/lora_device_lib_api/group__ldl__chip__interface.html): `chip_set_mode()`, `chip_write()`, `chip_read()`
+- keys: `app_key_ptr`, `nwk_key_ptr`, `dev_eui_ptr`, `join_eui_ptr`
+- system interfaces: `your_ticks()`, `your_rand()`
+- `your_app_handler()`
+
+The fastest way to get started with LDL is to use the [MBED wrapper](wrappers/mbed).
+This project repository can be imported directly into an MBED project and
+the MBED tooling will find the wrapper.
 
 It is important to keep in mind that LDL is still experimental. This means that things may not work properly and that
 interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_device_lib/releases) commits for best results.
@@ -101,12 +143,14 @@ interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_de
 - Supported radios (run-time option)
     - SX1272
     - SX1276
-- [Build options](https://cjhdev.github.io/lora_device_lib_api/group__ldl__build__options.html)
 - [Interface documentation](https://cjhdev.github.io/lora_device_lib_api/)
+- [Build options](https://cjhdev.github.io/lora_device_lib_api/group__ldl__build__options.html)
 - Examples
-    - [Arduino wrapper](wrappers/arduino/output/arduino_ldl)
+    - [rtos mbed example](examples/mbed)
+    - [bare-metal mbed example](examples/bare_mbed)
     - [documentation example](examples/doxygen/example.c)
-    
+    - [chip interface example](examples/chip_interface)
+
 ## Limitations
 
 - Class B and C not supported
@@ -123,14 +167,6 @@ interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_de
 - [design goals](design_goals.md)
 - [todo list](todo.md)
 
-## Building Interface Documentation
-
-- have doxygen and make installed
-- `cd doxygen && make`
-- open doxygen/html/index.html
-
-Alternatively just read the [header files](include).
-
 ## Commercial Support
 
 Commercial support is available from the author.
@@ -139,8 +175,8 @@ contact@stackmechanic.com
 
 ## See Also
 
-- [LoRaMAC-Node](https://github.com/Lora-net/LoRaMac-node): Semtech reference implementation
-- LDL vs. LoRaMac-Node: [size and complexity](https://cjh.id.au/2019/12/11/comparing-ldl-to-loramac.html)   
+- [LoRaMAC-Node](https://github.com/Lora-net/LoRaMac-node) (Semtech reference implementation)
+- [LDL vs. LoRaMac-Node: size and complexity](https://cjh.id.au/2019/12/11/comparing-ldl-to-loramac.html)
 
 ## License
 

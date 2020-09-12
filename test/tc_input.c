@@ -5,6 +5,7 @@
 #include "cmocka.h"
 
 #include "ldl_mac.h"
+#include "mock_ldl_system.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -18,8 +19,11 @@ static int setup(void **user)
 {
     static struct ldl_mac state;
     (void)memset(&state, 0, sizeof(state));
-    *user = (void *)&state;                
-    
+    *user = (void *)&state;
+
+    state.tps = 1000000UL;
+    state.ticks = LDL_System_ticks;
+
     return 0;
 }
 
@@ -29,56 +33,56 @@ static int setup(void **user)
 
 static void inputCheck_shall_return_false_for_no_signal(void **user)
 {
-    struct ldl_mac *self = (struct ldl_mac *)(*user);    
+    struct ldl_mac *self = (struct ldl_mac *)(*user);
     uint32_t error;
-    
+
     assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_TX_COMPLETE, &error) );
     assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_RX_READY, &error) );
-    assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_RX_TIMEOUT, &error) );    
+    assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_RX_TIMEOUT, &error) );
 }
 
 static void inputCheck_shall_return_false_for_unarmed_signal(void **user)
 {
-    struct ldl_mac *self = (struct ldl_mac *)(*user);    
+    struct ldl_mac *self = (struct ldl_mac *)(*user);
     uint32_t error;
-    
-    LDL_MAC_inputSignal(self, LDL_INPUT_RX_READY);
-    
-    assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_RX_READY, &error) );    
+
+    LDL_MAC_inputSignal(self, LDL_INPUT_RX_READY, system_time);
+
+    assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_RX_READY, &error) );
 }
 
 static void inputCheck_shall_return_true_for_latched_signal_and_false_for_others(void **user)
 {
-    struct ldl_mac *self = (struct ldl_mac *)(*user);    
+    struct ldl_mac *self = (struct ldl_mac *)(*user);
     uint32_t error;
-    
+
     LDL_MAC_inputArm(self, LDL_INPUT_RX_READY);
-    
-    LDL_MAC_inputSignal(self, LDL_INPUT_RX_READY);
-    
+
+    LDL_MAC_inputSignal(self, LDL_INPUT_RX_READY, system_time);
+
     assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_TX_COMPLETE, &error) );
     assert_true( LDL_MAC_inputCheck(self, LDL_INPUT_RX_READY, &error) );
-    assert_int_equal(0, error);        
-    assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_RX_TIMEOUT, &error) );    
+    assert_int_equal(0, error);
+    assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_RX_TIMEOUT, &error) );
 }
 
 static void inputCheck_shall_return_time_error(void **user)
 {
-    struct ldl_mac *self = (struct ldl_mac *)(*user);    
+    struct ldl_mac *self = (struct ldl_mac *)(*user);
     uint32_t error;
-    
+
     LDL_MAC_inputArm(self, LDL_INPUT_TX_COMPLETE);
-    
-    LDL_MAC_inputSignal(self, LDL_INPUT_TX_COMPLETE);
-    
+
+    LDL_MAC_inputSignal(self, LDL_INPUT_TX_COMPLETE, system_time);
+
     system_time++;
     system_time++;
     system_time++;
     system_time++;
     system_time++;
-    
+
     assert_true( LDL_MAC_inputCheck(self, LDL_INPUT_TX_COMPLETE, &error) );
-    assert_int_equal(5, error);        
+    assert_int_equal(5, error);
 }
 
 
@@ -86,26 +90,26 @@ static void inputCheck_shall_return_time_error(void **user)
 
 static void inputClear_shall_reset_inputs(void **user)
 {
-    struct ldl_mac *self = (struct ldl_mac *)(*user);    
+    struct ldl_mac *self = (struct ldl_mac *)(*user);
     uint32_t error;
-    
+
     assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_RX_READY, &error) );
     assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_TX_COMPLETE, &error) );
-    
+
     LDL_MAC_inputArm(self, LDL_INPUT_TX_COMPLETE);
-    LDL_MAC_inputSignal(self, LDL_INPUT_TX_COMPLETE);
-    
+    LDL_MAC_inputSignal(self, LDL_INPUT_TX_COMPLETE, system_time);
+
     assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_RX_READY, &error) );
     assert_true( LDL_MAC_inputCheck(self, LDL_INPUT_TX_COMPLETE, &error) );
-    
+
     LDL_MAC_inputClear(self);
-    
+
     assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_RX_READY, &error) );
     assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_TX_COMPLETE, &error) );
-    
+
     LDL_MAC_inputArm(self, LDL_INPUT_RX_READY);
-    LDL_MAC_inputSignal(self, LDL_INPUT_RX_READY);
-    
+    LDL_MAC_inputSignal(self, LDL_INPUT_RX_READY, system_time);
+
     assert_true( LDL_MAC_inputCheck(self, LDL_INPUT_RX_READY, &error) );
     assert_false( LDL_MAC_inputCheck(self, LDL_INPUT_TX_COMPLETE, &error) );
 }
@@ -115,9 +119,9 @@ static void inputClear_shall_reset_inputs(void **user)
 int main(void)
 {
     const struct CMUnitTest tests[] = {
-        
+
         /* inputCheck ********************************************************/
-        
+
         cmocka_unit_test_setup(
             inputCheck_shall_return_false_for_no_signal,
             setup
@@ -134,13 +138,13 @@ int main(void)
             inputCheck_shall_return_time_error,
             setup
         ),
-        
+
         /* inputClear *************************************************/
-        
+
         cmocka_unit_test_setup(
             inputClear_shall_reset_inputs,
             setup
-        ),        
+        ),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
