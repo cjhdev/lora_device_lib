@@ -426,7 +426,14 @@ struct ldl_mac_session {
     uint8_t session_version;    /* set to currentSessionVersion */
     bool joined;
     bool adr;
+    /* 0: 1.0 backend, 1: 1.1 backend */
+#ifndef LDL_DISABLE_POINTONE
     uint8_t version;
+#define SESS_VERSION(sess) (sess.version)
+#else
+    // constant value, so the compiler can optimize out unneeded code paths
+#define SESS_VERSION(sess) (0)
+#endif
 
     enum ldl_region region;
 

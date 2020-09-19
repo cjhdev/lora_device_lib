@@ -1216,7 +1216,9 @@ static void processRX(struct ldl_mac *self)
                 }
 
                 self->ctx.devAddr = frame.devAddr;
+#ifndef LDL_DISABLE_POINTONE
                 self->ctx.version = (frame.optNeg) ? 1U : 0U;
+#endif
 
                 /* cache this so that the session keys can be re-derived */
                 self->ctx.netID = frame.netID;
@@ -1225,7 +1227,7 @@ static void processRX(struct ldl_mac *self)
 
                 self->joinNonce = frame.joinNonce;
 
-                if(self->ctx.version > 0){
+                if(SESS_VERSION(self->ctx) > 0){
 
                     setPendingCommand(self, LDL_CMD_REKEY);
                 }
@@ -2721,7 +2723,7 @@ static void downlinkMissingHandler(struct ldl_mac *self)
             if(selectChannel(self, self->tx.rate, self->tx.chIndex, ms_until_next, &self->tx.chIndex, &self->tx.freq)){
 
                 /* MIC must be refreshed when channel changes */
-                if(self->ctx.version > 0){
+                if(SESS_VERSION(self->ctx) > 0){
 
                     LDL_OPS_micDataFrame(self, self->buffer, self->bufferLen);
                 }
@@ -2753,7 +2755,7 @@ static void downlinkMissingHandler(struct ldl_mac *self)
             if((self->band[LDL_BAND_GLOBAL] < LDL_Region_getMaxDCycleOffLimit(self->ctx.region)) && selectChannel(self, self->tx.rate, self->tx.chIndex, LDL_Region_getMaxDCycleOffLimit(self->ctx.region), &self->tx.chIndex, &self->tx.freq)){
 
                 /* must recalculate the MIC for V1.1 since channel changes */
-                if(self->ctx.version > 0){
+                if(SESS_VERSION(self->ctx) > 0){
 
                     LDL_OPS_micDataFrame(self, self->buffer, self->bufferLen);
                 }
