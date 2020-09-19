@@ -1054,10 +1054,11 @@ uint8_t LDL_MAC_mtu(const struct ldl_mac *self)
         overhead += commandIsPending(self, LDL_CMD_NEW_CHANNEL) ? LDL_MAC_sizeofCommandUp(LDL_CMD_NEW_CHANNEL) : 0U;
         overhead += commandIsPending(self, LDL_CMD_RX_TIMING_SETUP) ? LDL_MAC_sizeofCommandUp(LDL_CMD_RX_TIMING_SETUP) : 0U;
         overhead += commandIsPending(self, LDL_CMD_DL_CHANNEL) ? LDL_MAC_sizeofCommandUp(LDL_CMD_DL_CHANNEL) : 0U;
-
+#ifndef LDL_DISABLE_POINTONE
         overhead += commandIsPending(self, LDL_CMD_REKEY) ? LDL_MAC_sizeofCommandUp(LDL_CMD_REKEY) : 0U;
         overhead += commandIsPending(self, LDL_CMD_ADR_PARAM_SETUP) ? LDL_MAC_sizeofCommandUp(LDL_CMD_ADR_PARAM_SETUP) : 0U;
         overhead += commandIsPending(self, LDL_CMD_REJOIN_PARAM_SETUP) ? LDL_MAC_sizeofCommandUp(LDL_CMD_REJOIN_PARAM_SETUP) : 0U;
+#endif
     }
 
     return (overhead > max) ? 0 : (max - overhead);
@@ -1381,7 +1382,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                 LDL_DEBUG(self->app, "preparing data frame")
 
                                 /* sticky commands */
-
+#ifndef LDL_DISABLE_POINTONE
                                 if(commandIsPending(self, LDL_CMD_REKEY)){
 
                                     struct ldl_rekey_ind ind = {
@@ -1392,7 +1393,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
 
                                     LDL_DEBUG(self->app, "adding rekey_ind: version=%u", self->ctx.version)
                                 }
-
+#endif
                                 if(commandIsPending(self, LDL_CMD_RX_PARAM_SETUP)){
 
                                     LDL_MAC_putRXParamSetupAns(&s, &self->ctx.rx_param_setup_ans);
@@ -1455,7 +1456,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                         self->ctx.new_channel_ans.channelFreqOK ? "true" : "false"
                                     )
                                 }
-
+#ifndef LDL_DISABLE_POINTONE
                                 if(commandIsPending(self, LDL_CMD_REJOIN_PARAM_SETUP)){
 
                                     LDL_MAC_putRejoinParamSetupAns(&s, &self->ctx.rejoin_param_setup_ans);
@@ -1465,7 +1466,6 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                         self->ctx.rejoin_param_setup_ans.timeOK ? "true" : "false"
                                     )
                                 }
-
                                 if(commandIsPending(self, LDL_CMD_ADR_PARAM_SETUP)){
 
                                     LDL_MAC_putADRParamSetupAns(&s);
@@ -1473,6 +1473,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
 
                                     LDL_DEBUG(self->app, "adding adr_param_setup_ans")
                                 }
+#endif
 
                                 if(commandIsPending(self, LDL_CMD_TX_PARAM_SETUP)){
 
@@ -2001,6 +2002,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
         }
             break;
 #endif
+#ifndef LDL_DISABLE_POINTONE
         case LDL_CMD_ADR_PARAM_SETUP:
 
             LDL_DEBUG(self->app, "adr_param_setup: limit_exp=%u delay_exp=%u",
@@ -2053,6 +2055,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             self->ctx.rejoin_param_setup_ans.timeOK = false;
             setPendingCommand(self, LDL_CMD_REJOIN_PARAM_SETUP);
             break;
+#endif            
         }
     }
 

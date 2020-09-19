@@ -42,11 +42,13 @@ static const struct type_to_tag tags[] = {
     {8U, LDL_CMD_RX_TIMING_SETUP},
     {9U, LDL_CMD_TX_PARAM_SETUP},
     {10U, LDL_CMD_DL_CHANNEL},
+    {13U, LDL_CMD_DEVICE_TIME},
+#ifndef LDL_DISABLE_POINTONE
     {11U, LDL_CMD_REKEY},
     {12U, LDL_CMD_ADR_PARAM_SETUP},
-    {13U, LDL_CMD_DEVICE_TIME},
     {14U, LDL_CMD_FORCE_REJOIN},
     {15U, LDL_CMD_REJOIN_PARAM_SETUP}
+#endif    
 };
 
 /* functions **********************************************************/
@@ -280,6 +282,13 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
             }
                 break;
 
+            case LDL_CMD_DEVICE_TIME:
+
+                (void)LDL_Stream_getU32(s, &cmd->fields.deviceTime.seconds);
+                (void)LDL_Stream_getU8(s, &cmd->fields.deviceTime.fractions);
+                break;
+
+#ifndef LDL_DISABLE_POINTONE
             case LDL_CMD_REKEY:
 
                 (void)LDL_Stream_getU8(s, &cmd->fields.rekey.version);
@@ -295,12 +304,6 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
                 cmd->fields.adrParamSetup.limit_exp = buf >> 4;
                 cmd->fields.adrParamSetup.delay_exp = buf & 0xfU;
             }
-                break;
-
-            case LDL_CMD_DEVICE_TIME:
-
-                (void)LDL_Stream_getU32(s, &cmd->fields.deviceTime.seconds);
-                (void)LDL_Stream_getU8(s, &cmd->fields.deviceTime.fractions);
                 break;
 
             case LDL_CMD_FORCE_REJOIN:
@@ -326,6 +329,7 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
                 cmd->fields.rejoinParamSetup.maxCountN = buf & 0xfU;
             }
                 break;
+#endif
             }
         }
     }
