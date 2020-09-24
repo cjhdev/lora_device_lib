@@ -276,12 +276,12 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                             }
                             else{
 
-                                LDL_DEBUG(self->app, "joinAccept MIC failed")
+                                LDL_DEBUG(self->app, "%s: joinAccept MIC failed", __FUNCTION__)
                             }
                         }
                         else{
 
-                            LDL_DEBUG(self->app, "invalid joinNonce")
+                            LDL_DEBUG(self->app, "%s: invalid joinNonce", __FUNCTION__)
                         }
                     }
                     else{
@@ -294,14 +294,14 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                         }
                         else{
 
-                            LDL_DEBUG(self->app, "joinAccept MIC failed")
+                            LDL_DEBUG(self->app, "%s: joinAccept MIC failed", __FUNCTION__)
                         }
                     }
                 }
             }
             else{
 
-                LDL_DEBUG(self->app, "unexpected frame type")
+                LDL_DEBUG(self->app, "%s: unexpected frame type", __FUNCTION__)
             }
             break;
 
@@ -354,17 +354,17 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                     }
                     else{
 
-                        LDL_DEBUG(self->app, "mic failed")
+                        LDL_DEBUG(self->app, "%s: mic failed", __FUNCTION__)
                     }
                 }
                 else{
 
-                    LDL_DEBUG(self->app, "devaddr mismatch")
+                    LDL_DEBUG(self->app, "%s: devaddr mismatch", __FUNCTION__)
                 }
             }
             else{
 
-                LDL_DEBUG(self->app, "unexpected frame type")
+                LDL_DEBUG(self->app, "%s: unexpected frame type", __FUNCTION__)
             }
 
             break;
@@ -372,7 +372,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
     }
     else{
 
-        LDL_DEBUG(self->app, "invalid frame")
+        LDL_DEBUG(self->app, "%s: invalid frame", __FUNCTION__)
     }
 
     return retval;

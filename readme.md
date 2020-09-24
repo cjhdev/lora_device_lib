@@ -106,10 +106,12 @@ This project repository can be imported directly into an MBED project and
 the MBED tooling will find the wrapper.
 
 It is important to keep in mind that LDL is still experimental. This means that things may not work properly and that
-interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_device_lib/releases) commits for best results.
+interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_device_lib/releases) commits for best results
+and read [history.md](history.md) if updating from an older version.
 
 ## Features
 
+- Small memory footprint*
 - LoRaWAN 1.1
 - Class A
 - OTAA
@@ -140,7 +142,7 @@ interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_de
     - EU_433
     - US_902_928
     - AU_915_928
-- Supported radios (run-time option)
+- Non-blocking radio driver with run-time configuration
     - SX1272
     - SX1276
 - [Interface documentation](https://cjhdev.github.io/lora_device_lib_api/)
@@ -150,6 +152,8 @@ interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_de
     - [bare-metal mbed example](examples/bare_mbed)
     - [documentation example](examples/doxygen/example.c)
     - [chip interface example](examples/chip_interface)
+
+*compared to LoRaMAC-Node.
 
 ## Limitations
 

@@ -17,7 +17,10 @@
     "target_overrides": {
         "*": {
             "platform.stdio-baud-rate": 115200,
-            "mbed-trace.enable": 1
+            "mbed-trace.enable": 1,
+            "mbed-trace.max-level" : "TRACE_LEVEL_DEBUG",
+            "ldl.enable-verbose-debug" : 1,
+            "ldl.enable-radio-debug" : 1
         }
     }
 }

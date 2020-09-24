@@ -85,12 +85,10 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
     LDL_PEDANTIC(arg != NULL)
     LDL_PEDANTIC(arg->tps >= 1000UL)    /* ideally 1M >= tps >= 1K */
 
-    LDL_ASSERT(arg->joinEUI != NULL)
-    LDL_ASSERT(arg->devEUI != NULL)
-
-    LDL_ASSERT(arg->devEUI != NULL)
-
-    LDL_ASSERT(arg->ticks != NULL);
+    LDL_PEDANTIC(arg->joinEUI != NULL)
+    LDL_PEDANTIC(arg->devEUI != NULL)
+    LDL_PEDANTIC(arg->devEUI != NULL)
+    LDL_PEDANTIC(arg->ticks != NULL);
 
     (void)memset(self, 0, sizeof(*self));
 
@@ -214,7 +212,7 @@ enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self)
 
                 uint32_t delay = self->rand(self->app) % (60UL*self->tps);
 
-                LDL_DEBUG(self->app, "sending first OTAA request in %" PRIu32 " ticks", delay)
+                LDL_DEBUG(self->app, "%s: sending first OTAA request in %" PRIu32 " ticks", __FUNCTION__, delay)
 
                 LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
 
@@ -342,6 +340,8 @@ void LDL_MAC_process(struct ldl_mac *self)
             delay = (self->tps * delay / 1000UL) + 1UL;
 
             LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
+
+            LDL_DEBUG(self->app, "%s: waiting %" PRIu32 " ticks for Radio xtal", __FUNCTION__, delay)
         }
         break;
 
@@ -352,7 +352,13 @@ void LDL_MAC_process(struct ldl_mac *self)
             self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_STANDBY);
             self->state = LDL_STATE_WAIT_RADIO;
 
-            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, self->radio_interface->get_xtal_delay(self->radio));
+            delay = self->radio_interface->get_xtal_delay(self->radio);
+
+            delay = (self->tps * delay / 1000UL) + 1UL;
+
+            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
+
+            LDL_DEBUG(self->app, "%s: waiting %" PRIu32 " ticks for Radio xtal", __FUNCTION__, delay)
         }
         break;
 
@@ -433,10 +439,6 @@ void LDL_MAC_process(struct ldl_mac *self)
     case LDL_STATE_TX:
 
         if(LDL_MAC_inputCheck(self, LDL_INPUT_TX_COMPLETE, &error)){
-
-            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_STANDBY);
-
-            LDL_MAC_inputClear(self);
 
             uint32_t waitSeconds;
             uint32_t waitTicks;
@@ -523,6 +525,9 @@ void LDL_MAC_process(struct ldl_mac *self)
                 LDL_MAC_timerSet(self, LDL_TIMER_WAITB, 0U);
                 self->state = LDL_STATE_WAIT_RX2;
             }
+
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_STANDBY);
+            LDL_MAC_inputClear(self);
 
             self->handler(self->app, LDL_MAC_TX_COMPLETE, NULL);
         }
@@ -875,7 +880,7 @@ void LDL_MAC_process(struct ldl_mac *self)
 
                 delay = (self->state == LDL_STATE_WAIT_RETRY) ? (self->rand(self->app) % (self->tps*30UL)) : 0UL;
 
-                LDL_DEBUG(self->app, "adding %" PRIu32 " ticks of dither to retry", delay)
+                LDL_DEBUG(self->app, "%s: adding %" PRIu32 " ticks of dither to retry", __FUNCTION__, delay)
 
                 LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
                 self->state = LDL_STATE_WAIT_TX;
@@ -1088,7 +1093,7 @@ bool LDL_MAC_addChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, ui
 {
     LDL_PEDANTIC(self != NULL)
 
-    LDL_DEBUG(self->app, "adding chIndex=%u freq=%" PRIu32 " minRate=%u maxRate=%u", chIndex, freq, minRate, maxRate)
+    LDL_DEBUG(self->app, "%s: adding chIndex=%u freq=%" PRIu32 " minRate=%u maxRate=%u", __FUNCTION__, chIndex, freq, minRate, maxRate)
 
     return setChannel(self, chIndex, freq, minRate, maxRate);
 }
@@ -1376,7 +1381,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                             {
                                 LDL_Stream_init(&s, macs, sizeof(macs));
 
-                                LDL_DEBUG(self->app, "preparing data frame")
+                                LDL_DEBUG(self->app, "%s: preparing data frame", __FUNCTION__)
 
                                 /* sticky commands */
 
@@ -1388,14 +1393,15 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
 
                                     LDL_MAC_putRekeyInd(&s, &ind);
 
-                                    LDL_DEBUG(self->app, "adding rekey_ind: version=%u", self->ctx.version)
+                                    LDL_DEBUG(self->app, "%s: adding rekey_ind: version=%u", __FUNCTION__, self->ctx.version)
                                 }
 
                                 if(commandIsPending(self, LDL_CMD_RX_PARAM_SETUP)){
 
                                     LDL_MAC_putRXParamSetupAns(&s, &self->ctx.rx_param_setup_ans);
 
-                                    LDL_DEBUG(self->app, "adding rx_param_setup_ans: rx1DROffsetOK=%s rx2DataRate=%s rx2Freq=%s",
+                                    LDL_DEBUG(self->app, "%s: adding rx_param_setup_ans: rx1DROffsetOK=%s rx2DataRate=%s rx2Freq=%s",
+                                        __FUNCTION__,
                                         self->ctx.rx_param_setup_ans.rx1DROffsetOK ? "true" : "false",
                                         self->ctx.rx_param_setup_ans.rx2DataRateOK ? "true" : "false",
                                         self->ctx.rx_param_setup_ans.channelOK ? "true" : "false"
@@ -1406,7 +1412,8 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
 
                                     LDL_MAC_putDLChannelAns(&s, &self->ctx.dl_channel_ans);
 
-                                    LDL_DEBUG(self->app, "adding dl_channel_ans: uplinkFreqOK=%s channelFreqOK=%s",
+                                    LDL_DEBUG(self->app, "%s: adding dl_channel_ans: uplinkFreqOK=%s channelFreqOK=%s",
+                                        __FUNCTION__,
                                         self->ctx.dl_channel_ans.uplinkFreqOK ? "true" : "false",
                                         self->ctx.dl_channel_ans.channelFreqOK ? "true" : "false"
                                     )
@@ -1415,7 +1422,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                 if(commandIsPending(self, LDL_CMD_RX_TIMING_SETUP)){
 
                                     LDL_MAC_putRXTimingSetupAns(&s);
-                                    LDL_DEBUG(self->app, "adding rx_timing_setup_ans")
+                                    LDL_DEBUG(self->app, "%s: adding rx_timing_setup_ans", __FUNCTION__)
                                 }
 
                                 /* single shot commands */
@@ -1425,7 +1432,8 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                     LDL_MAC_putLinkADRAns(&s, &self->ctx.link_adr_ans);
                                     clearPendingCommand(self, LDL_CMD_LINK_ADR);
 
-                                    LDL_DEBUG(self->app, "adding link_adr_ans: powerOK=%s dataRateOK=%s channelMaskOK=%s",
+                                    LDL_DEBUG(self->app, "%s: adding link_adr_ans: powerOK=%s dataRateOK=%s channelMaskOK=%s",
+                                        __FUNCTION__,
                                         self->ctx.link_adr_ans.dataRateOK ? "true" : "false",
                                         self->ctx.link_adr_ans.powerOK ? "true" : "false",
                                         self->ctx.link_adr_ans.channelMaskOK ? "true" : "false"
@@ -1437,7 +1445,8 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                     LDL_MAC_putDevStatusAns(&s, &self->ctx.dev_status_ans);
                                     clearPendingCommand(self, LDL_CMD_DEV_STATUS);
 
-                                    LDL_DEBUG(self->app, "adding dev_status_ans: battery=%u margin=%i",
+                                    LDL_DEBUG(self->app, "%s: adding dev_status_ans: battery=%u margin=%i",
+                                        __FUNCTION__,
                                         self->ctx.dev_status_ans.battery,
                                         self->ctx.dev_status_ans.margin
                                     )
@@ -1448,7 +1457,8 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                     LDL_MAC_putNewChannelAns(&s, &self->ctx.new_channel_ans);
                                     clearPendingCommand(self, LDL_CMD_NEW_CHANNEL);
 
-                                    LDL_DEBUG(self->app, "adding new_channel_ans: dataRateRangeOK=%s channelFreqOK=%s",
+                                    LDL_DEBUG(self->app, "%s: adding new_channel_ans: dataRateRangeOK=%s channelFreqOK=%s",
+                                        __FUNCTION__,
                                         self->ctx.new_channel_ans.dataRateRangeOK ? "true" : "false",
                                         self->ctx.new_channel_ans.channelFreqOK ? "true" : "false"
                                     )
@@ -1459,7 +1469,8 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                     LDL_MAC_putRejoinParamSetupAns(&s, &self->ctx.rejoin_param_setup_ans);
                                     clearPendingCommand(self, LDL_CMD_REJOIN_PARAM_SETUP);
 
-                                    LDL_DEBUG(self->app, "adding rejoin_param_setup_ans: timeOK=%s",
+                                    LDL_DEBUG(self->app, "%s: adding rejoin_param_setup_ans: timeOK=%s",
+                                        __FUNCTION__,
                                         self->ctx.rejoin_param_setup_ans.timeOK ? "true" : "false"
                                     )
                                 }
@@ -1469,7 +1480,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                     LDL_MAC_putADRParamSetupAns(&s);
                                     clearPendingCommand(self, LDL_CMD_ADR_PARAM_SETUP);
 
-                                    LDL_DEBUG(self->app, "adding adr_param_setup_ans")
+                                    LDL_DEBUG(self->app, "%s: adding adr_param_setup_ans", __FUNCTION__)
                                 }
 
                                 if(commandIsPending(self, LDL_CMD_TX_PARAM_SETUP)){
@@ -1477,7 +1488,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                     LDL_MAC_putTXParamSetupAns(&s);
                                     clearPendingCommand(self, LDL_CMD_TX_PARAM_SETUP);
 
-                                    LDL_DEBUG(self->app, "adding tx_param_setup_ans")
+                                    LDL_DEBUG(self->app, "%s: adding tx_param_setup_ans", __FUNCTION__)
                                 }
 
                                 if(commandIsPending(self, LDL_CMD_DUTY_CYCLE)){
@@ -1485,30 +1496,30 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                     LDL_MAC_putDutyCycleAns(&s);
                                     clearPendingCommand(self, LDL_CMD_DUTY_CYCLE);
 
-                                    LDL_DEBUG(self->app, "adding duty_cycle_ans")
+                                    LDL_DEBUG(self->app, "%s: adding duty_cycle_ans", __FUNCTION__)
                                 }
 #ifndef LDL_DISABLE_CHECK
                                 if(self->opts.check){
 
                                     LDL_MAC_putLinkCheckReq(&s);
-                                    LDL_DEBUG(self->app, "adding link_check_req")
+                                    LDL_DEBUG(self->app, "%s: adding link_check_req", __FUNCTION__)
                                 }
 #endif
 #ifndef LDL_DISABLE_DEVICE_TIME
                                 if(self->opts.getTime){
 
                                     LDL_MAC_putDeviceTimeReq(&s);
-                                    LDL_DEBUG(self->app, "adding device_time_req")
+                                    LDL_DEBUG(self->app, "%s: adding device_time_req", __FUNCTION__)
                                 }
 #endif
                             }
 
-                            LDL_DEBUG(self->app, "%uB data %uB mac", len, LDL_Stream_tell(&s))
+                            LDL_DEBUG(self->app, "%s: %uB data %uB mac", __FUNCTION__, len, LDL_Stream_tell(&s))
 
                             /* MAC commands won't fit into Fopts; frame becomes a port 0 data frame (and application loses) */
                             if((LDL_Stream_tell(&s) > 15U) || (LDL_Frame_dataOverhead() + len + LDL_Stream_tell(&s)) > maxPayload){
 
-                                LDL_DEBUG(self->app, "MAC commands and data too large for frame; MAC commands prioritised")
+                                LDL_DEBUG(self->app, "%s: MAC commands and data too large for frame; MAC commands prioritised", __FUNCTION__)
 
                                 f.type = FRAME_TYPE_DATA_UNCONFIRMED_UP;
                                 self->op = LDL_OP_DATA_UNCONFIRMED;
@@ -1599,7 +1610,7 @@ static void adaptRate(struct ldl_mac *self)
 
                 self->adrAckReq = true;
 
-                LDL_DEBUG(self->app, "adr: adrAckCounter=%u (past ADRAckLimit)", self->adrAckCounter)
+                LDL_DEBUG(self->app, "%s: adr: adrAckCounter=%u (past ADRAckLimit)", __FUNCTION__, self->adrAckCounter)
 
                 if(self->adrAckCounter >= (self->ctx.adr_ack_limit + self->ctx.adr_ack_delay)){
 
@@ -1610,11 +1621,11 @@ static void adaptRate(struct ldl_mac *self)
                             if(self->ctx.rate > LDL_DEFAULT_RATE){
 
                                 self->ctx.rate--;
-                                LDL_DEBUG(self->app, "adr: rate reduced to %u", self->ctx.rate)
+                                LDL_DEBUG(self->app, "%s: adr: rate reduced to %u", __FUNCTION__, self->ctx.rate)
                             }
                             else{
 
-                                LDL_DEBUG(self->app, "adr: all channels unmasked")
+                                LDL_DEBUG(self->app, "%s: adr: all channels unmasked", __FUNCTION__)
 
                                 unmaskAllChannels(self->ctx.chMask, sizeof(self->ctx.chMask));
 
@@ -1623,7 +1634,7 @@ static void adaptRate(struct ldl_mac *self)
                         }
                         else{
 
-                            LDL_DEBUG(self->app, "adr: full power enabled")
+                            LDL_DEBUG(self->app, "%s: adr: full power enabled", __FUNCTION__)
                             self->ctx.power = 0U;
                         }
                     }
@@ -1680,7 +1691,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 
         switch(cmd.type){
         default:
-            LDL_DEBUG(self->app, "not handling type %u", cmd.type)
+            LDL_DEBUG(self->app, "%s: not handling type %u", __FUNCTION__, cmd.type)
             break;
 #ifndef LDL_DISABLE_CHECK
         case LDL_CMD_LINK_CHECK:
@@ -1691,7 +1702,8 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             arg.link_status.margin = ans->margin;
             arg.link_status.gwCount = ans->gwCount;
 
-            LDL_DEBUG(self->app, "link_check_ans: margin=%u gwCount=%u",
+            LDL_DEBUG(self->app, "%s: link_check_ans: margin=%u gwCount=%u",
+                __FUNCTION__,
                 ans->margin,
                 ans->gwCount
             )
@@ -1704,7 +1716,8 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
         {
             const struct ldl_link_adr_req *req = &cmd.fields.linkADR;
 
-            LDL_DEBUG(self->app, "link_adr_req: dataRate=%u txPower=%u chMask=%04x chMaskCntl=%u nbTrans=%u",
+            LDL_DEBUG(self->app, "%s: link_adr_req: dataRate=%u txPower=%u chMask=%04x chMaskCntl=%u nbTrans=%u",
+                __FUNCTION__,
                 req->dataRate, req->txPower, req->channelMask, req->channelMaskControl, req->nbTrans)
 
             uint8_t i;
@@ -1827,7 +1840,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
                     /* do not allow server to mask all channels */
                     if(allChannelsAreMasked(self->ctx.chMask, sizeof(self->ctx.chMask))){
 
-                        LDL_INFO(self->app, "server attempted to mask all channels")
+                        LDL_INFO(self->app, "%s: server attempted to mask all channels", __FUNCTION__)
                         self->ctx.link_adr_ans.channelMaskOK = false;
                     }
 
@@ -1840,22 +1853,22 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
                         adr_state = _ADR_BAD;
                     }
 
-
-
-
                     setPendingCommand(self, LDL_CMD_LINK_ADR);
                 }
             }
             else{
 
-                LDL_DEBUG(self->app, "ignoring multiple link_adr_req contiguous blocks")
+                LDL_DEBUG(self->app, "%s: ignoring multiple link_adr_req contiguous blocks", __FUNCTION__)
             }
         }
             break;
 
         case LDL_CMD_DUTY_CYCLE:
 
-            LDL_DEBUG(self->app, "duty_cycle_req: %u", cmd.fields.dutyCycle.maxDutyCycle)
+            LDL_DEBUG(self->app, "%s: duty_cycle_req: %u",
+                __FUNCTION__,
+                cmd.fields.dutyCycle.maxDutyCycle
+            )
 
             self->ctx.maxDutyCycle = cmd.fields.dutyCycle.maxDutyCycle;
 
@@ -1866,7 +1879,8 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
         {
             const struct ldl_rx_param_setup_req *req = &cmd.fields.rxParamSetup;
 
-            LDL_DEBUG(self->app, "rx_param_setup_req: rx1DROffset=%u rx2DataRate=%u freq=%" PRIu32,
+            LDL_DEBUG(self->app, "%s: rx_param_setup_req: rx1DROffset=%u rx2DataRate=%u freq=%" PRIu32,
+                __FUNCTION__,
                 req->rx1DROffset,
                 req->rx2DataRate,
                 req->freq
@@ -1888,7 +1902,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 
         case LDL_CMD_DEV_STATUS:
         {
-            LDL_DEBUG(self->app, "dev_status_req")
+            LDL_DEBUG(self->app, "%s: dev_status_req", __FUNCTION__)
 
             self->ctx.dev_status_ans.battery = self->get_battery_level(self->app);
 
@@ -1909,7 +1923,8 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 
         case LDL_CMD_NEW_CHANNEL:
 
-            LDL_DEBUG(self->app, "new_channel_req: chIndex=%u freq=%" PRIu32 " maxDR=%u minDR=%u",
+            LDL_DEBUG(self->app, "%s: new_channel_req: chIndex=%u freq=%" PRIu32 " maxDR=%u minDR=%u",
+                __FUNCTION__,
                 cmd.fields.newChannel.chIndex,
                 cmd.fields.newChannel.freq,
                 cmd.fields.newChannel.maxDR,
@@ -1930,13 +1945,14 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             }
             else{
 
-                LDL_DEBUG(self->app, "new_channel_req not processed in this region")
+                LDL_DEBUG(self->app, "%s: new_channel_req not processed in this region", __FUNCTION__)
             }
             break;
 
         case LDL_CMD_DL_CHANNEL:
 
-            LDL_DEBUG(self->app, "dl_channel_req: chIndex=%u freq=%" PRIu32,
+            LDL_DEBUG(self->app, "%s: dl_channel_req: chIndex=%u freq=%" PRIu32,
+                __FUNCTION__,
                 cmd.fields.dlChannel.chIndex,
                 cmd.fields.dlChannel.freq
             )
@@ -1949,13 +1965,14 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             }
             else{
 
-                LDL_DEBUG(self->app, "dl_channel_req not processed in this region")
+                LDL_DEBUG(self->app, "%s: dl_channel_req not processed in this region", __FUNCTION__)
             }
             break;
 
         case LDL_CMD_RX_TIMING_SETUP:
 
-            LDL_DEBUG(self->app, "rx_timing_setup_req: delay=%u",
+            LDL_DEBUG(self->app, "%s: rx_timing_setup_req: delay=%u",
+                __FUNCTION__,
                 cmd.fields.rxTimingSetup.delay
             )
 
@@ -1966,7 +1983,8 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 
         case LDL_CMD_TX_PARAM_SETUP:
 
-            LDL_DEBUG(self->app, "tx_param_setup_req: downlinkDwellTime=%s uplinkDwellTime=%s maxEIRP=%u",
+            LDL_DEBUG(self->app, "%s: tx_param_setup_req: downlinkDwellTime=%s uplinkDwellTime=%s maxEIRP=%u",
+                __FUNCTION__,
                 cmd.fields.txParamSetup.downlinkDwell ? "true" : "false",
                 cmd.fields.txParamSetup.uplinkDwell ? "true" : "false",
                 cmd.fields.txParamSetup.maxEIRP
@@ -1978,7 +1996,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             }
             else{
 
-                LDL_DEBUG(self->app, "tx_param_setup_req not processed in this region")
+                LDL_DEBUG(self->app, "%s: tx_param_setup_req not processed in this region", __FUNCTION__)
             }
             break;
 
@@ -1990,7 +2008,8 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             arg.device_time.seconds = cmd.fields.deviceTime.seconds;
             arg.device_time.fractions = cmd.fields.deviceTime.fractions;
 
-            LDL_DEBUG(self->app, "device_time_ans: seconds=%" PRIu32 " fractions=%u",
+            LDL_DEBUG(self->app, "%s: device_time_ans: seconds=%" PRIu32 " fractions=%u",
+                __FUNCTION__,
                 arg.device_time.seconds,
                 arg.device_time.fractions
             )
@@ -2001,7 +2020,8 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 #endif
         case LDL_CMD_ADR_PARAM_SETUP:
 
-            LDL_DEBUG(self->app, "adr_param_setup: limit_exp=%u delay_exp=%u",
+            LDL_DEBUG(self->app, "%s: adr_param_setup: limit_exp=%u delay_exp=%u",
+                __FUNCTION__,
                 cmd.fields.adrParamSetup.limit_exp,
                 cmd.fields.adrParamSetup.delay_exp
             )
@@ -2014,7 +2034,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 
         case LDL_CMD_REKEY:
 
-            LDL_DEBUG(self->app, "rekey_conf: version=%u", cmd.fields.rekey.version)
+            LDL_DEBUG(self->app, "%s: rekey_conf: version=%u", __FUNCTION__, cmd.fields.rekey.version)
 
             /* The server version must be greater than 0 (0 is not allowed), and smaller or equal (<=) to the
              * device’s LoRaWAN version. Therefore for a LoRaWAN1.1 device the only valid value is 1. If
@@ -2028,14 +2048,15 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 
         case LDL_CMD_FORCE_REJOIN:
 
-            LDL_DEBUG(self->app, "force_rejoin_req: max_retries=%u rejoin_type=%u period=% dr=%u",
+            LDL_DEBUG(self->app, "%s: force_rejoin_req: max_retries=%u rejoin_type=%u period=% dr=%u",
+                __FUNCTION__,
                 cmd.fields.forceRejoin.max_retries,
                 cmd.fields.forceRejoin.rejoin_type,
                 cmd.fields.forceRejoin.period,
                 cmd.fields.forceRejoin.dr
             )
 
-            LDL_DEBUG(self->app, "force rejoin not implemented")
+            LDL_DEBUG(self->app, "%s: force rejoin not implemented", __FUNCTION__)
 
             /* no reply - you are meant to start doing a rejoin */
 
@@ -2043,7 +2064,8 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 
         case LDL_CMD_REJOIN_PARAM_SETUP:
 
-            LDL_DEBUG(self->app, "rejoin_param_setup_req: maxTimeN=%u maxCountN=%u",
+            LDL_DEBUG(self->app, "%s: rejoin_param_setup_req: maxTimeN=%u maxCountN=%u",
+                __FUNCTION__,
                 cmd.fields.rejoinParamSetup.maxTimeN,
                 cmd.fields.rejoinParamSetup.maxCountN
             )
@@ -2057,7 +2079,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
     /* roll back ADR request if not successful */
     if(adr_state == _ADR_BAD){
 
-        LDL_DEBUG(self->app, "bad ADR setting; rollback")
+        LDL_DEBUG(self->app, "%s: bad ADR setting; rollback", __FUNCTION__)
 
         (void)memcpy(self->ctx.chMask, chMask, sizeof(self->ctx.chMask));
 
@@ -2593,7 +2615,7 @@ static void downlinkMissingHandler(struct ldl_mac *self)
             }
             else{
 
-                LDL_DEBUG(self->app, "no channel available for retry")
+                LDL_DEBUG(self->app, "%s: no channel available for retry", __FUNCTION__)
 
                 self->handler(self->app, LDL_MAC_DATA_COMPLETE, NULL);
 
@@ -2626,12 +2648,12 @@ static void downlinkMissingHandler(struct ldl_mac *self)
 
         if(selectChannel(self, self->tx.rate, self->tx.chIndex, ms_until_next, &self->tx.chIndex, &self->tx.freq)){
 
-            LDL_DEBUG(self->app, "OTAA retry in %" PRIu32 "ms", ms_until_next)
+            LDL_DEBUG(self->app, "%s: OTAA retry in %" PRIu32 "ms", __FUNCTION__, ms_until_next)
             self->state = LDL_STATE_WAIT_RETRY;
         }
         else{
 
-            LDL_DEBUG(self->app, "no channel available for OTAA retry")
+            LDL_DEBUG(self->app, "%s: no channel available for OTAA retry", __FUNCTION__)
 
             self->state = LDL_STATE_IDLE;
             self->op = LDL_OP_NONE;

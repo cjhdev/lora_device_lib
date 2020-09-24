@@ -66,6 +66,22 @@
     #define LDL_INFO(APP,...)
 #endif
 
+#ifndef LDL_TRACE_BEGIN
+#define LDL_TRACE_BEGIN()
+#endif
+
+#ifndef LDL_TRACE_PART
+    #define LDL_TRACE_PART(...)
+#endif
+
+#ifndef LDL_TRACE_HEX
+    #define LDL_TRACE_HEX(PTR, LEN)
+#endif
+
+#ifndef LDL_TRACE_FINAL
+    #define LDL_TRACE_FINAL()
+#endif
+
 #ifndef LDL_DEBUG
     /** A printf-like function that captures run-time debug level messages with
      * varaidic arguments

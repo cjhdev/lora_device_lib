@@ -1,6 +1,17 @@
 Release History
 ===============
 
+## 0.4.1
+
+- added LDL_TRACE_* macros for verbose debug messages
+- added __FUNCTION__ as first argument to LDL_DEBUG(), LDL_INFO(), and LDL_ERROR() level messages to add consistency in logs
+- added ldl_radio_debug.c/h to have option of printing register access using the trace macros
+- added LDL_ENABLE_RADIO_DEBUG build option to enable trace level radio debugging (depends on LDL_TRACE_*)
+- changed radio driver to set the read/write bit in the opcode instead of having chip_adapter do it
+- fixed bug in SX1276 driver where RegPllHop is written instead of RegTcxo
+- refactored modem config code in ldl_radio.c to work better with debug readback
+- added options to mbed wrapper to enable/disable radio debugging
+
 ## 0.4.0
 
 In this release effort has gone into making it easier to evaluate

@@ -245,15 +245,14 @@ MAC::do_process()
     }
     while(next == 0U);
 
-    if(next < UINT32_MAX){
+    next = (next == UINT32_MAX) ? 60000UL : next;
 
-        event.cancel(next_event_handler);
+    event.cancel(next_event_handler);
 
-        next_event_handler = event.call_in(std::chrono::milliseconds(next), callback(this, &MAC::do_process));
+    next_event_handler = event.call_in(std::chrono::milliseconds(next), callback(this, &MAC::do_process));
 
-        /* LoRaWAN will grind to a halt if there is no memory to enqueue */
-        MBED_ASSERT(next_event_handler != 0);
-    }
+    /* LoRaWAN will grind to a halt if there is no memory to enqueue */
+    MBED_ASSERT(next_event_handler != 0);
 }
 
 bool
@@ -278,7 +277,7 @@ MAC::start(enum ldl_region region)
     arg.ticks = _ticks;
     arg.tps = 1000UL;
     arg.a = 0UL;
-    arg.b = 2UL;
+    arg.b = 4UL;
     arg.advance = 0UL;
 
     arg.rand = _rand;

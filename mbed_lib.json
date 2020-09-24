@@ -38,6 +38,15 @@
             "help" : "The maximum data rate LDL will use",
             "macro_name" : "LDL_DEFAULT_RATE",
             "value" : 1
+        },
+        "enable-verbose-debug" : {
+            "help" : "Enable very verbose debug messages",
+            "value" : null
+        },
+        "enable-radio-debug" : {
+            "help" : "Enable verbose radio debug messages (requires enable-verbose-debug)",
+            "macro_name" : "LDL_ENABLE_RADIO_DEBUG",
+            "value" : null
         }
     }
 }

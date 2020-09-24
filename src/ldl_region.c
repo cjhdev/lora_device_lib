@@ -98,7 +98,7 @@ void LDL_Region_convertRate(enum ldl_region region, uint8_t rate, enum ldl_sprea
             *sf = LDL_SF_7;
             *bw = LDL_BW_125;
             *mtu = 250U;
-            LDL_INFO(NULL,"invalid rate")
+            LDL_INFO(NULL,"%s: invalid rate", __FUNCTION__)
             break;
         }
         break;
@@ -162,7 +162,7 @@ void LDL_Region_convertRate(enum ldl_region region, uint8_t rate, enum ldl_sprea
             *sf = LDL_SF_7;
             *bw = LDL_BW_125;
             *mtu = 250U;
-            LDL_INFO(NULL,"invalid rate")
+            LDL_INFO(NULL,"%s: invalid rate", __FUNCTION__)
             break;
         }
         break;
@@ -236,7 +236,7 @@ void LDL_Region_convertRate(enum ldl_region region, uint8_t rate, enum ldl_sprea
             *sf = LDL_SF_7;
             *bw = LDL_BW_125;
             *mtu = 250U;
-            LDL_INFO(NULL,"invalid rate")
+            LDL_INFO(NULL,"%s: invalid rate", __FUNCTION__)
             break;
         }
         break;
@@ -418,9 +418,9 @@ void LDL_Region_getDefaultChannels(enum ldl_region region, struct ldl_mac *mac)
 
         (void)upRateRange(region, 0U, &minRate, &maxRate);
 
-        LDL_MAC_addChannel(mac, 0U, 868100000UL, minRate, maxRate);
-        LDL_MAC_addChannel(mac, 1U, 868300000UL, minRate, maxRate);
-        LDL_MAC_addChannel(mac, 2U, 868500000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 0U, 868100000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 1U, 868300000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 2U, 868500000UL, minRate, maxRate);
         break;
 #endif
 #ifdef LDL_ENABLE_EU_433
@@ -428,9 +428,9 @@ void LDL_Region_getDefaultChannels(enum ldl_region region, struct ldl_mac *mac)
 
         (void)upRateRange(region, 0U, &minRate, &maxRate);
 
-        LDL_MAC_addChannel(mac, 0U, 433175000UL, minRate, maxRate);
-        LDL_MAC_addChannel(mac, 1U, 433375000UL, minRate, maxRate);
-        LDL_MAC_addChannel(mac, 2U, 433575000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 0U, 433175000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 1U, 433375000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 2U, 433575000UL, minRate, maxRate);
         break;
 #endif
     }
@@ -608,6 +608,7 @@ void LDL_Region_getRX1DataRate(enum ldl_region region, uint8_t tx_rate, uint8_t 
 
     switch(region){
     default:
+        break;
 #if defined(LDL_ENABLE_EU_863_870) || defined(LDL_ENABLE_EU_433)
 #   ifdef LDL_ENABLE_EU_863_870
     case LDL_EU_863_870:
@@ -680,7 +681,7 @@ void LDL_Region_getRX1DataRate(enum ldl_region region, uint8_t tx_rate, uint8_t 
         else{
 
             *rx1_rate = tx_rate;
-            LDL_INFO(NULL,"out of range error")
+            LDL_INFO(NULL,"%s: out of range error", __FUNCTION__)
         }
     }
 }

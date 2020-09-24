@@ -152,6 +152,19 @@
     #define LDL_LITTLE_ENDIAN
     #undef LDL_LITTLE_ENDIAN
 
+    /**
+     * Define to enable verbose radio interface debugging that will
+     * buffer and print register access via LDL_TRACE_*
+     *
+     * This feature uses a buffer to defer printing until the driver
+     * is past a timing sensitive part.
+     *
+     * Note: you need to define LDL_TRACE_* macros to get output.
+     *
+     * */
+    #define LDL_ENABLE_RADIO_DEBUG
+    #undef LDL_ENABLE_RADIO_DEBUG
+
 #endif
 
 #ifdef LDL_TARGET_INCLUDE
