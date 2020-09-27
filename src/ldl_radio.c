@@ -296,7 +296,6 @@ void LDL_Radio_transmit(struct ldl_radio *self, const struct ldl_radio_tx_settin
     LDL_PEDANTIC(settings != NULL)
     LDL_PEDANTIC((data != NULL) || (len == 0U))
     LDL_PEDANTIC(settings->freq != 0U)
-LDL_DEBUG(self, "TX");    
 
     self->dio_mapping1 = 0x40U;
 
@@ -318,7 +317,6 @@ void LDL_Radio_receive(struct ldl_radio *self, const struct ldl_radio_rx_setting
     LDL_PEDANTIC(self != NULL)
     LDL_PEDANTIC(settings != NULL)
     LDL_PEDANTIC(settings->freq != 0U)
-LDL_DEBUG(self, "RX b:%u s:%u f:%lu", settings->bw, settings->sf, settings->freq);    
 
     self->dio_mapping1 = 0U;
 
