@@ -759,7 +759,7 @@ LDL_DEBUG(self, "mdk");
                     fopts = frame.opts;
                     foptsLen = frame.optsLen;
 
-                    if((frame.data != NULL) && (frame.port == 0U)){
+                    if(frame.data != NULL){
 
                         if(frame.port == 0U){
 
