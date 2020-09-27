@@ -132,7 +132,7 @@ enum ldl_radio_sx1272_register {
     RegAgcThresh2=0x45,
     RegAgcThresh3=0x46,
     RegPllHop=0x4B,
-    RegTcxo=0x58,
+    RegTcxo=0x4B,
     RegPaDac=0x5A,
     RegPll=0x5C,
     RegPllLowPn=0x5E,
@@ -296,6 +296,7 @@ void LDL_Radio_transmit(struct ldl_radio *self, const struct ldl_radio_tx_settin
     LDL_PEDANTIC(settings != NULL)
     LDL_PEDANTIC((data != NULL) || (len == 0U))
     LDL_PEDANTIC(settings->freq != 0U)
+LDL_DEBUG(self, "TX");    
 
     self->dio_mapping1 = 0x40U;
 
@@ -317,6 +318,7 @@ void LDL_Radio_receive(struct ldl_radio *self, const struct ldl_radio_rx_setting
     LDL_PEDANTIC(self != NULL)
     LDL_PEDANTIC(settings != NULL)
     LDL_PEDANTIC(settings->freq != 0U)
+LDL_DEBUG(self, "RX b:%u s:%u f:%lu", settings->bw, settings->sf, settings->freq);    
 
     self->dio_mapping1 = 0U;
 
@@ -606,6 +608,7 @@ static void setModemConfig(struct ldl_radio *self, enum ldl_signal_bandwidth bw,
 
         _timeout = (uint16_t)timeout;
     }
+    LDL_DEBUG(self, "setModemConfig timeout=%u", _timeout);
 
     bool low_rate = ((bw == LDL_BW_125) && ((sf == LDL_SF_11) || (sf == LDL_SF_12))) ? true : false;
 

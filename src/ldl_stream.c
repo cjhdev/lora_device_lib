@@ -38,6 +38,7 @@ void LDL_Stream_init(struct ldl_stream *self, void *buf, uint8_t size)
 
 void LDL_Stream_initReadOnly(struct ldl_stream *self, const void *buf, uint8_t size)
 {
+    LDL_DEBUG(NULL, "strinit");
     LDL_PEDANTIC(self != NULL)
     LDL_PEDANTIC((buf != NULL) || (size == 0U))
 

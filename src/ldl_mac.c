@@ -213,6 +213,7 @@ enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self)
                 self->bufferLen = LDL_OPS_prepareJoinRequest(self, &f, self->buffer, sizeof(self->buffer));
 
                 uint32_t delay = self->rand(self->app) % (60UL*self->tps);
+delay = 10000UL;                
 
                 LDL_DEBUG(self->app, "sending first OTAA request in %" PRIu32 " ticks", delay)
 
@@ -481,6 +482,8 @@ void LDL_MAC_process(struct ldl_mac *self)
 
                 /* advance timer by time required for extra symbols */
                 advanceA = advance + (self->rx1_margin/2UL);
+LDL_DEBUG(self, "1 wt:%lu ad:%lu xe:%lu sp:%lu es:%lu r1m:%lu r1s:%lu aa:%lu", waitTicks, advance, xtal_error, 
+        symbolPeriod(self->tps, sf, bw), extra_symbols, self->rx1_margin, self->rx1_symbols, advanceA);
             }
 
             /* RX2 */
@@ -499,6 +502,8 @@ void LDL_MAC_process(struct ldl_mac *self)
 
                 /* advance timer by time required for extra symbols */
                 advanceB = advance + (self->rx2_margin/2UL);
+LDL_DEBUG(self, "2 xe:%lu sp:%lu es:%lu r2m:%lu r2s:%lu ab:%lu", xtal_error, 
+        symbolPeriod(self->tps, sf, bw), extra_symbols, self->rx2_margin, self->rx2_symbols, advanceB);
             }
 
             if(advanceB <= (waitTicks + self->tps)){
@@ -674,6 +679,7 @@ void LDL_MAC_process(struct ldl_mac *self)
             arg.downstream.size = len;
 
             self->handler(self->app, LDL_MAC_DOWNSTREAM, &arg);
+LDL_DEBUG(self, "m0 l:%u r:%d s:%d", len, meta.rssi, meta.snr);
 
             self->margin = meta.snr - self->snr_min;
 
@@ -699,6 +705,7 @@ void LDL_MAC_process(struct ldl_mac *self)
                     self->ctx.rx2DataRate = frame.rx2DataRate;
                     self->ctx.rx1Delay = frame.rxDelay;
 
+LDL_DEBUG(self, "m1");
                     if(frame.cfList != NULL){
 
                         LDL_Region_processCFList(self->ctx.region, self, frame.cfList, frame.cfListLen);
@@ -721,6 +728,7 @@ void LDL_MAC_process(struct ldl_mac *self)
                         setPendingCommand(self, LDL_CMD_REKEY);
                     }
 
+LDL_DEBUG(self, "mdk");
                     LDL_OPS_deriveKeys(self);
 
                     self->joinNonce++;
@@ -1235,7 +1243,7 @@ void LDL_MAC_inputSignal(struct ldl_mac *self, enum ldl_input_type type, uint32_
 
             self->inputs.time = ticks;
             self->inputs.state = (1U << type);
-        }
+        } 
     }
 
     LDL_SYSTEM_LEAVE_CRITICAL(self->app)
@@ -1243,6 +1251,7 @@ void LDL_MAC_inputSignal(struct ldl_mac *self, enum ldl_input_type type, uint32_
 
 void LDL_MAC_inputArm(struct ldl_mac *self, enum ldl_input_type type)
 {
+    LDL_DEBUG(self, "iArm %u", type);
     LDL_SYSTEM_ENTER_CRITICAL(self->app)
 
     self->inputs.armed |= (1U << type);
@@ -1264,11 +1273,15 @@ bool LDL_MAC_inputCheck(const struct ldl_mac *self, enum ldl_input_type type, ui
 
     LDL_SYSTEM_LEAVE_CRITICAL(self->app)
 
+    if (retval)
+        LDL_DEBUG(self, "iState %u %lu", self->inputs.state, self->inputs.time);
+
     return retval;
 }
 
 void LDL_MAC_inputClear(struct ldl_mac *self)
 {
+    LDL_DEBUG(self, "iClr");
     LDL_SYSTEM_ENTER_CRITICAL(self->app)
 
     self->inputs.state = 0U;

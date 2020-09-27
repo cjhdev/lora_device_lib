@@ -218,18 +218,25 @@ uint8_t LDL_OPS_prepareJoinRequest(struct ldl_mac *self, const struct ldl_frame_
 
 bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_t *in, uint8_t len)
 {
+LDL_DEBUG(self->app, "rf");
     bool retval;
     uint32_t mic;
 
     retval = false;
 
-    if(LDL_Frame_decode(f, in, len)){
+LDL_DEBUG(NULL, "rfd0");
+//    if(LDL_Frame_decode(f, in, len)){
+    bool res = LDL_Frame_decode(f, in, len);
+LDL_DEBUG(NULL, "rfd0res %u", res);
+    if(res){
+LDL_DEBUG(NULL, "rfd1");
 
         switch(f->type){
         default:
             break;
 
         case FRAME_TYPE_JOIN_ACCEPT:
+LDL_DEBUG(self->app, "rf1");
 
             if((self->op == LDL_OP_JOINING) || (self->op == LDL_OP_REJOINING)){
 
@@ -246,6 +253,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
 
                 if(LDL_Frame_decode(f, in, len)){
 
+#ifndef LDL_DISABLE_POINTONE
                     if(f->optNeg){
 
                         if(f->joinNonce >= self->joinNonce){
@@ -284,9 +292,12 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                             LDL_DEBUG(self->app, "invalid joinNonce")
                         }
                     }
-                    else{
-
+                    else
+#endif                    
+                        {
+LDL_DEBUG(self->app, "rf_bm");
                         mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_NWK, NULL, 0U, in, len-sizeof(mic));
+LDL_DEBUG(self->app, "rf_am");
 
                         if(f->mic == mic){
 

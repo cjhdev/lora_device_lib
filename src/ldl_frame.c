@@ -122,6 +122,7 @@ uint8_t LDL_Frame_sizeofJoinAccept(bool withCFList)
 
 bool LDL_Frame_decode(struct ldl_frame_down *f, void *in, uint8_t len)
 {
+LDL_DEBUG(NULL, "fd0");
     LDL_PEDANTIC(f != NULL)
     LDL_PEDANTIC((in != NULL) && (len > 0U))
 
@@ -155,28 +156,31 @@ bool LDL_Frame_decode(struct ldl_frame_down *f, void *in, uint8_t len)
                 (void)LDL_Stream_getU32(&s, &f->devAddr);
                 (void)LDL_Stream_getU8(&s, &dlSettings);
                 (void)LDL_Stream_getU8(&s, &f->rxDelay);
+LDL_DEBUG(NULL, "ft: %u, da:%lx, dlSett:%x", f->type,  f->devAddr, dlSettings);
 
                 f->optNeg =             ((dlSettings & 0x80U) != 0);
                 f->rx1DataRateOffset =  (dlSettings >> 4) & 0x7U;
                 f->rx2DataRate =        dlSettings & 0xfU;
 
                 f->rxDelay = ( f->rxDelay == 0U) ? 1U : f->rxDelay;
+LDL_DEBUG(NULL, "rx1off:%x, dr:%x delay:%x", f->rx1DataRateOffset, f->rx2DataRate, f->rxDelay);
 
                 /* cflist is included */
                 if(LDL_Stream_remaining(&s) > sizeof(f->mic)){
-
                     f->cfList = &ptr[LDL_Stream_tell(&s)];
                     f->cfListLen = 16U;
                     (void)LDL_Stream_seekCur(&s, f->cfListLen);
+LDL_DEBUG(NULL, "fd_c %x %x %x", f->cfList[0], f->cfList[1], f->cfList[2]);
                 }
 
                 (void)LDL_Stream_getU32(&s, &f->mic);
+LDL_DEBUG(NULL, "fd_mic: %lx", f->mic);
 
                 if(!LDL_Stream_error(&s)){
+LDL_DEBUG(NULL, "fd_noerr rem: %u", LDL_Stream_remaining(&s));
 
                     /* buffer should only be this size */
                     if(LDL_Stream_remaining(&s) == 0U){
-
                         retval = true;
                     }
                 }
@@ -224,6 +228,7 @@ bool LDL_Frame_decode(struct ldl_frame_down *f, void *in, uint8_t len)
         }
     }
 
+LDL_DEBUG(NULL, "fdX %u", retval);
     return retval;
 }
 
@@ -244,6 +249,7 @@ uint8_t LDL_Frame_phyOverhead(void)
 
 static bool getFrameType(uint8_t tag, enum ldl_frame_type *type)
 {
+LDL_DEBUG(NULL, "fdgft");
     bool retval = false;
 
     if((tag & 0x1fU) == 0U){
