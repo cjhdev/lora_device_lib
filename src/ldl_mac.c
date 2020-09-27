@@ -751,7 +751,7 @@ void LDL_MAC_process(struct ldl_mac *self)
                     fopts = frame.opts;
                     foptsLen = frame.optsLen;
 
-                    if((frame.data != NULL) && (frame.port == 0U)){
+                    if(frame.data != NULL){
 
                         if(frame.port == 0U){
 
