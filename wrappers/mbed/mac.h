@@ -37,7 +37,7 @@ namespace LDL {
 
         protected:
 
-            enum {
+            enum mac_run_state {
 
                 OFF,
                 ON
@@ -50,9 +50,7 @@ namespace LDL {
             Radio& radio;
             SM& sm;
             Store& store;
-            EventQueue& event;
-            int next_event_handler;
-            Semaphore semaphore;
+            LowPowerTimer timer;
 
             Callback<void(unsigned int)> entropy_cb;
             Callback<void(enum ldl_mac_response_type, const union ldl_mac_response_arg *)> event_cb;
@@ -61,9 +59,6 @@ namespace LDL {
             static MAC *to_obj(void *ptr);
 
             static void app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg);
-
-
-            void do_handle_radio_event(enum ldl_radio_event event, uint32_t ticks);
 
             /* called by radio in ISR */
             void handle_radio_event(enum ldl_radio_event event);
@@ -76,10 +71,9 @@ namespace LDL {
 
             void do_process();
 
-            MAC(EventQueue& event, Store& store, SM& sm, Radio& radio);
+            MAC(Store& store, SM& sm, Radio& radio);
 
             bool start(enum ldl_region region);
-            void stop();
 
             enum ldl_mac_status unconfirmed(uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts = NULL);
             enum ldl_mac_status confirmed(uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts = NULL);

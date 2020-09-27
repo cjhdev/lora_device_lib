@@ -16,13 +16,9 @@ const uint8_t join_eui[] = MBED_CONF_APP_JOIN_EUI;
 /* pin mapping for the DISCO_L072CZ_LRWAN1 */
 SPI spi(PA_7, PA_6, PB_3);
 
-EventQueue event;
-
 LDL::DefaultSM sm(app_key, nwk_key);
 
 __attribute__ ((section (".noinit"))) LDL::DefaultStore store(dev_eui, join_eui);
-
-
 
 int main()
 {
@@ -39,7 +35,7 @@ int main()
         PA_12       // enable_tcxo
     );
 
-    static LDL::MAC mac(event, store, sm, radio);
+    static LDL::MAC mac(store, sm, radio);
 
     mac.start(LDL_EU_863_870);
 

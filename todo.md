@@ -30,3 +30,5 @@ Todo
     - KR_920_923
     - IN_865_867
     - RU_864_870
+
+- Adjust current trim in radio driver

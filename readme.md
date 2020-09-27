@@ -112,7 +112,7 @@ and read [history.md](history.md) if updating from an older version.
 ## Features
 
 - Small memory footprint*
-- LoRaWAN 1.1
+- LoRaWAN 1.1 subset
 - Class A
 - OTAA
     - frequency and mask CFLists
@@ -160,7 +160,7 @@ and read [history.md](history.md) if updating from an older version.
 - Class B and C not supported
 - FSK modulation not supported
 - ABP not supported
-- Rejoin not supported
+- 1.1 Rejoin not supported
 - **Experimental**
 
 ## Documentation
@@ -170,12 +170,6 @@ and read [history.md](history.md) if updating from an older version.
 - [history](history.md)
 - [design goals](design_goals.md)
 - [todo list](todo.md)
-
-## Commercial Support
-
-Commercial support is available from the author.
-
-contact@stackmechanic.com
 
 ## See Also
 

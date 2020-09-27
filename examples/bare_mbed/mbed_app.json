@@ -1,5 +1,5 @@
 {
-    "requires": ["bare-metal", "ldl", "events", "mbed-trace"],
+    "requires": ["bare-metal", "ldl", "mbed-trace"],
     "config" : {
 
         "app_key" : {
@@ -21,9 +21,7 @@
             "platform.default-serial-baud-rate": 115200,
             "target.c_lib": "small",
             "mbed-trace.enable": 1,
-            "mbed-trace.max-level" : "TRACE_LEVEL_DEBUG",
-            "ldl.enable-verbose-debug" : 1,
-            "ldl.enable-radio-debug" : 1
+            "mbed-trace.max-level" : "TRACE_LEVEL_DEBUG"
         },
         "DISCO_L072CZ_LRWAN1" : {
 

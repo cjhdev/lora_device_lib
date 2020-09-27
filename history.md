@@ -1,6 +1,16 @@
 Release History
 ===============
 
+## 0.4.2
+
+- fixed RegTcxo bug again: got the mapping backwards in 0.4.1
+- fixed bug affecting behaviour of MAC if RX2 slot is handled too late
+- added more debug registers that are read when LDL_ENABLE_RADIO_DEBUG is defined
+- refactored MBED wrapper to not use EventQueue which was causing timing problems
+- added Pout control for RFO SX1276 (was todo)
+- added LDL_ENABLE_POINTONE_ERRATA_A1 build option to apply 1.1 A1 errata
+- added LDL_DISABLE_RANDOM_DEV_NONCE build option for using a counter based devNonce if LDL_DISABLE_POINTONE is defined
+
 ## 0.4.1
 
 - added LDL_TRACE_* macros for verbose debug messages

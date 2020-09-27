@@ -203,8 +203,10 @@ enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self)
                 f.devEUI = self->devEUI;
 
 #ifdef LDL_DISABLE_POINTONE
+#ifndef LDL_DISABLE_RANDOM_DEV_NONCE
                 /* LoRAWAN 1.0 uses random nonce */
                 self->devNonce = self->rand(self->app);
+#endif
 #endif
                 f.devNonce = self->devNonce;
 
@@ -489,7 +491,7 @@ void LDL_MAC_process(struct ldl_mac *self)
             {
                 LDL_Region_convertRate(self->ctx.region, self->ctx.rx2Rate, &sf, &bw, &mtu);
 
-                xtal_error = ((waitSeconds + 1UL) * self->a * 2UL) + self->b;
+                xtal_error += (self->a * 2UL);
 
                 extra_symbols = extraSymbols(xtal_error, symbolPeriod(self->tps, sf, bw));
 
@@ -583,20 +585,25 @@ void LDL_MAC_process(struct ldl_mac *self)
                 LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (self->tps + self->a) * 4U);
 
                 self->snr_min = LDL_Radio_getMinSNR(radio_setting.sf);
+
+                arg.rx_slot.margin = self->rx1_margin;
+                arg.rx_slot.timeout = self->rx1_symbols;
+                arg.rx_slot.error = error;
+                arg.rx_slot.freq = freq;
+                arg.rx_slot.bw = radio_setting.bw;
+                arg.rx_slot.sf = radio_setting.sf;
+
+                self->handler(self->app, LDL_MAC_RX1_SLOT, &arg);
             }
             else{
 
                 self->state = LDL_STATE_WAIT_RX2;
+                LDL_ERROR(self->app, "%s: too late for RX1 window: error=%" PRIu32 " margin=%" PRIu32 "",
+                    __FUNCTION__,
+                    error,
+                    self->rx1_margin
+                )
             }
-
-            arg.rx_slot.margin = self->rx1_margin;
-            arg.rx_slot.timeout = self->rx1_symbols;
-            arg.rx_slot.error = error;
-            arg.rx_slot.freq = freq;
-            arg.rx_slot.bw = radio_setting.bw;
-            arg.rx_slot.sf = radio_setting.sf;
-
-            self->handler(self->app, LDL_MAC_RX1_SLOT, &arg);
         }
         break;
 
@@ -627,22 +634,38 @@ void LDL_MAC_process(struct ldl_mac *self)
                 LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (self->tps + self->a) * 4U);
 
                 self->snr_min = LDL_Radio_getMinSNR(radio_setting.sf);
+
+                arg.rx_slot.margin = self->rx2_margin;
+                arg.rx_slot.timeout = self->rx2_symbols;
+                arg.rx_slot.error = error;
+                arg.rx_slot.freq = self->ctx.rx2Freq;
+                arg.rx_slot.bw = radio_setting.bw;
+                arg.rx_slot.sf = radio_setting.sf;
+
+                self->handler(self->app, LDL_MAC_RX2_SLOT, &arg);
             }
             else{
 
-                adaptRate(self);
+                self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
 
-                self->state = LDL_STATE_IDLE;
+                LDL_MAC_timerClear(self, LDL_TIMER_WAITB);
+
+                uint8_t mtu;
+                enum ldl_spreading_factor sf;
+                enum ldl_signal_bandwidth bw;
+
+                LDL_Region_convertRate(self->ctx.region, self->tx.rate, &sf, &bw, &mtu);
+
+                LDL_MAC_timerSet(self, LDL_TIMER_WAITA, LDL_Radio_getAirTime(self->tps, bw, sf, mtu, false));
+
+                self->state = LDL_STATE_RX2_LOCKOUT;
+
+                LDL_ERROR(self->app, "%s: too late for RX2 window: error=%" PRIu32 " margin=%" PRIu32 "",
+                    __FUNCTION__,
+                    error,
+                    self->rx2_margin
+                )
             }
-
-            arg.rx_slot.margin = self->rx2_margin;
-            arg.rx_slot.timeout = self->rx2_symbols;
-            arg.rx_slot.error = error;
-            arg.rx_slot.freq = self->ctx.rx2Freq;
-            arg.rx_slot.bw = radio_setting.bw;
-            arg.rx_slot.sf = radio_setting.sf;
-
-            self->handler(self->app, LDL_MAC_RX2_SLOT, &arg);
         }
         break;
 

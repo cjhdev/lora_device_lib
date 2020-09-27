@@ -58,7 +58,7 @@ int main()
 }
 ~~~
 
-## Gotchas
+## FYI
 
 ### DevNonce
 
@@ -71,6 +71,13 @@ seen the devNonce.
 
 The workaround here is to implement persistence as a subclass of LDL::Store. Alternatively you can
 reset the counter on the server side.
+
+### LowPowerTimer and LowPowerTimeout
+
+The wrapper depends on LowPowerTimer and LowPowerTimer.
+
+I assume that these features are available on all MBED targets. A build option
+can be added to swap in the full-power variants if this isn't true.
 
 
 

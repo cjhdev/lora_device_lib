@@ -281,11 +281,25 @@ The rest should be explained in the chip interface documentation.
 ### Debugging Radio Driver
 
 Not a porting issue, but if you need to see what is being written/read to
-the transceiver you can enable a printout by defining:
+the transceiver you can see this information printed by defining:
 
 - LDL_ENABLE_RADIO_DEBUG
 - LDL_TRACE_*
 
-Enabling this feature will require significant flash and RAM. The implementation
-uses a buffer to defer printing until the driver is past code
-that would be affected by the time it takes to print.
+Enabling this feature will increase RAM and flash usage. The RAM is used
+to buffer register accesses so that printing doesn't affect time
+sensitive operations. You probably shouldn't leave this on in releases
+since it is very verbose.
+
+### LoRaWAN 1.1 Errata
+
+There is an errata dated 26 Jan 2018 that changes the way Fopts are
+encrypted in 1.1 mode. This document is public but is still marked as
+proposed.
+
+By default this change is not applied to the source, but it can be enabled
+by defining:
+
+- LDL_ENABLE_POINTONE_ERRATA_A1
+
+

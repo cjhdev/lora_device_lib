@@ -24,6 +24,7 @@
 
 #include "mbed_assert.h"
 #include "mbed_trace.h"
+#include "mbed_critical.h"
 
 #define TRACE_GROUP "LDL"
 
@@ -54,5 +55,8 @@ void my_trace_end(void);
 #define LDL_TRACE_PART(...) my_trace_part(__VA_ARGS__);
 #define LDL_TRACE_HEX(PTR, LEN) my_trace_hex(PTR, LEN);
 #define LDL_TRACE_FINAL() my_trace_end();
+
+#define LDL_SYSTEM_ENTER_CRITICAL(APP)  core_util_critical_section_enter();
+#define LDL_SYSTEM_LEAVE_CRITICAL(APP)  core_util_critical_section_exit();
 
 #endif

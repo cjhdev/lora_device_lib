@@ -272,7 +272,7 @@ static void debugRegister(struct ldl_radio *self, const char *fn, const struct l
 
         LDL_TRACE_PART("RegTcxo): reg=0x%02X value=0x%02X ", reg, data)
         LDL_TRACE_PART("TcxoInputOn=%s",
-            (data & 0x10U) ? "XTAL" : "TCXO"
+            (data & 0x10U) ? "TCXO" : "CRYSTAL"
         )
         break;
 
@@ -349,6 +349,56 @@ static void debugRegister(struct ldl_radio *self, const char *fn, const struct l
             (data >> 1) & 1U,
             data & 1U
         )
+        break;
+
+    case RegHopChannel:
+
+        LDL_TRACE_PART("RegHopChannel): reg=0x%02X value=0x%02X ", reg, data)
+        LDL_TRACE_PART("PllTimeout=%u CrcOnPayload=%u FhssPresentChannel=%u",
+            (data >> 7) & 1U,
+            (data >> 6) & 1U,
+            data & 0x3fU
+        )
+        break;
+
+    case RegRxHeaderCntValueMsb:
+
+        LDL_TRACE_PART("RegRxHeaderCntValueMsb): reg=0x%02X value=0x%02X", reg, data)
+        break;
+
+    case RegRxHeaderCntValueLsb:
+
+        LDL_TRACE_PART("RegRxHeaderCntValueLsb): reg=0x%02X value=0x%02X", reg, data)
+        break;
+
+    case RegRxPacketCntValueMsb:
+
+        LDL_TRACE_PART("RegRxPacketCntValueMsb): reg=0x%02X value=0x%02X", reg, data)
+        break;
+
+    case RegRxPacketCntValueLsb:
+
+        LDL_TRACE_PART("RegRxPacketCntValueLsb): reg=0x%02X value=0x%02X", reg, data)
+        break;
+
+    case LoraRegFeiMsb:
+
+        LDL_TRACE_PART("RegFeiMsb): reg=0x%02X value=0x%02X", reg, data)
+        break;
+
+    case RegFeiMid:
+
+        LDL_TRACE_PART("RegFeiMid): reg=0x%02X value=0x%02X", reg, data)
+        break;
+
+    case LoraRegFeiLsb:
+
+        LDL_TRACE_PART("RegFeiLsb): reg=0x%02X value=0x%02X", reg, data)
+        break;
+
+    case RegFifoRxCurrentAddr:
+
+        LDL_TRACE_PART("RegFifoRxCurrentAddr): reg=0x%02X value=0x%02X", reg, data)
         break;
 
     default:

@@ -34,6 +34,22 @@
             "macro_name" : "LDL_TARGET_INCLUDE",
             "value" : "\"mbed_ldl_port.h\""
         },
+        "tps" : {
+            "help" : "this timebase works with all the high level timer objects (so don't change it)",
+            "value" : "1000000UL"
+        },
+        "advance" : {
+            "help" : "advance timing of events by this many ticks (probably never required since xtal-error-b can provide fudge factor)",
+            "value" : "0UL"
+        },
+        "xtal-error-a" : {
+            "help" : "(error = (seconds * xtal-error-a * 2) + xtal-error-b) with 1us tick",
+            "value" : "0UL"
+        },
+        "xtal-error-b" : {
+            "help" : "(error = (seconds * xtal-error-a * 2) + xtal-error-b) with 1us tick",
+            "value" : "4000UL"
+        },
         "default-rate" : {
             "help" : "The maximum data rate LDL will use",
             "macro_name" : "LDL_DEFAULT_RATE",
