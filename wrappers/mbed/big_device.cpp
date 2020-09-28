@@ -30,7 +30,8 @@ using namespace LDL;
 
 Device::Device(Store &store, SM &sm, Radio &radio) :
     mac(store, sm, radio),
-    worker_thread(1024U)
+    worker_thread(1024U),
+    radio(radio)
 {
 }
 
@@ -198,6 +199,13 @@ Device::notify_api()
     api.release();
 }
 
+void
+Device::handle_radio_event(enum ldl_radio_event ev)
+{
+    mac.handle_radio_event(ev);
+    do_work();
+}
+
 /* public methods *****************************************************/
 
 bool
@@ -208,6 +216,9 @@ Device::start(enum ldl_region region)
     mutex.lock();
 
     if(mac.start(region)){
+
+        // override the callback set by mac so we can intercept the events
+        radio.set_event_handler(callback(this, &Device::handle_radio_event));
 
         worker_thread.start(callback(this,&Device::worker));
         retval = true;

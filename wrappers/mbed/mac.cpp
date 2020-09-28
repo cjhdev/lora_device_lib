@@ -206,15 +206,13 @@ MAC::app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
     }
 }
 
-/* protected **********************************************************/
+/* public methods *****************************************************/
 
 void
 MAC::handle_radio_event(enum ldl_radio_event event)
 {
     LDL_MAC_radioEvent(&mac, event);
 }
-
-/* public methods *****************************************************/
 
 bool
 MAC::start(enum ldl_region region)
@@ -259,8 +257,6 @@ MAC::start(enum ldl_region region)
 
     arg.session = (session_size == sizeof(session)) ? &session : NULL;
 
-    radio.set_event_handler(callback(this, &MAC::handle_radio_event));
-
     LDL_MAC_init(&mac, region, &arg);
 
     /* apply TTN fair access policy
@@ -274,6 +270,8 @@ MAC::start(enum ldl_region region)
      *
      * */
     LDL_MAC_setMaxDCycle(&mac, 12U);
+
+    radio.set_event_handler(callback(this, &MAC::handle_radio_event));
 
     run_state = ON;
 

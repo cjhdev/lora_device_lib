@@ -44,6 +44,7 @@ namespace LDL {
             Mutex mutex;
             Semaphore work;
             LowPowerTimeout timeout;
+            Radio &radio;
 
             void do_work();
 
@@ -52,6 +53,9 @@ namespace LDL {
             void begin_api();
             void wait_until_api_done();
             void notify_api();
+
+            /* called by radio in ISR */
+            void handle_radio_event(enum ldl_radio_event ev);
 
             /* executed from the event queue */
             void do_unconfirmed(enum ldl_mac_status *retval, uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts);

@@ -60,16 +60,14 @@ namespace LDL {
 
             static void app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg);
 
-            /* called by radio in ISR */
-            void handle_radio_event(enum ldl_radio_event event);
-
             static uint32_t _ticks(void *app);
             static uint32_t _rand(void *app);
             static uint8_t _get_battery_level(void *app);
 
         public:
 
-            void do_process();
+            /* called by radio in ISR */
+            void handle_radio_event(enum ldl_radio_event event);
 
             MAC(Store& store, SM& sm, Radio& radio);
 

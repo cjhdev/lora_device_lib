@@ -1,6 +1,11 @@
 Release History
 ===============
 
+## 0.4.3
+
+- changed LDL::Device so that worker thread is scheduled to run when a radio ISR
+  event is received
+
 ## 0.4.2
 
 - fixed RegTcxo bug again: got the mapping backwards in 0.4.1
