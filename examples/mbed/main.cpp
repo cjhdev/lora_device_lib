@@ -15,7 +15,7 @@ const uint8_t join_eui[] = MBED_CONF_APP_JOIN_EUI;
 
 SPI spi(D11, D12, D13);
 LDL::DefaultSM sm(app_key, nwk_key);
-__attribute__ ((section (".noinit"))) LDL::DefaultStore store(dev_eui, join_eui);
+LDL::DefaultStore store(dev_eui, join_eui);
 
 int main()
 {

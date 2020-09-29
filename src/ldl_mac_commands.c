@@ -236,6 +236,8 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
 
                 (void)LDL_Stream_getU8(s, &cmd->fields.rxParamSetup.rx1DROffset);
                 (void)LDL_Stream_getU24(s, &cmd->fields.rxParamSetup.freq);
+
+                cmd->fields.rxParamSetup.freq *= 100UL;
                 break;
 
             case LDL_CMD_DEV_STATUS:
@@ -253,6 +255,8 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
 
                 cmd->fields.newChannel.maxDR = buf >> 4;
                 cmd->fields.newChannel.minDR = buf & 0xfU;
+
+                cmd->fields.newChannel.freq *= 100UL;
             }
                 break;
 
@@ -260,6 +264,8 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
 
                 (void)LDL_Stream_getU8(s, &cmd->fields.dlChannel.chIndex);
                 (void)LDL_Stream_getU24(s, &cmd->fields.dlChannel.freq);
+
+                cmd->fields.dlChannel.freq *= 100UL;
                 break;
 
             case LDL_CMD_RX_TIMING_SETUP:

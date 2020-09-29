@@ -423,9 +423,7 @@ struct ldl_mac_channel {
 /** session cache */
 struct ldl_mac_session {
 
-    /* set to currentSessionVersion */
-    uint8_t session_version;
-
+    uint8_t session_version;    /* set to currentSessionVersion */
     bool joined;
     bool adr;
     uint8_t version;
@@ -443,28 +441,21 @@ struct ldl_mac_session {
     struct ldl_mac_channel chConfig[16U];
 
     uint8_t chMask[72U / 8U];
-
     uint8_t rate;
     uint8_t power;
-
     uint8_t maxDutyCycle;
     uint8_t nbTrans;
-
     uint8_t rx1DROffset;
     uint8_t rx1Delay;
     uint8_t rx2DataRate;
-    uint8_t rx2Rate;
 
     uint32_t rx2Freq;
 
     uint16_t adr_ack_limit;
     uint16_t adr_ack_delay;
 
-    uint16_t pending_cmds;
-
     struct ldl_rx_param_setup_ans rx_param_setup_ans;
     struct ldl_dl_channel_ans dl_channel_ans;
-
     struct ldl_link_adr_ans link_adr_ans;
     struct ldl_dev_status_ans dev_status_ans;
     struct ldl_new_channel_ans new_channel_ans;
@@ -472,6 +463,7 @@ struct ldl_mac_session {
 
     uint32_t joinNonce;
     uint16_t devNonce;
+    uint16_t pending_cmds;
 };
 
 /** data service invocation options */
@@ -570,6 +562,8 @@ struct ldl_mac {
     uint32_t a;
     uint32_t b;
     uint32_t advance;
+
+    uint8_t maxDutyCycle;
 };
 
 /** passed as an argument to LDL_MAC_init()

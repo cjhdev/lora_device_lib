@@ -78,9 +78,20 @@
     #define LDL_TRACE_HEX(PTR, LEN)
 #endif
 
+#ifndef LDL_TRACE_BIT_STRING
+    #define LDL_TRACE_BIT_STRING(PTR, LEN)
+#endif
+
 #ifndef LDL_TRACE_FINAL
     #define LDL_TRACE_FINAL()
 #endif
+
+#define LDL_TRACE(...) do{\
+    LDL_TRACE_BEGIN()\
+    LDL_TRACE_PART(__VA_ARGS__)\
+    LDL_TRACE_FINAL()\
+}while(0);
+
 
 #ifndef LDL_DEBUG
     /** A printf-like function that captures run-time debug level messages with

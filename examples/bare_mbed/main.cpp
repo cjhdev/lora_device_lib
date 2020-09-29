@@ -18,7 +18,7 @@ SPI spi(PA_7, PA_6, PB_3);
 
 LDL::DefaultSM sm(app_key, nwk_key);
 
-__attribute__ ((section (".noinit"))) LDL::DefaultStore store(dev_eui, join_eui);
+LDL::DefaultStore store(dev_eui, join_eui);
 
 int main()
 {

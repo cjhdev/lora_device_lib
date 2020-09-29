@@ -39,6 +39,7 @@ enum {
 
 /* static function prototypes *****************************************/
 
+static void debugSession(struct ldl_mac *self, const char *fn);
 static uint32_t extraSymbols(uint32_t xtal_error, uint32_t symbol_period);
 static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confirmed, uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts);
 static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len);
@@ -46,7 +47,8 @@ static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prev
 static void registerTime(struct ldl_mac *self, uint32_t freq, uint32_t airTime);
 static bool getChannel(const struct ldl_mac *self, uint8_t chIndex, uint32_t *freq, uint8_t *minRate, uint8_t *maxRate);
 static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rate, uint32_t limit);
-static void restoreDefaults(struct ldl_mac *self, bool keep);
+static void initSession(struct ldl_mac *self, enum ldl_region region);
+static void forgetNetwork(struct ldl_mac *self);
 static bool setChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate);
 static bool maskChannel(uint8_t *mask, uint8_t max, enum ldl_region region, uint8_t chIndex);
 static bool unmaskChannel(uint8_t *mask, uint8_t max, enum ldl_region region, uint8_t chIndex);
@@ -55,7 +57,7 @@ static bool channelIsMasked(const uint8_t *mask, uint8_t max, enum ldl_region re
 static uint32_t symbolPeriod(uint32_t tps, enum ldl_spreading_factor sf, enum ldl_signal_bandwidth bw);
 static bool msUntilAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rate, uint32_t *ms);
 static bool rateSettingIsValid(enum ldl_region region, uint8_t rate);
-static void adaptRate(struct ldl_mac *self);
+static bool adaptRate(struct ldl_mac *self);
 static uint32_t timeNow(struct ldl_mac *self);
 static void processBands(struct ldl_mac *self);
 static uint32_t nextBandEvent(const struct ldl_mac *self);
@@ -133,8 +135,10 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
     }
     else{
 
-        restoreDefaults(self, false);
+        initSession(self, region);
     }
+
+    debugSession(self, __FUNCTION__);
 
     self->band[LDL_BAND_GLOBAL] = (uint32_t)LDL_STARTUP_DELAY;
 
@@ -254,7 +258,7 @@ void LDL_MAC_forget(struct ldl_mac *self)
 
     if(self->ctx.joined){
 
-        restoreDefaults(self, true);
+        forgetNetwork(self);
 
         pushSessionUpdate(self);
     }
@@ -489,7 +493,7 @@ void LDL_MAC_process(struct ldl_mac *self)
 
             /* RX2 */
             {
-                LDL_Region_convertRate(self->ctx.region, self->ctx.rx2Rate, &sf, &bw, &mtu);
+                LDL_Region_convertRate(self->ctx.region, self->ctx.rx2DataRate, &sf, &bw, &mtu);
 
                 xtal_error += (self->a * 2UL);
 
@@ -713,7 +717,7 @@ void LDL_MAC_process(struct ldl_mac *self)
                 default:
                 case FRAME_TYPE_JOIN_ACCEPT:
 
-                    restoreDefaults(self, true);
+                    forgetNetwork(self);
 
                     self->ctx.joined = true;
 
@@ -890,8 +894,6 @@ void LDL_MAC_process(struct ldl_mac *self)
         if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
 
             downlinkMissingHandler(self);
-
-            pushSessionUpdate(self);
         }
         break;
 
@@ -1100,7 +1102,8 @@ void LDL_MAC_setMaxDCycle(struct ldl_mac *self, uint8_t maxDCycle)
 {
     LDL_PEDANTIC(self != NULL)
 
-    self->ctx.maxDutyCycle = maxDCycle & 0xfU;
+    self->maxDutyCycle = maxDCycle & 0xfU;
+    self->ctx.maxDutyCycle = self->maxDutyCycle;
 
     pushSessionUpdate(self);
 }
@@ -1621,8 +1624,10 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
     return retval;
 }
 
-static void adaptRate(struct ldl_mac *self)
+static bool adaptRate(struct ldl_mac *self)
 {
+    bool session_changed = false;
+
     self->adrAckReq = false;
 
     if(self->ctx.adr){
@@ -1660,6 +1665,8 @@ static void adaptRate(struct ldl_mac *self)
                             LDL_DEBUG(self->app, "%s: adr: full power enabled", __FUNCTION__)
                             self->ctx.power = 0U;
                         }
+
+                        session_changed = true;
                     }
                 }
             }
@@ -1667,6 +1674,8 @@ static void adaptRate(struct ldl_mac *self)
             self->adrAckCounter++;
         }
     }
+
+    return session_changed;
 }
 
 static uint32_t symbolPeriod(uint32_t tps, enum ldl_spreading_factor sf, enum ldl_signal_bandwidth bw)
@@ -1957,7 +1966,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             if(LDL_Region_isDynamic(self->ctx.region)){
 
                 self->ctx.new_channel_ans.dataRateRangeOK = LDL_Region_validateRate(self->ctx.region, cmd.fields.newChannel.chIndex, cmd.fields.newChannel.minDR, cmd.fields.newChannel.maxDR);
-                self->ctx.new_channel_ans.channelFreqOK = LDL_Region_validateFreq(self->ctx.region, cmd.fields.newChannel.chIndex, cmd.fields.newChannel.freq);
+                self->ctx.new_channel_ans.channelFreqOK = LDL_Region_validateFreq(self->ctx.region, cmd.fields.newChannel.freq);
 
                 if(self->ctx.new_channel_ans.dataRateRangeOK && self->ctx.new_channel_ans.channelFreqOK){
 
@@ -1983,7 +1992,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             if(LDL_Region_isDynamic(self->ctx.region)){
 
                 self->ctx.dl_channel_ans.uplinkFreqOK = true;
-                self->ctx.dl_channel_ans.channelFreqOK = LDL_Region_validateFreq(self->ctx.region, cmd.fields.dlChannel.chIndex, cmd.fields.dlChannel.freq);
+                self->ctx.dl_channel_ans.channelFreqOK = LDL_Region_validateFreq(self->ctx.region, cmd.fields.dlChannel.freq);
                 setPendingCommand(self, LDL_CMD_DL_CHANNEL);
             }
             else{
@@ -2283,39 +2292,47 @@ static bool msUntilAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_
     return retval;
 }
 
-static void restoreDefaults(struct ldl_mac *self, bool keep)
+static void initSession(struct ldl_mac *self, enum ldl_region region)
 {
+    (void)memset(&self->ctx, 0, sizeof(self->ctx));
+
+    forgetNetwork(self);
+
+    self->ctx.region = region;
+    self->ctx.rate = LDL_DEFAULT_RATE;
+    self->ctx.adr = true;
+}
+
+static void forgetNetwork(struct ldl_mac *self)
+{
+    /* the following items must not be cleared */
+    enum ldl_region region = self->ctx.region;
+    uint8_t rate = self->ctx.rate;
+    uint8_t power = self->ctx.power;
+    bool adr = self->ctx.adr;
+
+    (void)memset(&self->ctx, 0, sizeof(self->ctx));
+
+    /* restore the essential fields */
+    self->ctx.region = region;
+    self->ctx.rate = rate;
+    self->ctx.power = power;
+    self->ctx.adr = adr;
+
+    /* init non-zero fields */
     self->ctx.session_version = currentSessionVersion;
-
-    if(!keep){
-
-        (void)memset(&self->ctx, 0, sizeof(self->ctx));
-        self->ctx.rate = LDL_DEFAULT_RATE;
-        self->ctx.adr = true;
-    }
-    else{
-
-        self->ctx.up = 0U;
-        self->ctx.nwkDown = 0U;
-        self->ctx.appDown = 0U;
-
-        (void)memset(self->ctx.chConfig, 0, sizeof(self->ctx.chConfig));
-        (void)memset(self->ctx.chMask, 0, sizeof(self->ctx.chMask));
-        self->ctx.joined = false;
-    }
-
-    LDL_Region_getDefaultChannels(self->ctx.region, self);
-
-    self->ctx.rx1DROffset = LDL_Region_getRX1Offset(self->ctx.region);
-    self->ctx.rx1Delay = LDL_Region_getRX1Delay(self->ctx.region);
-    self->ctx.rx2DataRate = LDL_Region_getRX2Rate(self->ctx.region);
-    self->ctx.rx2Freq = LDL_Region_getRX2Freq(self->ctx.region);
-    self->ctx.version = 0U;
-
+    self->ctx.rx1DROffset = LDL_Region_getRX1Offset(region);
+    self->ctx.rx1Delay = LDL_Region_getRX1Delay(region);
+    self->ctx.rx2DataRate = LDL_Region_getRX2Rate(region);
+    self->ctx.rx2Freq = LDL_Region_getRX2Freq(region);
     self->ctx.adr_ack_limit = ADRAckLimit;
     self->ctx.adr_ack_delay = ADRAckDelay;
 
-    self->ctx.pending_cmds = 0U;
+    /* locally set fields */
+    self->ctx.maxDutyCycle = self->maxDutyCycle;
+
+    /* reset the default channels (even though they shouldn't have changed!) */
+    LDL_Region_getDefaultChannels(self->ctx.region, self);
 }
 
 static bool getChannel(const struct ldl_mac *self, uint8_t chIndex, uint32_t *freq, uint8_t *minRate, uint8_t *maxRate)
@@ -2359,8 +2376,16 @@ static bool setChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uin
 
         if(chIndex < sizeof(self->ctx.chConfig)/sizeof(*self->ctx.chConfig)){
 
-            self->ctx.chConfig[chIndex].freqAndRate = ((freq/100U) << 8) | ((minRate << 4) & 0xfU) | (maxRate & 0xfU);
-            retval = true;
+            /* 0 means channel is disabled */
+            if((freq == 0UL) || LDL_Region_validateFreq(self->ctx.region, freq)){
+
+                self->ctx.chConfig[chIndex].freqAndRate = ((freq/100U) << 8) | ((minRate << 4) & 0xfU) | (maxRate & 0xfU);
+                retval = true;
+            }
+            else{
+
+                LDL_ERROR(self->app, "%s: %" PRIu32 "Hz not allowed in this region", __FUNCTION__, freq)
+            }
         }
     }
 
@@ -2609,7 +2634,10 @@ static void downlinkMissingHandler(struct ldl_mac *self)
         }
         else{
 
-            adaptRate(self);
+            if(adaptRate(self)){
+
+                pushSessionUpdate(self);
+            }
 
             self->tx.rate = self->ctx.rate;
             self->tx.power = self->ctx.power;
@@ -2648,7 +2676,10 @@ static void downlinkMissingHandler(struct ldl_mac *self)
         }
         else{
 
-            adaptRate(self);
+            if(adaptRate(self)){
+
+                pushSessionUpdate(self);
+            }
 
             self->tx.rate = self->ctx.rate;
             self->tx.power = self->ctx.power;
@@ -2724,6 +2755,61 @@ static void pushSessionUpdate(struct ldl_mac *self)
     arg.session_updated.session = &self->ctx;
 
     self->handler(self->app, LDL_MAC_SESSION_UPDATED, &arg);
+
+    debugSession(self, __FUNCTION__);
+}
+
+static void debugSession(struct ldl_mac *self, const char *fn)
+{
+    LDL_TRACE("%s: session_version=%u", fn, self->ctx.session_version)
+    LDL_TRACE("%s: joined=%s", fn, self->ctx.joined ? "true" : "false")
+    LDL_TRACE("%s: adr=%s", fn, self->ctx.adr ? "true" : "false")
+    LDL_TRACE("%s: version=%u", fn, self->ctx.version)
+
+    LDL_TRACE("%s: region=%s", fn, LDL_Region_enumToString(self->ctx.region))
+
+    LDL_TRACE("%s: up=%" PRIu32 "", fn, self->ctx.up)
+    LDL_TRACE("%s: appDown=%" PRIu16 "", fn, self->ctx.appDown)
+    LDL_TRACE("%s: nwkDown=%" PRIu16 "", fn, self->ctx.nwkDown)
+
+    LDL_TRACE("%s: devAddr=%" PRIu32 "", fn, self->ctx.devAddr)
+    LDL_TRACE("%s: netID=%" PRIu32 "", fn, self->ctx.netID)
+
+    size_t i;
+
+    for(i=0U; i < sizeof(self->ctx.chConfig)/sizeof(*self->ctx.chConfig); i++){
+
+        LDL_TRACE("%s: chConfig: chIndex=%u freq=%" PRIu32 " minRate=%u maxRate=%u dlFreq=%" PRIu32 "",
+            fn,
+            (uint8_t)i,
+            (uint32_t)((self->ctx.chConfig[i].freqAndRate >> 8) * 100UL),
+            (uint8_t)((self->ctx.chConfig[i].freqAndRate >> 4) & 0xfU),
+            (uint8_t)(self->ctx.chConfig[i].freqAndRate & 0xfU),
+            self->ctx.chConfig[i].dlFreq
+        )
+    }
+
+    LDL_TRACE_BEGIN()
+    LDL_TRACE_PART("%s: chMask=", fn)
+    LDL_TRACE_BIT_STRING(self->ctx.chMask, sizeof(self->ctx.chMask))
+    LDL_TRACE_FINAL()
+
+    LDL_TRACE("%s: rate=%u", fn, self->ctx.rate)
+    LDL_TRACE("%s: power=%u", fn, self->ctx.power)
+    LDL_TRACE("%s: maxDutyCycle=%u", fn, self->ctx.maxDutyCycle)
+    LDL_TRACE("%s: nbTrans=%u", fn, self->ctx.nbTrans)
+    LDL_TRACE("%s: rx1DROffset=%u", fn, self->ctx.rx1DROffset)
+    LDL_TRACE("%s: rx1Delay=%u", fn, self->ctx.rx1Delay)
+    LDL_TRACE("%s: rx2DataRate=%u", fn, self->ctx.rx2DataRate)
+
+    LDL_TRACE("%s: rx2Freq=%" PRIu32 "", fn, self->ctx.rx2Freq)
+
+    LDL_TRACE("%s: adr_ack_limit=%u", fn, self->ctx.adr_ack_limit)
+    LDL_TRACE("%s: adr_ack_delay=%u", fn, self->ctx.adr_ack_delay)
+
+    LDL_TRACE("%s: joinNonce=%" PRIu32 "", fn, self->ctx.joinNonce)
+    LDL_TRACE("%s: devNonce=%" PRIu16 "", fn, self->ctx.devNonce)
+    LDL_TRACE("%s: pending_cmds=0x%02X", fn, self->ctx.pending_cmds)
 }
 
 static void dummyResponseHandler(void *app, enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg)

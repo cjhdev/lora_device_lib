@@ -40,7 +40,35 @@ void my_trace_hex(const uint8_t *ptr, size_t len)
 
     for(i=0U; i < len; i++){
 
-        retval = snprintf(&buffer[pos], sizeof(buffer)-pos, "%02X", ptr[i]);
+        /* printf fmt wasn't doing this for me */
+        retval = snprintf(&buffer[pos], sizeof(buffer)-pos, "%X%X",
+            ptr[i] >> 4,
+            ptr[i]
+        );
+
+        pos += (retval > 0) ? retval : 0U;
+    }
+#endif
+}
+
+void my_trace_bitstring(const uint8_t *ptr, size_t len)
+{
+#ifdef MBED_CONF_LDL_ENABLE_VERBOSE_DEBUG
+    int retval;
+    size_t i;
+
+    for(i=0U; i < len; i++){
+
+        retval = snprintf(&buffer[pos], sizeof(buffer)-pos, "%u%u%u%u%u%u%u%u",
+            (ptr[i] >> 7) & 1U,
+            (ptr[i] >> 6) & 1U,
+            (ptr[i] >> 5) & 1U,
+            (ptr[i] >> 4) & 1U,
+            (ptr[i] >> 3) & 1U,
+            (ptr[i] >> 2) & 1U,
+            (ptr[i] >> 1) & 1U,
+            ptr[i] & 1
+        );
 
         pos += (retval > 0) ? retval : 0U;
     }

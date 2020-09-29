@@ -1,6 +1,19 @@
 Release History
 ===============
 
+## 0.4.4
+
+- fixed bug where frequency set by MAC commands was 1/100th of the required value (i.e. I forgot to multiply by 100).
+  This affected rxParamSetup, newChannel, and dlChannel commands. It's likely no-one has ever used
+  this feature.
+- added code to previously empty LDL_Region_validateFreq() to check centre frequency is within bounds for a given region
+- changed setChannel() to call LDL_Region_validateFreq() to guard against illegal channel settings
+- fixed bug in restoreDefaults() where region will always be set to zero
+- refactored restoreDefaults() into separate initSession() and forgetNetwork() functions
+- fixed bug where ctx.rx2Rate is used instead of ctx.rx2DataRate on receive
+- removed rx2Rate from session struct which appears to be duplicate of rx2DataRate
+- added debug code to print session to trace
+
 ## 0.4.3
 
 - changed LDL::Device so that worker thread is scheduled to run when a radio ISR
