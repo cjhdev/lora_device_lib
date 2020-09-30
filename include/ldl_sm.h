@@ -32,23 +32,32 @@ extern "C" {
 
 #include <stdint.h>
 
+#define LDL_KEY_SIZE 16U
+
 struct ldl_key {
 
-    uint8_t value[16U];
+    uint8_t value[LDL_KEY_SIZE];
 };
 
 /** default in-memory security module state */
 struct ldl_sm {
-
+#ifdef LDL_DISABLE_POINTONE
+    struct ldl_key keys[3U];
+#else
     struct ldl_key keys[8U];
+#endif
 };
 
-/** session key structure */
-struct ldl_sm_keys {
-
-    struct ldl_key keys[6U];
-};
-
+#ifdef LDL_DISABLE_POINTONE
+/**
+ * Initialise Default Security Module with root key
+ *
+ * @param[in] self      #ldl_sm
+ * @param[in] appKey    pointer to 16 byte field
+ *
+ * */
+void LDL_SM_init(struct ldl_sm *self, const void *appKey);
+#else
 /**
  * Initialise Default Security Module with root keys
  *
@@ -58,24 +67,7 @@ struct ldl_sm_keys {
  *
  * */
 void LDL_SM_init(struct ldl_sm *self, const void *appKey, const void *nwkKey);
-
-/**
- * Set/restore session keys
- *
- * @param[in]   self  #ldl_sm
- * @param[in]   keys
- *
- * */
-void LDL_SM_setSession(struct ldl_sm *self, const struct ldl_sm_keys *keys);
-
-/**
- * Get/save session keys
- *
- * @param[in]   self #ldl_sm
- * @param[out]  keys
- *
- * */
-void LDL_SM_getSession(struct ldl_sm *self, struct ldl_sm_keys *keys);
+#endif
 
 #ifdef __cplusplus
 }

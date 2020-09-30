@@ -41,21 +41,21 @@ const struct ldl_sm_interface LDL_SM_interface = {
 
 /* functions **********************************************************/
 
+#ifdef LDL_DISABLE_POINTONE
+/* LoRaWAN 1.0.x */
+void LDL_SM_init(struct ldl_sm *self, const void *appKey)
+{
+    /* not a mistake, internally we call this LDL_SM_KEY_NWK */
+    (void)memcpy(getKey(self, LDL_SM_KEY_NWK), appKey, LDL_KEY_SIZE);
+}
+#else
+/* LoRaWAN 1.1 */
 void LDL_SM_init(struct ldl_sm *self, const void *appKey, const void *nwkKey)
 {
-    (void)memcpy(self->keys[LDL_SM_KEY_APP].value, appKey, sizeof(self->keys[LDL_SM_KEY_APP].value));
-    (void)memcpy(self->keys[LDL_SM_KEY_NWK].value, nwkKey, sizeof(self->keys[LDL_SM_KEY_NWK].value));
+    (void)memcpy(getKey(self, LDL_SM_KEY_APP), appKey, LDL_KEY_SIZE);
+    (void)memcpy(getKey(self, LDL_SM_KEY_NWK), nwkKey, LDL_KEY_SIZE);
 }
-
-void LDL_SM_setSession(struct ldl_sm *self, const struct ldl_sm_keys *keys)
-{
-    (void)memcpy(self->keys, keys, sizeof(*keys));
-}
-
-void LDL_SM_getSession(struct ldl_sm *self, struct ldl_sm_keys *keys)
-{
-    (void)memcpy(keys, self->keys, sizeof(*keys));
-}
+#endif
 
 void LDL_SM_beginUpdateSessionKey(struct ldl_sm *self)
 {
@@ -81,7 +81,7 @@ void LDL_SM_updateSessionKey(struct ldl_sm *self, enum ldl_sm_key keyDesc, enum 
 
         LDL_AES_init(&ctx, getKey(self, rootDesc));
 
-        (void)memcpy(getKey(self, keyDesc), iv, 16U);
+        (void)memcpy(getKey(self, keyDesc), iv, LDL_KEY_SIZE);
 
         LDL_AES_encrypt(&ctx, getKey(self, keyDesc));
         break;
@@ -138,7 +138,29 @@ void LDL_SM_ctr(struct ldl_sm *self, enum ldl_sm_key desc, const void *iv, void 
 
 static void *getKey(struct ldl_sm *self, enum ldl_sm_key desc)
 {
-    LDL_PEDANTIC(desc < sizeof(self->keys)/sizeof(*self->keys))
+    size_t i = (size_t)desc;
 
-    return self->keys[desc].value;
+#ifdef LDL_DISABLE_POINTONE
+    switch(desc){
+    case LDL_SM_KEY_APP:
+    case LDL_SM_KEY_NWK:
+        i = 0U;
+        break;
+    case LDL_SM_KEY_FNWKSINT:
+    case LDL_SM_KEY_SNWKSINT:
+    case LDL_SM_KEY_NWKSENC:
+    case LDL_SM_KEY_JSINT:
+    case LDL_SM_KEY_JSENC:
+        i = 1U;
+        break;
+    case LDL_SM_KEY_APPS:
+    default:
+        i = 2U;
+        break;
+    }
+#endif
+
+    LDL_PEDANTIC(i < sizeof(self->keys)/sizeof(*self->keys))
+
+    return self->keys[i].value;
 }
