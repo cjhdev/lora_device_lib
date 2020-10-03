@@ -276,9 +276,12 @@ bool LDL_Stream_getU16(struct ldl_stream *self, uint16_t *value)
 
     retval = LDL_Stream_read(self, buf, sizeof(buf));
 
-    *value = buf[1];
-    *value <<= 8;
-    *value |= buf[0];
+    if(retval){
+
+        *value = buf[1];
+        *value <<= 8;
+        *value |= buf[0];
+    }
 #endif
 
     return retval;
@@ -298,11 +301,14 @@ bool LDL_Stream_getU24(struct ldl_stream *self, uint32_t *value)
 
     retval = LDL_Stream_read(self, buf, sizeof(buf));
 
-    *value = buf[2];
-    *value <<= 8;
-    *value |= buf[1];
-    *value <<= 8;
-    *value |= buf[0];
+    if(retval){
+
+        *value = buf[2];
+        *value <<= 8;
+        *value |= buf[1];
+        *value <<= 8;
+        *value |= buf[0];
+    }
 #endif
     return retval;
 }
@@ -320,13 +326,16 @@ bool LDL_Stream_getU32(struct ldl_stream *self, uint32_t *value)
 
     retval = LDL_Stream_read(self, buf, sizeof(buf));
 
-    *value = buf[3];
-    *value <<= 8;
-    *value |= buf[2];
-    *value <<= 8;
-    *value |= buf[1];
-    *value <<= 8;
-    *value |= buf[0];
+    if(retval){
+
+        *value = buf[3];
+        *value <<= 8;
+        *value |= buf[2];
+        *value <<= 8;
+        *value |= buf[1];
+        *value <<= 8;
+        *value |= buf[0];
+    }
 #endif
 
     return retval;
@@ -341,14 +350,17 @@ bool LDL_Stream_getEUI(struct ldl_stream *self, uint8_t *value)
 
     retval = LDL_Stream_read(self, out, sizeof(out));
 
-    value[0] = out[7];
-    value[1] = out[6];
-    value[2] = out[5];
-    value[3] = out[4];
-    value[4] = out[3];
-    value[5] = out[2];
-    value[6] = out[1];
-    value[7] = out[0];
+    if(retval){
+
+        value[0] = out[7];
+        value[1] = out[6];
+        value[2] = out[5];
+        value[3] = out[4];
+        value[4] = out[3];
+        value[5] = out[2];
+        value[6] = out[1];
+        value[7] = out[0];
+    }
 
     return retval;
 }

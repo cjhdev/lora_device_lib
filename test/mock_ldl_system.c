@@ -32,3 +32,15 @@ uint32_t LDL_System_getBatteryLevel(void *receiver)
     struct mock_system_param *self = (struct mock_system_param *)receiver;
     return self->battery_level;
 }
+
+FILE * trace_desc;
+
+void print_hex(FILE * fd, const uint8_t *data, size_t size)
+{
+    size_t i;
+
+    for(i=0U; i < size; i++){
+
+        fprintf(fd, "%02X", data[i]);
+    }
+}

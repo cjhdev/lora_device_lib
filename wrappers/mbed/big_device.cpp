@@ -29,19 +29,55 @@ using namespace LDL;
 /* constructors *******************************************************/
 
 Device::Device(Store &store, SM &sm, Radio &radio) :
-    event(),
-    mac(event, store, sm, radio),
-    event_thread(1024U)
+    mac(store, sm, radio),
+    worker_thread(1024U),
+    radio(radio)
 {
 }
 
 /* protected **********************************************************/
 
 void
+Device::do_work()
+{
+    work.release();
+}
+
+void
+Device::worker()
+{
+    uint32_t next;
+
+    for(;;){
+
+        work.acquire();
+
+        do{
+
+            mac.process();
+            next = mac.ticks_until_next_event();
+        }
+        while(next == 0U);
+
+        event.dispatch(0);
+
+        next = mac.ticks_until_next_event();
+
+        if(next == 0U){
+
+            do_work();
+        }
+        else{
+
+            timeout.attach(callback(this, &Device::do_work), std::chrono::microseconds(next));
+        }
+    }
+}
+
+void
 Device::do_unconfirmed(enum ldl_mac_status *retval, uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts)
 {
     *retval = mac.unconfirmed(port, data, len, opts);
-    mac.do_process();
     notify_api();
 }
 
@@ -49,7 +85,6 @@ void
 Device::do_confirmed(enum ldl_mac_status *retval, uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts)
 {
     *retval = mac.confirmed(port, data, len, opts);
-    mac.do_process();
     notify_api();
 }
 
@@ -57,7 +92,6 @@ void
 Device::do_otaa(enum ldl_mac_status *retval)
 {
     *retval = mac.otaa();
-    mac.do_process();
     notify_api();
 }
 
@@ -65,7 +99,6 @@ void
 Device::do_forget()
 {
     mac.forget();
-    mac.do_process();
     notify_api();
 }
 
@@ -149,6 +182,8 @@ Device::begin_api()
 void
 Device::wait_until_api_done()
 {
+    do_work();
+
     while(!done){
 
         api.acquire();
@@ -164,34 +199,34 @@ Device::notify_api()
     api.release();
 }
 
+void
+Device::handle_radio_event(enum ldl_radio_event ev)
+{
+    mac.handle_radio_event(ev);
+    do_work();
+}
+
 /* public methods *****************************************************/
 
 bool
 Device::start(enum ldl_region region)
 {
+    bool retval = false;
+
     mutex.lock();
 
-    mac.start(region);
+    if(mac.start(region)){
 
-    event_thread.start(callback(&event, &EventQueue::dispatch_forever));
+        // override the callback set by mac so we can intercept the events
+        radio.set_event_handler(callback(this, &Device::handle_radio_event));
+
+        worker_thread.start(callback(this,&Device::worker));
+        retval = true;
+    }
 
     mutex.unlock();
 
-    return true;
-}
-
-void
-Device::stop()
-{
-    mutex.lock();
-
-    event.break_dispatch();
-
-    event_thread.join();
-
-    mac.stop();
-
-    mutex.unlock();
+    return retval;
 }
 
 enum ldl_mac_status

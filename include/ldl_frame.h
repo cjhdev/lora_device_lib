@@ -119,11 +119,11 @@ struct ldl_frame_down {
     uint8_t *opts;      /* NULL when not present */
     uint8_t optsLen;    /* 0..15; 0 when not present */
 
-    bool dataPresent;   /* possible to have port without data */
+    bool dataPresent;   /* true if port is present */
 
     uint8_t port;       /* valid when dataPresent is true */
 
-    uint8_t *data;      /* NULL when not present */
+    uint8_t *data;      /* not-NULL when present (possible to have port but no data) */
     uint8_t dataLen;    /* 0 when not present */
 
     uint32_t mic;

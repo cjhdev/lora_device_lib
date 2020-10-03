@@ -238,15 +238,15 @@ Radio::_chip_set_mode(void *self, enum ldl_chip_mode mode)
 }
 
 void
-Radio::_chip_write(void *self, uint8_t addr, const void *data, uint8_t size)
+Radio::_chip_write(void *self, uint8_t opcode, const void *data, uint8_t size)
 {
-    to_obj(self)->chip_write(addr, data, size);
+    to_obj(self)->chip_write(opcode, data, size);
 }
 
 void
-Radio::_chip_read(void *self, uint8_t addr, void *data, uint8_t size)
+Radio::_chip_read(void *self, uint8_t opcode, void *data, uint8_t size)
 {
-    to_obj(self)->chip_read(addr, data, size);
+    to_obj(self)->chip_read(opcode, data, size);
 }
 
 /* protected **********************************************************/
@@ -294,11 +294,11 @@ Radio::chip_reset(bool state)
 }
 
 void
-Radio::chip_write(uint8_t addr, const void *data, uint8_t size)
+Radio::chip_write(uint8_t opcode, const void *data, uint8_t size)
 {
     chip_select(true);
 
-    spi.write(addr | 0x80U);
+    spi.write(opcode);
 
     spi.write((const char *)data, size, nullptr, 0);
 
@@ -306,11 +306,11 @@ Radio::chip_write(uint8_t addr, const void *data, uint8_t size)
 }
 
 void
-Radio::chip_read(uint8_t addr, void *data, uint8_t size)
+Radio::chip_read(uint8_t opcode, void *data, uint8_t size)
 {
     chip_select(true);
 
-    spi.write(addr & 0x7fU);
+    spi.write(opcode);
 
     spi.write(nullptr, 0, (char *)data, size);
 

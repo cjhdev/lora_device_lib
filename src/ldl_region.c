@@ -418,9 +418,9 @@ void LDL_Region_getDefaultChannels(enum ldl_region region, struct ldl_mac *mac)
 
         (void)upRateRange(region, 0U, &minRate, &maxRate);
 
-        LDL_MAC_addChannel(mac, 0U, 868100000UL, minRate, maxRate);
-        LDL_MAC_addChannel(mac, 1U, 868300000UL, minRate, maxRate);
-        LDL_MAC_addChannel(mac, 2U, 868500000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 0U, 868100000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 1U, 868300000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 2U, 868500000UL, minRate, maxRate);
         break;
 #endif
 #ifdef LDL_ENABLE_EU_433
@@ -428,9 +428,9 @@ void LDL_Region_getDefaultChannels(enum ldl_region region, struct ldl_mac *mac)
 
         (void)upRateRange(region, 0U, &minRate, &maxRate);
 
-        LDL_MAC_addChannel(mac, 0U, 433175000UL, minRate, maxRate);
-        LDL_MAC_addChannel(mac, 1U, 433375000UL, minRate, maxRate);
-        LDL_MAC_addChannel(mac, 2U, 433575000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 0U, 433175000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 1U, 433375000UL, minRate, maxRate);
+        (void)LDL_MAC_addChannel(mac, 2U, 433575000UL, minRate, maxRate);
         break;
 #endif
     }
@@ -589,13 +589,43 @@ bool LDL_Region_validateRate(enum ldl_region region, uint8_t chIndex, uint8_t mi
     return retval;
 }
 
-bool LDL_Region_validateFreq(enum ldl_region region, uint8_t chIndex, uint32_t freq)
+bool LDL_Region_validateFreq(enum ldl_region region, uint32_t freq)
 {
-    (void)region;
-    (void)chIndex;
-    (void)freq;
+    bool retval;
 
-    return true;
+    /* todo: take bw as argument to double check we are actually within bounds
+     *
+     * for now we only check the centre is within bounds
+     *
+     * */
+
+    switch(region){
+    default:
+        retval = false;
+        break;
+#ifdef LDL_ENABLE_EU_863_870
+    case LDL_EU_863_870:
+        retval = (freq > 863000000UL) && (freq < 870000000UL);
+        break;
+#endif
+#ifdef LDL_ENABLE_EU_433
+    case LDL_EU_433:
+        retval = (freq >= 433175000UL) && (freq <= 434665000UL);
+        break;
+#endif
+#ifdef LDL_ENABLE_US_902_928
+    case LDL_US_902_928:
+        retval = (freq > 902000000UL) && (freq < 928000000UL);
+        break;
+#endif
+#ifdef LDL_ENABLE_AU_915_928
+    case LDL_AU_915_928:
+        retval = (freq > 915000000UL) && (freq < 928000000UL);
+        break;
+#endif
+    }
+
+    return retval;
 }
 
 void LDL_Region_getRX1DataRate(enum ldl_region region, uint8_t tx_rate, uint8_t rx1_offset, uint8_t *rx1_rate)
@@ -608,6 +638,7 @@ void LDL_Region_getRX1DataRate(enum ldl_region region, uint8_t tx_rate, uint8_t 
 
     switch(region){
     default:
+        break;
 #if defined(LDL_ENABLE_EU_863_870) || defined(LDL_ENABLE_EU_433)
 #   ifdef LDL_ENABLE_EU_863_870
     case LDL_EU_863_870:
@@ -952,6 +983,39 @@ uint32_t LDL_Region_getMaxDCycleOffLimit(enum ldl_region region)
      *
      * */
     return (60UL*60UL*1000UL);
+}
+
+const char *LDL_Region_enumToString(enum ldl_region region)
+{
+    const char *retval;
+
+    switch(region){
+    default:
+        retval = "undefined";
+        break;
+#ifdef LDL_ENABLE_EU_863_870
+    case LDL_EU_863_870:
+        retval = "LDL_EU_863_870";
+        break;
+#endif
+#ifdef LDL_ENABLE_EU_433
+    case LDL_EU_433:
+        retval = "LDL_EU_433";
+        break;
+#endif
+#ifdef LDL_ENABLE_US_902_928
+    case LDL_US_902_928:
+        retval = "LDL_US_902_928";
+        break;
+#endif
+#ifdef LDL_ENABLE_AU_915_928
+    case LDL_AU_915_928:
+        retval = "LDL_AU_915_928";
+        break;
+#endif
+    }
+
+    return retval;
 }
 
 /* static functions ***************************************************/

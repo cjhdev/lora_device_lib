@@ -24,6 +24,7 @@
 
 #include "mbed_assert.h"
 #include "mbed_trace.h"
+#include "mbed_critical.h"
 
 #define TRACE_GROUP "LDL"
 
@@ -36,5 +37,28 @@
 #define LDL_ERROR(APP, ...) do{\
     tr_error( __VA_ARGS__);\
 }while(0);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void my_trace_begin(void);
+void my_trace_part(const char *fmt, ...);
+void my_trace_hex(const uint8_t *ptr, size_t len);
+void my_trace_bitstring(const uint8_t *ptr, size_t len);
+void my_trace_end(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#define LDL_TRACE_BEGIN() my_trace_begin();
+#define LDL_TRACE_PART(...) my_trace_part(__VA_ARGS__);
+#define LDL_TRACE_HEX(PTR, LEN) my_trace_hex(PTR, LEN);
+#define LDL_TRACE_BIT_STRING(PTR, LEN) my_trace_bitstring(PTR, LEN);
+#define LDL_TRACE_FINAL() my_trace_end();
+
+#define LDL_SYSTEM_ENTER_CRITICAL(APP)  core_util_critical_section_enter();
+#define LDL_SYSTEM_LEAVE_CRITICAL(APP)  core_util_critical_section_exit();
 
 #endif

@@ -30,7 +30,7 @@ namespace LDL {
 
     /** Abstract radio driver
      *
-     * Users should instanciate one of the concrete subclasses named for the
+     * Users should instantiate one of the concrete subclasses named for the
      * radio transceiver they want to drive.
      *
      * Users can choose to subclass one of the concrete subclasses
@@ -70,16 +70,16 @@ namespace LDL {
             static void _receive_entropy(struct ldl_radio *self);
 
             static void _chip_set_mode(void *self, enum ldl_chip_mode mode);
-            static void _chip_write(void *self, uint8_t addr, const void *data, uint8_t size);
-            static void _chip_read(void *self, uint8_t addr, void *data, uint8_t size);
+            static void _chip_write(void *self, uint8_t opcode, const void *data, uint8_t size);
+            static void _chip_read(void *self, uint8_t opcode, void *data, uint8_t size);
 
             void dio0_handler();
             void dio1_handler();
 
             void chip_select(bool state);
             void chip_reset(bool state);
-            void chip_write(uint8_t addr, const void *data, uint8_t size);
-            void chip_read(uint8_t addr, void *data, uint8_t size);
+            void chip_write(uint8_t opcode, const void *data, uint8_t size);
+            void chip_read(uint8_t opcode, void *data, uint8_t size);
             virtual void chip_set_mode(enum ldl_chip_mode mode) = 0;
 
         public:

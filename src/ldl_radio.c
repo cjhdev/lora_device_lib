@@ -23,122 +23,10 @@
 
 #include "ldl_debug.h"
 #include "ldl_radio.h"
-#include "ldl_platform.h"
 #include "ldl_system.h"
+#include "ldl_radio_registers.h"
 
 #if defined(LDL_ENABLE_SX1272) || defined(LDL_ENABLE_SX1276)
-
-enum ldl_radio_sx1272_register {
-    RegFifo=0x00,
-    RegOpMode=0x01,
-    RegBitrateMsb=0x02,
-    RegBitrateLsb=0x03,
-    RegFdevMsb=0x04,
-    RegFdevLsb=0x05,
-    RegFrfMsb=0x06,
-    RegFrfMid=0x07,
-    RegFrfLsb=0x08,
-    RegPaConfig=0x09,
-    RegPaRamp=0x0A,
-    RegOcp=0x0B,
-    RegLna=0x0C,
-    RegRxConfig=0x0D,
-    RegFifoAddrPtr=0x0D,
-    RegRssiConfig=0x0E,
-    RegFifoTxBaseAddr=0x0E,
-    RegRssiCollision=0x0F,
-    RegFifoRxBaseAddr=0x0F,
-    RegRssiThresh=0x10,
-    RegFifoRxCurrentAddr=0x10,
-    RegRssiValue=0x11,
-    RegIrqFlagsMask=0x11,
-    RegRxBw=0x12,
-    RegIrqFlags=0x12,
-    RegAfcBw=0x13,
-    RegRxNbBytes=0x13,
-    RegOokPeak=0x14,
-    RegRxHeaderCntValueMsb=0x14,
-    RegOokFix=0x15,
-    RegRxHeaderCntValueLsb=0x15,
-    RegOokAvg=0x16,
-    RegRxPacketCntValueMsb=0x16,
-    RegRxpacketCntValueLsb=0x17,
-    RegModemStat=0x18,
-    RegPktSnrValue=0x19,
-    RegAfcFei=0x1A,
-    RegPktRssiValue=0x1A,
-    RegAfcMsb=0x1B,
-    LoraRegRssiValue=0x1B,
-    RegAfcLsb=0x1C,
-    RegHopChannel=0x1C,
-    RegFeiMsb=0x1D,
-    RegModemConfig1=0x1D,
-    RegFeiLsb=0x1E,
-    RegModemConfig2=0x1E,
-    RegPreambleDetect=0x1F,
-    RegSymbTimeoutLsb=0x1F,
-    RegRxTimeout1=0x20,
-    LoraRegPreambleMsb=0x20,
-    RegRxTimeout2=0x21,
-    LoraRegPreambleLsb=0x21,
-    RegRxTimeout3=0x22,
-    LoraRegPayloadLength=0x22,
-    RegRxDelay=0x23,
-    RegPayloadMaxLength=0x23,
-    RegOsc=0x24,
-    RegHopPeriod=0x24,
-    RegPreambleMsb=0x25,
-    RegFifoRxByteAddr=0x25,
-    RegModemConfig3=0x26,
-    RegPreambleLsb=0x26,
-    RegSyncConfig=0x27,
-    LoraRegFeiMsb=0x28,
-    RegSyncValue1=0x28,
-    LoraFeiMib=0x29,
-    RegSyncValue2=0x29,
-    LoraRegFeiLsb=0x2A,
-    RegSyncValue3=0x2A,
-    RegSyncValue4=0x2B,
-    RegRssiWideband=0x2C,
-    RegSyncValue5=0x2C,
-    RegSyncValue6=0x2D,
-    RegSyncValue7=0x2E,
-    RegSyncValue8=0x2F,
-    RegPacketConfig1=0x30,
-    RegPacketConfig2=0x31,
-    RegDetectOptimize=0x31,
-    RegPayloadLength=0x32,
-    RegNodeAdrs=0x33,
-    RegInvertIQ=0x33,
-    RegBroadcastAdrs=0x34,
-    RegFifoThresh=0x35,
-    RegSeqConfig1=0x36,
-    RegSeqConfig2=0x37,
-    RegDetectionThreshold=0x37,
-    RegTimerResol=0x38,
-    RegTimer1Coef=0x39,
-    RegSyncWord=0x39,
-    RegTimer2Coef=0x3A,
-    RegImageCal=0x3B,
-    RegTemp=0x3C,
-    RegLowBat=0x3D,
-    RegIrqFlags1=0x3E,
-    RegIrqFlags2=0x3F,
-    RegDioMapping1=0x40,
-    RegDioMapping2=0x41,
-    RegVersion=0x42,
-    RegAgcRef=0x43,
-    RegAgcThresh1=0x44,
-    RegAgcThresh2=0x45,
-    RegAgcThresh3=0x46,
-    RegPllHop=0x4B,
-    RegTcxo=0x4B,
-    RegPaDac=0x5A,
-    RegPll=0x5C,
-    RegPllLowPn=0x5E,
-    RegFormerTemp=0x6C,
-    RegBitRateFrac=0x70
-};
 
 const struct ldl_radio_interface LDL_Radio_interface = {
 
@@ -151,27 +39,37 @@ const struct ldl_radio_interface LDL_Radio_interface = {
     .receive_entropy = LDL_Radio_receiveEntropy
 };
 
+struct modem_config {
+
+    enum ldl_signal_bandwidth bw;
+    enum ldl_spreading_factor sf;
+    bool crc;
+    uint16_t timeout;
+};
+
 /* static function prototypes *****************************************/
 
 static enum ldl_radio_event interruptToEvent(struct ldl_radio *self, uint8_t n);
 static uint8_t readFIFO(struct ldl_radio *self, uint8_t *data, uint8_t max);
-static void writeFIFO(struct ldl_radio *self, const uint8_t *data, uint8_t len);
 static void setFreq(struct ldl_radio *self, uint32_t freq);
-static void setModemConfig(struct ldl_radio *self, enum ldl_signal_bandwidth bw, enum ldl_spreading_factor sf, uint32_t timeout);
 static void setPower(struct ldl_radio *self, int16_t dbm);
 static uint8_t readReg(struct ldl_radio *self, uint8_t reg);
 static void writeReg(struct ldl_radio *self, uint8_t reg, uint8_t data);
 static void burstRead(struct ldl_radio *self, uint8_t reg, uint8_t *data, uint8_t len);
 static void burstWrite(struct ldl_radio *self, uint8_t reg, const uint8_t *data, uint8_t len);
-static uint8_t getOpMode(struct ldl_radio *self);
 static void setOpRXSingle(struct ldl_radio *self);
 static void setOpTX(struct ldl_radio *self);
 static void setOpRXContinuous(struct ldl_radio *self);
 static void setOpStandby(struct ldl_radio *self);
 static void setOpSleep(struct ldl_radio *self);
-static uint8_t crSetting(const struct ldl_radio *self, enum ldl_coding_rate cr);
-static uint8_t bwSetting(const struct ldl_radio *self, enum ldl_signal_bandwidth bw);
-static uint8_t sfSetting(const struct ldl_radio *self, enum ldl_spreading_factor sf);
+static void setXTAL(struct ldl_radio *self);
+static void setModemConfig1(struct ldl_radio *self, const struct modem_config *config);
+static void setModemConfig2(struct ldl_radio *self, const struct modem_config *config);
+static void setModemConfig3(struct ldl_radio *self, const struct modem_config *config);
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+static void rxDiagnostics(struct ldl_radio *self);
+#endif
 
 /* functions **********************************************************/
 
@@ -179,6 +77,10 @@ void LDL_Radio_init(struct ldl_radio *self, const struct ldl_radio_init_arg *arg
 {
     LDL_PEDANTIC(self != NULL)
     LDL_PEDANTIC(arg != NULL)
+
+    LDL_PEDANTIC(arg->chip_read != NULL)
+    LDL_PEDANTIC(arg->chip_write != NULL)
+    LDL_PEDANTIC(arg->chip_set_mode != NULL)
 
     (void)memset(self, 0, sizeof(*self));
 
@@ -191,6 +93,14 @@ void LDL_Radio_init(struct ldl_radio *self, const struct ldl_radio_init_arg *arg
     self->tx_gain = arg->tx_gain;
     self->xtal = arg->xtal;
     self->xtal_delay = arg->xtal_delay;
+
+    LDL_DEBUG(NULL, "pa=%s type=%s tx_gain=%d xtal=%s xtal_delay=%u",
+        LDL_Radio_paToString(self->pa),
+        LDL_Radio_typeToString(self->type),
+        self->tx_gain,
+        LDL_Radio_xtalToString(self->xtal),
+        self->xtal_delay
+    )
 }
 
 void LDL_Radio_setEventCallback(struct ldl_radio *self, void *ctx, ldl_radio_event_fn cb)
@@ -215,10 +125,19 @@ void LDL_Radio_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
 {
     LDL_PEDANTIC(self != NULL)
 
-    LDL_DEBUG(NULL, "setMode(%u) from %u", mode, self->mode)
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogReset(self);
+#endif
 
     switch(mode){
     case LDL_RADIO_MODE_RESET:
+
+        if(self->mode == LDL_RADIO_MODE_STANDBY){
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+            rxDiagnostics(self);
+#endif
+        }
 
         self->chip_set_mode(self->chip, LDL_CHIP_MODE_RESET);
         break;
@@ -226,58 +145,73 @@ void LDL_Radio_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
     case LDL_RADIO_MODE_SLEEP:
 
         switch(self->mode){
+        /* goto sleep from reset */
         case LDL_RADIO_MODE_RESET:
 
             self->chip_set_mode(self->chip, LDL_CHIP_MODE_SLEEP);
             /* do not write to registers coming out of reset! */
             break;
 
+        /* goto sleep from sleep */
         case LDL_RADIO_MODE_SLEEP:
             setOpSleep(self);
             break;
 
+        /* goto sleep from standby */
         case LDL_RADIO_MODE_STANDBY:
 
+#ifdef LDL_ENABLE_RADIO_DEBUG
+            rxDiagnostics(self);
+#endif
             setOpStandby(self);
             writeReg(self, RegIrqFlags, 0xff);
             writeReg(self, RegIrqFlagsMask, 0xffU);
             self->chip_set_mode(self->chip, LDL_CHIP_MODE_SLEEP);
             setOpSleep(self);
+            break;
+
+        default:
+            break;
         }
         break;
 
     case LDL_RADIO_MODE_STANDBY:
 
-        /* you will have timing problems shifting
-         * from reset to standby. This code only
-         * exists to make the chip interface behave properly */
+        /* goto standby from standby
+         *
+         * This is an invalid transition. The following code
+         * will either fail on assertion, or make the software
+         * behave correctly if assertions are not included in the
+         * build.
+         *
+         *  */
         if(self->mode == LDL_RADIO_MODE_RESET){
+
+            LDL_ASSERT(self->mode != LDL_RADIO_MODE_RESET)
 
             LDL_Radio_setMode(self, LDL_RADIO_MODE_SLEEP);
         }
 
         switch(self->mode){
+        default:
         case LDL_RADIO_MODE_RESET:
             break;
+
+        /* goto standby from sleep */
         case LDL_RADIO_MODE_SLEEP:
 
             self->chip_set_mode(self->chip, LDL_CHIP_MODE_STANDBY);
             setOpSleep(self);
-
-            if(self->xtal == LDL_RADIO_XTAL_TCXO){
-
-                writeReg(self, RegTcxo, readReg(self, RegTcxo) | 0x10U);
-            }
-            else{
-
-                writeReg(self, RegTcxo, readReg(self, RegTcxo) & ~(0x10U));
-            }
-
+            setXTAL(self);
             setOpStandby(self);
             break;
 
+        /* goto standby from standby */
         case LDL_RADIO_MODE_STANDBY:
 
+#ifdef LDL_ENABLE_RADIO_DEBUG
+            rxDiagnostics(self);
+#endif
             self->chip_set_mode(self->chip, LDL_CHIP_MODE_STANDBY);
             setOpStandby(self);
             writeReg(self, RegIrqFlags, 0xff);
@@ -285,7 +219,16 @@ void LDL_Radio_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
             break;
         }
         break;
+
+    default:
+        break;
     }
+
+    LDL_DEBUG(NULL, "new_mode=%s cur_mode=%s", LDL_Radio_modeToString(mode), LDL_Radio_modeToString(self->mode))
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogFlush(self, __FUNCTION__);
+#endif
 
     self->mode = mode;
 }
@@ -296,20 +239,68 @@ void LDL_Radio_transmit(struct ldl_radio *self, const struct ldl_radio_tx_settin
     LDL_PEDANTIC(settings != NULL)
     LDL_PEDANTIC((data != NULL) || (len == 0U))
     LDL_PEDANTIC(settings->freq != 0U)
+    LDL_PEDANTIC(self->mode == LDL_RADIO_MODE_STANDBY)
+
+    struct modem_config config = {
+        .sf = settings->sf,
+        .bw = settings->bw,
+        .timeout = 0U,
+        .crc = true
+    };
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogReset(self);
+
+    rxDiagnostics(self);
+#endif
 
     self->dio_mapping1 = 0x40U;
 
-    writeReg(self, RegIrqFlags, 0xff);
-    setPower(self, settings->dbm);                                          // configure PA and accessory IO
-    setModemConfig(self, settings->bw, settings->sf, 0U);                   // configure LoRa modem
-    setFreq(self, settings->freq);                                          // set frequency
-    writeReg(self, RegSyncWord, 0x34);                                      // set sync word
-    writeReg(self, RegPaRamp, (readReg(self, RegPaRamp) & 0xf0U) | 0x08U);  // 50us PA ramp
-    writeReg(self, RegInvertIQ, 0x27U);                                     // non-invert IQ
-    writeReg(self, RegDioMapping1, self->dio_mapping1);                     // DIO0 (TX_COMPLETE) DIO1 (RX_DONE)
-    writeReg(self, RegIrqFlagsMask, 0xf7U);                                 // unmask TX_DONE interrupt
-    writeFIFO(self, data, len);                                             // write in the data
-    setOpTX(self);                                                          // TX
+    setPower(self, settings->dbm);                      // configure PA and accessory IO
+
+    setModemConfig1(self, &config);
+    setModemConfig2(self, &config);
+    setModemConfig3(self, &config);
+
+    writeReg(self, RegSyncWord, 0x34);                  // set sync word
+    writeReg(self, RegInvertIQ, 0x27U);                 // non-invert IQ
+    writeReg(self, RegDioMapping1, self->dio_mapping1); // DIO0 (TX_COMPLETE) DIO1 (RX_DONE)
+    writeReg(self, RegIrqFlags, 0xff);                  // clear interrupts
+    writeReg(self, RegIrqFlagsMask, 0xf7U);             // unmask TX_DONE interrupt
+    writeReg(self, RegFifoTxBaseAddr, 0U);              // set tx base
+    writeReg(self, RegFifoAddrPtr, 0U);                 // set address pointer
+    writeReg(self, LoraRegPayloadLength, len);          // bytes to transmit (note. datasheet doesn't say we have to but in practice we do)
+    burstWrite(self, RegFifo, data, len);               // write buffer
+
+    setFreq(self, settings->freq);                      // set carrier frequency
+
+    /* read everything back for debug */
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    (void)readReg(self, RegModemConfig1);
+    (void)readReg(self, RegModemConfig2);
+#ifdef LDL_ENABLE_SX1276
+    if(self->type == LDL_RADIO_SX1276){
+        (void)readReg(self, RegModemConfig3);
+    }
+#endif
+    (void)readReg(self, RegSyncWord);
+    (void)readReg(self, RegInvertIQ);
+    (void)readReg(self, RegDioMapping1);
+    (void)readReg(self, RegIrqFlags);
+    (void)readReg(self, RegIrqFlagsMask);
+    (void)readReg(self, RegFifoTxBaseAddr);
+    (void)readReg(self, RegFifoAddrPtr);
+    (void)readReg(self, LoraRegPayloadLength);
+    (void)readReg(self, RegFrfMsb);
+    (void)readReg(self, RegFrfMid);
+    (void)readReg(self, RegFrfLsb);
+#endif
+
+    setOpTX(self);                                      // TX
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogFlush(self, __FUNCTION__);
+#endif
 }
 
 void LDL_Radio_receive(struct ldl_radio *self, const struct ldl_radio_rx_setting *settings)
@@ -317,36 +308,109 @@ void LDL_Radio_receive(struct ldl_radio *self, const struct ldl_radio_rx_setting
     LDL_PEDANTIC(self != NULL)
     LDL_PEDANTIC(settings != NULL)
     LDL_PEDANTIC(settings->freq != 0U)
+    LDL_PEDANTIC(self->mode == LDL_RADIO_MODE_STANDBY)
+
+    uint16_t timeout;
+
+    if(settings->timeout > 0x3ffU){
+
+        timeout = 0x3ffU;
+    }
+    else if(settings->timeout < 8U){
+
+        timeout = 8U;
+    }
+    else{
+
+        timeout = settings->timeout;
+    }
+
+    struct modem_config config = {
+        .sf = settings->sf,
+        .bw = settings->bw,
+        .timeout = timeout,
+        .crc = false
+    };
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogReset(self);
+
+    rxDiagnostics(self);
+#endif
 
     self->dio_mapping1 = 0U;
 
-    writeReg(self, RegIrqFlags, 0xff);                                  // clear all interrupts
     self->chip_set_mode(self->chip, LDL_CHIP_MODE_RX);                  // configure accessory IO
-    setModemConfig(self, settings->bw, settings->sf, settings->timeout);// configure LoRa modem
-    setFreq(self, settings->freq);                                      // set carrier frequency
-    writeReg(self, RegSyncWord, 0x34);                                  // set sync word
-    writeReg(self, RegLna, 0x23U);                                      // LNA gain to max, LNA boost enable
-    writeReg(self, RegPayloadMaxLength, 0xffU);                         // max payload
-    writeReg(self, RegInvertIQ, 0x40U + 0x27U);                         // invert IQ
-    writeReg(self, RegDioMapping1, self->dio_mapping1);                 // DIO0 (RX_TIMEOUT) DIO1 (RX_DONE)
-    writeReg(self, RegIrqFlagsMask, 0x3fU);                             // unmask RX_TIMEOUT and RX_DONE interrupt
 
-    writeReg(self, RegFifoRxBaseAddr, 0U);
+    /* modem config */
+    setModemConfig1(self, &config);
+    setModemConfig2(self, &config);
+    setModemConfig3(self, &config);
+
+    writeReg(self, RegSymbTimeoutLsb, (uint8_t)timeout);    // set symbol timeout
+    writeReg(self, RegSyncWord, 0x34);                      // set sync word
+    writeReg(self, RegLna, 0x23U);                          // LNA gain to max, LNA boost enable
+    writeReg(self, RegPayloadMaxLength, settings->max);     // max payload
+    writeReg(self, RegInvertIQ, 0x40U + 0x27U);             // invert IQ
+    writeReg(self, RegDioMapping1, self->dio_mapping1);     // DIO0 (RX_TIMEOUT) DIO1 (RX_DONE)
+    writeReg(self, RegIrqFlags, 0xffU);                      // clear all interrupts
+    writeReg(self, RegIrqFlagsMask, 0x3fU);                 // unmask RX_TIMEOUT and RX_DONE interrupt
     writeReg(self, RegFifoAddrPtr, 0U);
 
-    setOpRXSingle(self);                                                // single RX
+    setFreq(self, settings->freq);                          // set carrier frequency
+
+    /* read everything back for debug */
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    (void)readReg(self, RegModemConfig1);
+    (void)readReg(self, RegModemConfig2);
+#ifdef LDL_ENABLE_SX1276
+    if(self->type == LDL_RADIO_SX1276){
+        (void)readReg(self, RegModemConfig3);
+    }
+#endif
+    (void)readReg(self, RegSymbTimeoutLsb);
+    (void)readReg(self, RegSyncWord);
+    (void)readReg(self, RegLna);
+    (void)readReg(self, RegPayloadMaxLength);
+    (void)readReg(self, RegInvertIQ);
+    (void)readReg(self, RegDioMapping1);
+    (void)readReg(self, RegIrqFlags);
+    (void)readReg(self, RegIrqFlagsMask);
+    (void)readReg(self, RegFifoAddrPtr);
+    (void)readReg(self, RegFrfMsb);
+    (void)readReg(self, RegFrfMid);
+    (void)readReg(self, RegFrfLsb);
+#endif
+
+    setOpRXSingle(self);                                    // single RX
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogFlush(self, __FUNCTION__);
+#endif
 }
 
 uint8_t LDL_Radio_readBuffer(struct ldl_radio *self, struct ldl_radio_packet_metadata *meta, void *data, uint8_t max)
 {
     LDL_PEDANTIC(self != NULL)
     LDL_PEDANTIC((data != NULL) || (max == 0U))
+    LDL_PEDANTIC(self->mode == LDL_RADIO_MODE_STANDBY)
 
     uint8_t retval;
 
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogReset(self);
+
+    rxDiagnostics(self);
+#endif
+
     retval = readFIFO(self, data, max);
+
     meta->rssi = (int16_t)readReg(self, RegPktRssiValue) - 157;
     meta->snr = ((int16_t)readReg(self, RegPktSnrValue)) * 100 / 4;
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogFlush(self, __FUNCTION__);
+#endif
 
     return retval;
 }
@@ -354,10 +418,17 @@ uint8_t LDL_Radio_readBuffer(struct ldl_radio *self, struct ldl_radio_packet_met
 void LDL_Radio_receiveEntropy(struct ldl_radio *self)
 {
     LDL_PEDANTIC(self != NULL)
+    LDL_PEDANTIC(self->mode == LDL_RADIO_MODE_STANDBY)
 
-    self->chip_set_mode(self->chip, LDL_CHIP_MODE_RX);   // configure accessory IO
-    writeReg(self, RegIrqFlags, 0xff);                              // clear all interrupts
-    writeReg(self, RegIrqFlagsMask, 0xffU);                         // mask all interrupts
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogReset(self);
+
+    rxDiagnostics(self);
+#endif
+
+    self->chip_set_mode(self->chip, LDL_CHIP_MODE_RX);  // configure accessory IO
+    writeReg(self, RegIrqFlags, 0xff);                  // clear all interrupts
+    writeReg(self, RegIrqFlagsMask, 0xffU);             // mask all interrupts
 
     /* application note instructions */
     switch(self->type){
@@ -378,6 +449,10 @@ void LDL_Radio_receiveEntropy(struct ldl_radio *self)
     }
 
     setOpRXContinuous(self);                                        // continuous RX
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogFlush(self, __FUNCTION__);
+#endif
 }
 
 unsigned int LDL_Radio_readEntropy(struct ldl_radio *self)
@@ -386,6 +461,13 @@ unsigned int LDL_Radio_readEntropy(struct ldl_radio *self)
     unsigned int retval = 0U;
 
     LDL_PEDANTIC(self != NULL)
+    LDL_PEDANTIC(self->mode == LDL_RADIO_MODE_STANDBY)
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogReset(self);
+
+    rxDiagnostics(self);
+#endif
 
     /* sample wideband RSSI */
     for(i=0U; i < (sizeof(unsigned int)*8U); i++){
@@ -394,10 +476,14 @@ unsigned int LDL_Radio_readEntropy(struct ldl_radio *self)
         retval |= readReg(self, RegRssiWideband) & 0x1U;
     }
 
-    setOpStandby(self);                                                 // standby
-    self->chip_set_mode(self->chip, LDL_CHIP_MODE_STANDBY);  // configure accessory IO
-    writeReg(self, RegIrqFlags, 0xff);                                  // clear all interrupts
-    writeReg(self, RegIrqFlagsMask, 0xffU);                             // mask all interrupts
+    setOpStandby(self);                                     // standby
+    self->chip_set_mode(self->chip, LDL_CHIP_MODE_STANDBY); // configure accessory IO
+    writeReg(self, RegIrqFlags, 0xff);                      // clear all interrupts
+    writeReg(self, RegIrqFlagsMask, 0xffU);                 // mask all interrupts
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogFlush(self, __FUNCTION__);
+#endif
 
     return retval;
 }
@@ -515,6 +601,95 @@ uint32_t LDL_Radio_bwToNumber(enum ldl_signal_bandwidth bw)
     return retval;
 }
 
+const char *LDL_Radio_typeToString(enum ldl_radio_type type)
+{
+    const char *retval;
+
+    switch(type){
+    default:
+        retval = "undefined";
+        break;
+    case LDL_RADIO_NONE:
+        retval = "none";
+        break;
+#ifdef LDL_ENABLE_SX1272
+    case LDL_RADIO_SX1272:
+        retval = "SX1272";
+        break;
+#endif
+#ifdef LDL_ENABLE_SX1276
+    case LDL_RADIO_SX1276:
+        retval = "SX1276";
+        break;
+#endif
+    }
+
+    return retval;
+}
+
+const char *LDL_Radio_modeToString(enum ldl_radio_mode mode)
+{
+    const char *retval;
+
+    switch(mode){
+    default:
+        retval = "undefined";
+        break;
+    case LDL_RADIO_MODE_RESET:
+        retval = "RESET";
+        break;
+    case LDL_RADIO_MODE_SLEEP:
+        retval = "SLEEP";
+        break;
+    case LDL_RADIO_MODE_STANDBY:
+        retval = "STANDBY";
+        break;
+    }
+
+    return retval;
+}
+
+const char *LDL_Radio_xtalToString(enum ldl_radio_xtal xtal)
+{
+    const char *retval;
+
+    switch(xtal){
+    default:
+        retval = "undefined";
+        break;
+    case LDL_RADIO_XTAL_CRYSTAL:
+        retval = "CRYSTAL";
+        break;
+    case LDL_RADIO_XTAL_TCXO:
+        retval = "TCXO";
+        break;
+    }
+
+    return retval;
+}
+
+const char *LDL_Radio_paToString(enum ldl_radio_pa pa)
+{
+    const char *retval;
+
+    switch(pa){
+    default:
+        retval = "undefined";
+        break;
+    case LDL_RADIO_PA_AUTO:
+        retval = "AUTO";
+        break;
+    case LDL_RADIO_PA_BOOST:
+        retval = "BOOST";
+        break;
+    case LDL_RADIO_PA_RFO:
+        retval = "RFO";
+        break;
+    }
+
+    return retval;
+}
+
 /* static functions ***************************************************/
 
 static enum ldl_radio_event interruptToEvent(struct ldl_radio *self, uint8_t n)
@@ -559,109 +734,37 @@ static enum ldl_radio_event interruptToEvent(struct ldl_radio *self, uint8_t n)
     return retval;
 }
 
-static uint8_t getOpMode(struct ldl_radio *self)
-{
-    return readReg(self, RegOpMode) & 0xf8U;
-}
-
 static void setOpSleep(struct ldl_radio *self)
 {
-    writeReg(self, RegOpMode, getOpMode(self));
-    writeReg(self, RegOpMode, getOpMode(self) | 0x80U);
+    writeReg(self, RegOpMode, 0x80U);
+    writeReg(self, RegOpMode, 0x80U);
 }
 
 static void setOpStandby(struct ldl_radio *self)
 {
-    writeReg(self, RegOpMode, getOpMode(self) | 1U);   // standby
+    writeReg(self, RegOpMode, 0x81U);   // standby
 }
 
 static void setOpTX(struct ldl_radio *self)
 {
-    writeReg(self, RegOpMode, getOpMode(self) | 3U);   // tx
+    writeReg(self, RegOpMode, 0x83U);   // tx
 }
 
 static void setOpRXContinuous(struct ldl_radio *self)
 {
-    writeReg(self, RegOpMode, getOpMode(self) | 5U);   // rx continuous
+    writeReg(self, RegOpMode, 0x85U);   // rx continuous
 }
 
 static void setOpRXSingle(struct ldl_radio *self)
 {
-    writeReg(self, RegOpMode, getOpMode(self) | 6U);   // rx single
-}
-
-static void setModemConfig(struct ldl_radio *self, enum ldl_signal_bandwidth bw, enum ldl_spreading_factor sf, uint32_t timeout)
-{
-    uint16_t _timeout;
-
-    if(timeout < 4U){
-
-        _timeout = 4U;
-    }
-    else if(timeout > 1023U){
-
-        _timeout = 1023U;
-    }
-    else{
-
-        _timeout = (uint16_t)timeout;
-    }
-    LDL_DEBUG(self, "setModemConfig timeout=%u", _timeout);
-
-    bool low_rate = ((bw == LDL_BW_125) && ((sf == LDL_SF_11) || (sf == LDL_SF_12))) ? true : false;
-
-    switch(self->type){
-    default:
-        break;
-#ifdef LDL_ENABLE_SX1272
-    case LDL_RADIO_SX1272:
-        /* bandwidth            (2bit)
-         * codingRate           (3bit)
-         * implicitHeaderModeOn (1bit) (0)
-         * rxPayloadCrcOn       (1bit) (1)
-         * lowDataRateOptimize  (1bit)      */
-        writeReg(self, RegModemConfig1, bwSetting(self, bw) | crSetting(self, CR_5) | 0U | 2U | (low_rate ? 1U : 0U));
-
-        /* spreadingFactor      (4bit)
-         * txContinuousMode     (1bit) (0)
-         * agcAutoOn            (1bit) (1)
-         * symbTimeout(9:8)     (2bit) (0)  */
-        writeReg(self, RegModemConfig2, sfSetting(self, sf) | 0U | 4U | ((_timeout >> 8) & 3U));
-
-        writeReg(self, RegSymbTimeoutLsb, _timeout);
-        break;
-#endif
-#ifdef LDL_ENABLE_SX1276
-    case LDL_RADIO_SX1276:
-        /* bandwidth            (4bit)
-         * codingRate           (3bit)
-         * implicitHeaderModeOn (1bit) (0)  */
-        writeReg(self, RegModemConfig1, bwSetting(self, bw) | crSetting(self, CR_5) | 0U);
-
-        /* spreadingFactor      (4bit)
-         * txContinuousMode     (1bit) (0)
-         * rxPayloadCrcOn       (1bit) (1)
-         * symbTimeout(9:8)     (2bit) (0)  */
-        writeReg(self, RegModemConfig2, sfSetting(self, sf) | 0U | 4U | 0U | ((_timeout >> 8) & 3U));
-
-        /* unused               (4bit) (0)
-         * lowDataRateOptimize  (1bit)
-         * agcAutoOn            (1bit) (1)
-         * unused               (2bit) (0)  */
-        writeReg(self, RegModemConfig3, 0U | (low_rate ? 8U : 0U) | 4U | 0U);
-
-        writeReg(self, RegSymbTimeoutLsb, _timeout);
-        break;
-#endif
-    }
-
+    writeReg(self, RegOpMode, 0x86U);   // rx single
 }
 
 static void setPower(struct ldl_radio *self, int16_t dbm)
 {
     /* Todo:
      *
-     * - adjust current limit trim
+     * - review current limiting
      *
      * */
     enum ldl_radio_pa pa = self->pa;
@@ -678,9 +781,6 @@ static void setPower(struct ldl_radio *self, int16_t dbm)
         uint8_t paConfig;
         uint8_t paDac;
 
-        paConfig = readReg(self, RegPaConfig);
-        paConfig &= ~(0xfU);
-
         if(pa == LDL_RADIO_PA_AUTO){
 
             pa = (dbm <= 14) ? LDL_RADIO_PA_RFO : LDL_RADIO_PA_BOOST;
@@ -689,42 +789,59 @@ static void setPower(struct ldl_radio *self, int16_t dbm)
         switch(pa){
         case LDL_RADIO_PA_RFO:
 
-            /* -1 to 14dbm */
-            paConfig &= ~(0x80U);
-            paConfig |= (dbm > 14) ? 0xf : (uint8_t)( (dbm < -1) ? 0 : (dbm + 1) );
+            self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_RFO);
+
+            paDac = 0x84U;
+
+            /* Pout = -1 + (0..15) */
+            if(dbm >= 14){
+
+                paConfig = 0x0fU;
+            }
+            else if(dbm >= -1){
+
+                paConfig = (uint8_t)(dbm + 1) & 0x0fU;
+            }
+            else{
+
+                paConfig = 0U;
+            }
 
             writeReg(self, RegPaConfig, paConfig);
-            self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_RFO);
+            writeReg(self, SX1272RegPaDac, paDac);
             break;
 
         case LDL_RADIO_PA_BOOST:
 
-            paDac = readReg(self, RegPaDac);
+            self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_BOOST);
 
-            paConfig |= 0x80U;
-            paDac &= ~(7U);
+            paDac = readReg(self, SX1272RegPaDac);
+
+            paConfig = 0x80U;
 
             /* fixed 20dbm */
             if(dbm >= 20){
 
-                paDac |= 7U;
-                paConfig |= 0xfU;
+                paDac = 0x87U;
+                paConfig |= 0x0fU;
             }
             /* 2 dbm to 17dbm */
             else{
 
-                paDac |= 4U;
+                paDac = 0x84U;
                 paConfig |= (dbm > 17) ? 0xf : ( (dbm < 2) ? 0 : (dbm - 2) );
             }
 
-            writeReg(self, RegPaDac, paDac);
             writeReg(self, RegPaConfig, paConfig);
-
-            self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_BOOST);
+            writeReg(self, SX1272RegPaDac, paDac);
             break;
         default:
             break;
         }
+#ifdef LDL_ENABLE_RADIO_DEBUG
+        (void)readReg(self, RegPaConfig);
+        (void)readReg(self, SX1272RegPaDac);
+#endif
     }
         break;
 #endif
@@ -734,53 +851,99 @@ static void setPower(struct ldl_radio *self, int16_t dbm)
         uint8_t paConfig;
         uint8_t paDac;
 
-        paConfig = readReg(self, RegPaConfig);
-        paConfig &= ~(0xfU);
-
         if(pa == LDL_RADIO_PA_AUTO){
 
             pa = (dbm <= 14) ? LDL_RADIO_PA_RFO : LDL_RADIO_PA_BOOST;
         }
 
         switch(pa){
+        /* -4dbm to 14dbm */
         case LDL_RADIO_PA_RFO:
 
-            /* todo */
-            paConfig |= 0x7eU;
-            writeReg(self, RegPaConfig, paConfig);
             self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_RFO);
+
+            paDac = 0x84U;
+
+            /* PaConfig = PaSelect(1) | MaxPower(3) | OutputPower(4)
+             *
+             * Pmax = 10.8 + (0.6 * MaxPower)
+             *
+             * Pout = Pmax - (15 - OutputPower)
+             *
+             *
+             * */
+            if(dbm >= 14){
+
+                /* Pmax = 10.8 + 0.6 * 5 = 13.8 dBm */
+                paConfig = 0x5fU;
+            }
+            else if(dbm == 13){
+
+                /* Pmax = (10.8 + 0.6 * 5) = 13.8 dBm
+                 *
+                 * Pout = 13.8 - (15 - 14) = 12.8 dBm
+                 *
+                 * */
+                paConfig = 0x5eU;
+            }
+            else if(dbm >= -3){
+
+                /* Pmax = (10.8 + 0.6 * 2) = 12 dBm
+                 *
+                 * Pout = 12 - (15 - OutputPower) = -3 .. 12 dBm
+                 *
+                 * */
+                paConfig = 0x20U | (dbm + 3);
+            }
+            else{
+
+                /* Pmax = 10.8 dBm
+                 *
+                 * Pout = 11.4 - 15 = -3.6
+                 *
+                 * */
+                paConfig = 0x10U;
+            }
+
+            writeReg(self, RegPaConfig, paConfig);
+            writeReg(self, SX1276RegPaDac, paDac);
             break;
 
+        /* 2dBm to 17dBm
+         * or
+         * 20dBm fixed */
         case LDL_RADIO_PA_BOOST:
 
-            /* regpadac address == 0x4d */
-            paDac = readReg(self, 0x4d);
+            self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_BOOST);
 
-            paConfig |= 0x80U;
-            paConfig &= ~0x70U;
-            paDac &= ~(7U);
+            /* PaConfig = PaSelect(1) | MaxPower(3) | OutputPower(4) */
+            paConfig = 0x80U | 0x40U;
 
             /* fixed 20dbm */
             if(dbm >= 20){
 
-                paDac |= 7U;
+                paDac = 0x87U;
                 paConfig |= 0xfU;
             }
             /* 2 dbm to 17dbm */
             else{
 
-                paDac |= 4U;
-                paConfig |= (dbm > 17) ? 0xf : ( (dbm < 2) ? 0 : (dbm - 2) );
+                paDac = 0x84U;
+                paConfig |= (dbm > 17) ? 0xfU : ( (dbm < 2) ? 0x40U : (uint8_t)(dbm - 2) );
             }
 
-            /* regpadac address == 0x4d */
-            writeReg(self, 0x4d, paDac);
             writeReg(self, RegPaConfig, paConfig);
-            self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_BOOST);
+            writeReg(self, SX1276RegPaDac, paDac);
             break;
+
         default:
             break;
         }
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+        (void)readReg(self, RegPaConfig);
+        (void)readReg(self, SX1276RegPaDac);
+#endif
     }
         break;
 #endif
@@ -789,102 +952,111 @@ static void setPower(struct ldl_radio *self, int16_t dbm)
     }
 }
 
-static uint8_t bwSetting(const struct ldl_radio *self, enum ldl_signal_bandwidth bw)
+static void setModemConfig1(struct ldl_radio *self, const struct modem_config *config)
 {
-    uint8_t retval = 0U;
+    switch(self->type){
+    default:
+        break;
+#ifdef LDL_ENABLE_SX1272
+    case LDL_RADIO_SX1272:
+    {
+        bool low_rate = (config->bw == LDL_BW_125) && ((config->sf == LDL_SF_11) || (config->sf == LDL_SF_12));
+        uint8_t bw;
+
+        switch(config->bw){
+        default:
+        case LDL_BW_125:
+            bw = 0x00U;
+            break;
+        case LDL_BW_250:
+            bw = 0x40U;
+            break;
+        case LDL_BW_500:
+            bw = 0x80U;
+            break;
+        }
+
+        /* bandwidth            (2bit)
+         * codingRate           (3bit) (CR_5)
+         * implicitHeaderModeOn (1bit) (0)
+         * rxPayloadCrcOn       (1bit) (1)
+         * lowDataRateOptimize  (1bit)      */
+        writeReg(self, RegModemConfig1, bw | 8U | 0U | (config->crc ? 2U : 0U) | (low_rate ? 1U : 0U));
+    }
+        break;
+#endif
+#ifdef LDL_ENABLE_SX1276
+    case LDL_RADIO_SX1276:
+    {
+        uint8_t bw;
+
+        switch(config->bw){
+        default:
+        case LDL_BW_125:
+            bw = 0x70U;
+            break;
+        case LDL_BW_250:
+            bw = 0x80U;
+            break;
+        case LDL_BW_500:
+            bw = 0x90U;
+            break;
+        }
+
+        /* bandwidth            (4bit)
+         * codingRate           (3bit) (CR_5)
+         * implicitHeaderModeOn (1bit) (0)  */
+        writeReg(self, RegModemConfig1, bw | 2U | 0U);
+    }
+        break;
+#endif
+    }
+}
+
+static void setModemConfig2(struct ldl_radio *self, const struct modem_config *config)
+{
+    uint8_t sf = ((uint8_t)config->sf & 0xfU) << 4;
 
     switch(self->type){
     default:
         break;
 #ifdef LDL_ENABLE_SX1272
     case LDL_RADIO_SX1272:
-        switch(bw){
-        default:
-        case LDL_BW_125:
-            retval = 0x00U;
-            break;
-        case LDL_BW_250:
-            retval = 0x40U;
-            break;
-        case LDL_BW_500:
-            retval = 0x80U;
-            break;
-        }
+
+        /* spreadingFactor      (4bit)
+         * txContinuousMode     (1bit) (0)
+         * agcAutoOn            (1bit) (1)
+         * symbTimeout(9:8)     (2bit) (0)  */
+        writeReg(self, RegModemConfig2, sf | 0U | 4U | ((config->timeout >> 8) & 3U));
         break;
 #endif
 #ifdef LDL_ENABLE_SX1276
     case LDL_RADIO_SX1276:
-        switch(bw){
-        default:
-        case LDL_BW_125:
-            retval = 0x70U;
-            break;
-        case LDL_BW_250:
-            retval = 0x80U;
-            break;
-        case LDL_BW_500:
-            retval = 0x90U;
-            break;
-        }
+
+        /* spreadingFactor      (4bit)
+         * txContinuousMode     (1bit) (0)
+         * rxPayloadCrcOn       (1bit) (1)
+         * symbTimeout(9:8)     (2bit) (0)  */
+        writeReg(self, RegModemConfig2, sf | 0U | (config->crc ? 4U : 0U) | 0U | ((config->timeout >> 8) & 3U));
         break;
 #endif
     }
-
-    return retval;
 }
 
-static uint8_t sfSetting(const struct ldl_radio *self, enum ldl_spreading_factor sf)
+static void setModemConfig3(struct ldl_radio *self, const struct modem_config *config)
 {
-    uint8_t retval = 0U;
-
-    (void)self;
-
-    switch(sf){
-    default:
-    case LDL_SF_7:
-        retval = 0x70U;
-        break;
-    case LDL_SF_8:
-        retval = 0x80U;
-        break;
-    case LDL_SF_9:
-        retval = 0x90U;
-        break;
-    case LDL_SF_10:
-        retval = 0xa0U;
-        break;
-    case LDL_SF_11:
-        retval = 0xb0U;
-        break;
-    case LDL_SF_12:
-        retval = 0xc0U;
-        break;
-    }
-    return retval;
-}
-
-static uint8_t crSetting(const struct ldl_radio *self, enum ldl_coding_rate cr)
-{
-    uint8_t retval = 0U;
-
-    (void)cr;
-
-    switch(self->type){
-    default:
-        break;
-#ifdef LDL_ENABLE_SX1272
-    case LDL_RADIO_SX1272:
-        retval = 8U;    // CR_5
-        break;
-#endif
 #ifdef LDL_ENABLE_SX1276
-    case LDL_RADIO_SX1276:
-        retval = 2U;    // CR_5
-        break;
-#endif
-    }
+    if(self->type == LDL_RADIO_SX1276){
 
-    return retval;
+        bool low_rate = (config->bw == LDL_BW_125) && ((config->sf == LDL_SF_11) || (config->sf == LDL_SF_12));
+
+        /* unused               (4bit) (0)
+         * lowDataRateOptimize  (1bit)
+         * agcAutoOn            (1bit) (1)
+         * unused               (2bit) (0)  */
+        writeReg(self, RegModemConfig3, 0U | (low_rate ? 8U : 0U) | 4U | 0U);
+    }
+#endif
 }
 
 static void setFreq(struct ldl_radio *self, uint32_t freq)
@@ -904,7 +1076,7 @@ static uint8_t readFIFO(struct ldl_radio *self, uint8_t *data, uint8_t max)
 
     if(size > 0U){
 
-        writeReg(self, RegFifoAddrPtr, readReg(self, RegFifoRxCurrentAddr));
+        writeReg(self, RegFifoAddrPtr, 0U);     // this driver always puts packets at address 0
 
         burstRead(self, RegFifo, data, size);
     }
@@ -912,34 +1084,107 @@ static uint8_t readFIFO(struct ldl_radio *self, uint8_t *data, uint8_t max)
     return size;
 }
 
-static void writeFIFO(struct ldl_radio *self, const uint8_t *data, uint8_t len)
-{
-    writeReg(self, RegFifoTxBaseAddr, 0x00U);    // set tx base
-    writeReg(self, RegFifoAddrPtr, 0x00U);       // set address pointer
-    writeReg(self, LoraRegPayloadLength, len);
-    burstWrite(self, RegFifo, data, len);        // write into fifo
-}
-
 static uint8_t readReg(struct ldl_radio *self, uint8_t reg)
 {
     uint8_t data;
-    self->chip_read(self->chip, reg, &data, sizeof(data));
+    uint8_t opcode = reg & 0x7FU;
+
+    self->chip_read(self->chip, opcode, &data, sizeof(data));
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogPush(self, opcode, &data, sizeof(data));
+#endif
+
     return data;
-}
-
-static void writeReg(struct ldl_radio *self, uint8_t reg, uint8_t data)
-{
-    self->chip_write(self->chip, reg, &data, sizeof(data));
-}
-
-static void burstWrite(struct ldl_radio *self, uint8_t reg, const uint8_t *data, uint8_t len)
-{
-    self->chip_write(self->chip, reg, data, len);
 }
 
 static void burstRead(struct ldl_radio *self, uint8_t reg, uint8_t *data, uint8_t len)
 {
-    self->chip_read(self->chip, reg, data, len);
+    uint8_t opcode = reg & 0x7FU;
+
+    self->chip_read(self->chip, opcode, data, len);
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogPush(self, opcode, data, len);
+#endif
 }
+
+static void writeReg(struct ldl_radio *self, uint8_t reg, uint8_t data)
+{
+    uint8_t opcode = reg | 0x80U;
+
+    self->chip_write(self->chip, opcode, &data, sizeof(data));
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogPush(self, opcode, &data, sizeof(data));
+#endif
+}
+
+static void burstWrite(struct ldl_radio *self, uint8_t reg, const uint8_t *data, uint8_t len)
+{
+    uint8_t opcode = reg | 0x80U;
+
+    self->chip_write(self->chip, opcode | 0x80U, data, len);
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    LDL_Radio_debugLogPush(self, opcode, data, len);
+#endif
+}
+
+static void setXTAL(struct ldl_radio *self)
+{
+    uint8_t value;
+    uint8_t reg;
+
+    switch(self->type){
+    default:
+        return;
+#ifdef LDL_ENABLE_SX1272
+    case LDL_RADIO_SX1272:
+        reg = SX1276RegTcxo;
+        break;
+#endif
+#ifdef LDL_ENABLE_SX1276
+    case LDL_RADIO_SX1276:
+        reg = SX1276RegTcxo;
+        break;
+#endif
+    }
+
+    value = readReg(self, reg);
+
+    if(value & 0x10U){
+
+        if(self->xtal == LDL_RADIO_XTAL_CRYSTAL){
+
+            writeReg(self, reg, value & ~(0x10U));
+        }
+    }
+    else{
+
+        if(self->xtal == LDL_RADIO_XTAL_TCXO){
+
+            writeReg(self, reg, value | 0x10U);
+        }
+    }
+}
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+static void rxDiagnostics(struct ldl_radio *self)
+{
+    (void)readReg(self, RegOpMode);
+    (void)readReg(self, RegIrqFlags);
+    (void)readReg(self, RegModemStat);
+    (void)readReg(self, RegHopChannel);             // PLL locked and CRC status
+    (void)readReg(self, RegRxHeaderCntValueMsb);    // number of headers rx since last sleep
+    (void)readReg(self, RegRxHeaderCntValueLsb);
+    (void)readReg(self, RegRxPacketCntValueMsb);    // number of packets rx since last sleep
+    (void)readReg(self, RegRxPacketCntValueLsb);
+    (void)readReg(self, RegRxNbBytes);              // number of bytes in last rx packet
+    (void)readReg(self, LoraRegFeiMsb);
+    (void)readReg(self, RegFeiMid);
+    (void)readReg(self, LoraRegFeiLsb);
+}
+#endif
 
 #endif
