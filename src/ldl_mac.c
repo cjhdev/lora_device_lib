@@ -850,7 +850,7 @@ static void processStartup(struct ldl_mac *self)
 
         LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
 
-        LDL_DEBUG(self->app, "%s: waiting %" PRIu32 " ticks for Radio xtal", __FUNCTION__, delay)
+        LDL_DEBUG(self->app, "waiting %" PRIu32 " ticks for Radio xtal", delay)
     }
 }
 
@@ -1078,8 +1078,7 @@ static void processWaitRX1(struct ldl_mac *self)
         else{
 
             self->state = LDL_STATE_WAIT_RX2;
-            LDL_ERROR(self->app, "%s: too late for RX1 window: error=%" PRIu32 " margin=%" PRIu32 "",
-                __FUNCTION__,
+            LDL_ERROR(self->app, "too late for RX1 window: error=%" PRIu32 " margin=%" PRIu32 "",
                 error,
                 self->rx1_margin
             )
@@ -1142,8 +1141,7 @@ static void processWaitRX2(struct ldl_mac *self)
 
             self->state = LDL_STATE_RX2_LOCKOUT;
 
-            LDL_ERROR(self->app, "%s: too late for RX2 window: error=%" PRIu32 " margin=%" PRIu32 "",
-                __FUNCTION__,
+            LDL_ERROR(self->app, "too late for RX2 window: error=%" PRIu32 " margin=%" PRIu32 "",
                 error,
                 self->rx2_margin
             )
@@ -1383,7 +1381,7 @@ static void processWaitTX(struct ldl_mac *self)
 
         LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
 
-        LDL_DEBUG(self->app, "%s: waiting %" PRIu32 " ticks for Radio xtal", __FUNCTION__, delay)
+        LDL_DEBUG(self->app, "waiting %" PRIu32 " ticks for Radio xtal", delay)
     }
 }
 
@@ -1425,7 +1423,7 @@ static void processWaitRetry(struct ldl_mac *self)
 
             delay = (self->state == LDL_STATE_WAIT_RETRY) ? (self->rand(self->app) % (self->tps*30UL)) : 0UL;
 
-            LDL_DEBUG(self->app, "%s: adding %" PRIu32 " ticks of dither to retry", __FUNCTION__, delay)
+            LDL_DEBUG(self->app, "adding %" PRIu32 " ticks of dither to retry", delay)
 
             LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
             self->state = LDL_STATE_WAIT_TX;
@@ -2467,7 +2465,7 @@ static bool setChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uin
             }
             else{
 
-                LDL_ERROR(self->app, "%s: %" PRIu32 "Hz not allowed in this region", __FUNCTION__, freq)
+                LDL_ERROR(self->app, "%" PRIu32 "Hz not allowed in this region", freq)
             }
         }
     }

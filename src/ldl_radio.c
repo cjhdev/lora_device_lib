@@ -94,8 +94,7 @@ void LDL_Radio_init(struct ldl_radio *self, const struct ldl_radio_init_arg *arg
     self->xtal = arg->xtal;
     self->xtal_delay = arg->xtal_delay;
 
-    LDL_DEBUG(NULL, "%s: pa=%s type=%s tx_gain=%d xtal=%s xtal_delay=%u",
-        __FUNCTION__,
+    LDL_DEBUG(NULL, "pa=%s type=%s tx_gain=%d xtal=%s xtal_delay=%u",
         LDL_Radio_paToString(self->pa),
         LDL_Radio_typeToString(self->type),
         self->tx_gain,
@@ -225,7 +224,7 @@ void LDL_Radio_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
         break;
     }
 
-    LDL_DEBUG(NULL, "%s: new_mode=%s cur_mode=%s", __FUNCTION__, LDL_Radio_modeToString(mode), LDL_Radio_modeToString(self->mode))
+    LDL_DEBUG(NULL, "new_mode=%s cur_mode=%s", LDL_Radio_modeToString(mode), LDL_Radio_modeToString(self->mode))
 
 #ifdef LDL_ENABLE_RADIO_DEBUG
     LDL_Radio_debugLogFlush(self, __FUNCTION__);
