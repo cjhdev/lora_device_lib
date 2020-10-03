@@ -471,6 +471,7 @@ struct ldl_mac_session {
     uint32_t joinNonce;
     uint16_t devNonce;
     uint16_t pending_cmds;
+    uint8_t  pending_ACK;   /** a CONFIRMED DATA message received, answer with ACK */
 };
 
 /** data service invocation options */
