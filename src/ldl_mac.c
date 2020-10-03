@@ -932,6 +932,9 @@ static void processTX(struct ldl_mac *self)
 
     if(LDL_MAC_inputCheck(self, LDL_INPUT_TX_COMPLETE, &error)){
 
+        /* reset ACK flag after transmission */
+        self->ctx.pending_ACK = 0U;
+
         /* the wait interval is always measured in whole seconds */
         waitSeconds = (self->op == LDL_OP_JOINING) ? LDL_Region_getJA1Delay(self->ctx.region) : self->ctx.rx1Delay;
 
@@ -1246,8 +1249,10 @@ static void processRX(struct ldl_mac *self)
                 self->op = LDL_OP_NONE;
                 break;
 
-            case FRAME_TYPE_DATA_UNCONFIRMED_DOWN:
             case FRAME_TYPE_DATA_CONFIRMED_DOWN:
+                self->ctx.pending_ACK = 1U;
+                /* fallthrough */
+            case FRAME_TYPE_DATA_UNCONFIRMED_DOWN:
 
                 LDL_OPS_syncDownCounter(self, frame.port, frame.counter);
 
@@ -1494,6 +1499,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                             f.adr = self->ctx.adr;
                             f.adrAckReq = self->adrAckReq;
                             f.port = port;
+                            f.ack = self->ctx.pending_ACK;
 
                             /* 1.1 has to awkwardly re-calculate the MIC when a frame is retried on a
                              * different channel and the counter is a parameter */
