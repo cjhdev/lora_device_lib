@@ -251,6 +251,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
 
                 if(LDL_Frame_decode(f, in, len)){
 
+#ifndef LDL_DISABLE_POINTONE
                     if(f->optNeg){
 
                         if(f->joinNonce >= self->joinNonce){
@@ -289,8 +290,9 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                             LDL_DEBUG(self->app, "invalid joinNonce")
                         }
                     }
-                    else{
-
+                    else
+#endif                    
+                        {
                         mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_NWK, NULL, 0U, in, len-sizeof(mic));
 
                         if(f->mic == mic){
