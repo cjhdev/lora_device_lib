@@ -1245,10 +1245,8 @@ static void processRX(struct ldl_mac *self)
                 self->op = LDL_OP_NONE;
                 break;
 
-            case FRAME_TYPE_DATA_CONFIRMED_DOWN:
-                self->ctx.pending_ACK = 1U;
-                /* fallthrough */
             case FRAME_TYPE_DATA_UNCONFIRMED_DOWN:
+            case FRAME_TYPE_DATA_CONFIRMED_DOWN:
 
                 LDL_OPS_syncDownCounter(self, frame.port, frame.counter);
 
@@ -1262,7 +1260,7 @@ static void processRX(struct ldl_mac *self)
                 fopts = frame.opts;
                 foptsLen = frame.optsLen;
 
-                if(frame.data != NULL){
+                if((frame.data != NULL) && (frame.port == 0U)){
 
                     if(frame.port == 0U){
 
