@@ -138,6 +138,26 @@
     #define LDL_DISABLE_POINTONE
     #undef LDL_DISABLE_POINTONE
 
+    /** Define to apply the proposed change to LoRaWAN 1.1 spec regarding
+     * the construction of the A1 block when encrypting Fopts.
+     *
+     * */
+    #define LDL_ENABLE_POINTONE_ERRATA_A1
+    #undef LDL_ENABLE_POINTONE_ERRATA_A1
+
+    /** To be true to the 1.0.x specification, if LDL_DISABLE_POINTONE
+     * is defined, the devNonce will be initialised from random.
+     *
+     * Define this build option (with LDL_DISABLE_POINTONE) to have
+     * devNonce initialised from a counter.
+     *
+     * This will avoid the problem of OTAA failing because a random
+     * devNonce has already been used.
+     *
+     * */
+    #define LDL_DISABLE_RANDOM_DEV_NONCE
+    #undef LDL_DISABLE_RANDOM_DEV_NONCE
+
      /**
       * Define to remove deviceTime MAC command handling
       *
@@ -151,6 +171,19 @@
       * */
     #define LDL_LITTLE_ENDIAN
     #undef LDL_LITTLE_ENDIAN
+
+    /**
+     * Define to enable verbose radio interface debugging that will
+     * buffer and print register access via LDL_TRACE_*
+     *
+     * This feature uses a buffer to defer printing until the driver
+     * is past a timing sensitive part.
+     *
+     * Note: you need to define LDL_TRACE_* macros to get output.
+     *
+     * */
+    #define LDL_ENABLE_RADIO_DEBUG
+    #undef LDL_ENABLE_RADIO_DEBUG
 
 #endif
 

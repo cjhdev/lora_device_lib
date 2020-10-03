@@ -4,7 +4,7 @@
 DIR_PROJECT_ROOT := $(shell cd ../..;pwd)
 
 # change this to point to your container
-DOCKER := docker run --mount type=bind,source=$(DIR_PROJECT_ROOT),destination=/mbed/lora_device_lib --device=/dev/ttyACM0:/dev/ttyACM0 -ti --rm --user 1000:1000 -v $(shell pwd):/mbed:cached my-mbed-cli
+DOCKER := docker run --mount type=bind,source=$(DIR_PROJECT_ROOT),destination=/mbed/lora_device_lib -ti --rm --user 1000:1000 -v $(shell pwd):/mbed:cached my-mbed-cli
 
 # special MBED name for target
 DEVICE ?= NUCLEO_F429ZI
@@ -82,7 +82,7 @@ upload_flash.jlink:
 	@ echo focus cmd                     >> $@
 
 clean:
-	rm .gdbinit upload_flash.jlink
+	rm -f .gdbinit upload_flash.jlink
 	rm -rf $(DIR_BUILD)
 
 .PHONY: clean gdb_server $(DIR_BUILD)/mbed.elf upload_flash.jlink .gdbinit config sterm

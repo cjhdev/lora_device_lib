@@ -28,15 +28,13 @@ using namespace LDL;
 
 /* constructors *******************************************************/
 
-MAC::MAC(EventQueue& event, Store &store, SM &sm, Radio &radio) :
+MAC::MAC(Store &store, SM &sm, Radio &radio) :
     signal(A0, 0),
     radio(radio),
     sm(sm),
-    store(store),
-    event(event),
-    semaphore(1)
+    store(store)
 {
-    next_event_handler = 0;
+    timer.start();
 }
 
 /* protected static  **************************************************/
@@ -50,7 +48,7 @@ MAC::to_obj(void *self)
 uint32_t
 MAC::_ticks(void *app)
 {
-    return to_obj(app)->event.tick();
+    return (uint32_t)to_obj(app)->timer.elapsed_time().count();
 }
 
 uint32_t
@@ -208,52 +206,12 @@ MAC::app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
     }
 }
 
-/* protected **********************************************************/
-
-void
-MAC::do_handle_radio_event(enum ldl_radio_event event, uint32_t ticks)
-{
-    LDL_MAC_radioEventWithTicks(&mac, event, ticks);
-    semaphore.release();
-}
+/* public methods *****************************************************/
 
 void
 MAC::handle_radio_event(enum ldl_radio_event event)
 {
-    if(semaphore.try_acquire()){
-
-        /* we don't assert on the return value
-         * since not having memory here will show up later as
-         * "chip error" when the interrupt never arrives.
-         *
-         * */
-        this->event.call(callback(this, &MAC::do_handle_radio_event), event, this->event.tick());
-    }
-}
-
-/* public methods *****************************************************/
-
-void
-MAC::do_process()
-{
-    uint32_t next;
-
-    do{
-
-        LDL_MAC_process(&mac);
-        next = LDL_MAC_ticksUntilNextEvent(&mac);
-    }
-    while(next == 0U);
-
-    if(next < UINT32_MAX){
-
-        event.cancel(next_event_handler);
-
-        next_event_handler = event.call_in(std::chrono::milliseconds(next), callback(this, &MAC::do_process));
-
-        /* LoRaWAN will grind to a halt if there is no memory to enqueue */
-        MBED_ASSERT(next_event_handler != 0);
-    }
+    LDL_MAC_radioEvent(&mac, event);
 }
 
 bool
@@ -274,12 +232,11 @@ MAC::start(enum ldl_region region)
     store.get_init_params(&store_params);
     session_size = store.get_session(&session, sizeof(session));
 
-    // clock source is the millisecond ticker in EventQueue
     arg.ticks = _ticks;
-    arg.tps = 1000UL;
-    arg.a = 0UL;
-    arg.b = 2UL;
-    arg.advance = 0UL;
+    arg.tps = MBED_CONF_LDL_TPS;
+    arg.a = MBED_CONF_LDL_XTAL_ERROR_A;
+    arg.b = MBED_CONF_LDL_XTAL_ERROR_B;
+    arg.advance = MBED_CONF_LDL_ADVANCE;
 
     arg.rand = _rand;
     arg.get_battery_level = _get_battery_level;
@@ -300,8 +257,6 @@ MAC::start(enum ldl_region region)
 
     arg.session = (session_size == sizeof(session)) ? &session : NULL;
 
-    radio.set_event_handler(callback(this, &MAC::handle_radio_event));
-
     LDL_MAC_init(&mac, region, &arg);
 
     /* apply TTN fair access policy
@@ -316,17 +271,11 @@ MAC::start(enum ldl_region region)
      * */
     LDL_MAC_setMaxDCycle(&mac, 12U);
 
+    radio.set_event_handler(callback(this, &MAC::handle_radio_event));
+
     run_state = ON;
 
-    do_process();
-
     return true;
-}
-
-void
-MAC::stop()
-{
-    run_state = OFF;
 }
 
 enum ldl_mac_status
@@ -422,5 +371,5 @@ MAC::ticks_until_next_event()
 void
 MAC::process()
 {
-    event.dispatch(0);
+    LDL_MAC_process(&mac);
 }

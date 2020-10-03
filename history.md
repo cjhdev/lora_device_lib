@@ -1,6 +1,45 @@
 Release History
 ===============
 
+## 0.4.4
+
+- fixed bug where frequency set by MAC commands was 1/100th of the required value (i.e. I forgot to multiply by 100).
+  This affected rxParamSetup, newChannel, and dlChannel commands. It's likely no-one has ever used
+  this feature.
+- added code to previously empty LDL_Region_validateFreq() to check centre frequency is within bounds for a given region
+- changed setChannel() to call LDL_Region_validateFreq() to guard against illegal channel settings
+- fixed bug in restoreDefaults() where region will always be set to zero
+- refactored restoreDefaults() into separate initSession() and forgetNetwork() functions
+- fixed bug where ctx.rx2Rate is used instead of ctx.rx2DataRate on receive
+- removed rx2Rate from session struct which appears to be duplicate of rx2DataRate
+- added debug code to print session to trace
+
+## 0.4.3
+
+- changed LDL::Device so that worker thread is scheduled to run when a radio ISR
+  event is received
+
+## 0.4.2
+
+- fixed RegTcxo bug again: got the mapping backwards in 0.4.1
+- fixed bug affecting behaviour of MAC if RX2 slot is handled too late
+- added more debug registers that are read when LDL_ENABLE_RADIO_DEBUG is defined
+- refactored MBED wrapper to not use EventQueue which was causing timing problems
+- added Pout control for RFO SX1276 (was todo)
+- added LDL_ENABLE_POINTONE_ERRATA_A1 build option to apply 1.1 A1 errata
+- added LDL_DISABLE_RANDOM_DEV_NONCE build option for using a counter based devNonce if LDL_DISABLE_POINTONE is defined
+
+## 0.4.1
+
+- added LDL_TRACE_* macros for verbose debug messages
+- added __FUNCTION__ as first argument to LDL_DEBUG(), LDL_INFO(), and LDL_ERROR() level messages to add consistency in logs
+- added ldl_radio_debug.c/h to have option of printing register access using the trace macros
+- added LDL_ENABLE_RADIO_DEBUG build option to enable trace level radio debugging (depends on LDL_TRACE_*)
+- changed radio driver to set the read/write bit in the opcode instead of having chip_adapter do it
+- fixed bug in SX1276 driver where RegPllHop is written instead of RegTcxo
+- refactored modem config code in ldl_radio.c to work better with debug readback
+- added options to mbed wrapper to enable/disable radio debugging
+
 ## 0.4.0
 
 In this release effort has gone into making it easier to evaluate

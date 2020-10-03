@@ -34,13 +34,15 @@ SRC_CMOCKA := $(notdir $(wildcard $(DIR_CMOCKA)/src/*.c))
 OBJ := $(SRC:.c=.o)
 OBJ_CMOCKA := $(SRC_CMOCKA:.c=.o)
 
-TESTS += tc_aes 
+TESTS += tc_aes
 TESTS += tc_cmac
 TESTS += tc_frame
 TESTS += tc_mac_commands
 TESTS += tc_input
 TESTS += tc_timer
 TESTS += tc_frame_with_encryption
+TESTS += tc_sx1272_without_sx1276
+TESTS += tc_sx1276_without_sx1272
 
 
 LINE := ================================================================
@@ -52,7 +54,7 @@ all: $(addprefix $(DIR_BIN)/, $(TESTS))
 line:
 	@ echo $(LINE)
 
-build_and_run: 
+build_and_run:
 	@ FAIL=0; \
 	for tc in $(addprefix $(DIR_BIN)/, $(TESTS)); do \
 		echo $(LINE); \
@@ -67,7 +69,7 @@ build_and_run:
 	exit $$FAIL
 
 $(DIR_BUILD)/%.o: %.c
-	@ echo building $@
+		@ echo building $@
 	@ $(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -76,43 +78,65 @@ clean:
 sqeaky_clean: clean
 	rm -f $(DIR_BIN)/*
 
-mccabe: 
+mccabe:
 	pmccabe -vt $(addprefix $(DIR_ROOT)/src/, $(SRC))
 
+check: CFLAGS += -DLDL_ENABLE_SX1272
+check: CFLAGS += -DLDL_ENABLE_SX1276
+check: CFLAGS += -DLDL_ENABLE_SX1276
 check: CC := clang
 check: CFLAGS += --analyze -Xanalyzer -analyzer-output=text
 check: $(addprefix $(DIR_BUILD)/, $(OBJ))
 
+# AES sanity check
 $(DIR_BIN)/tc_aes: $(addprefix $(DIR_BUILD)/, tc_aes.o ldl_aes.o $(OBJ_CMOCKA))
 	@ echo linking $@
 	@ $(CC) $(LDFLAGS) $^ -o $@
 
+# AES CMAC sanity check
 $(DIR_BIN)/tc_cmac: $(addprefix $(DIR_BUILD)/, tc_cmac.o ldl_cmac.o ldl_aes.o $(OBJ_CMOCKA))
 	@ echo linking $@
 	@ $(CC) $(LDFLAGS) $^ -o $@
 
+# check frame codec
 $(DIR_BIN)/tc_frame: $(addprefix $(DIR_BUILD)/, tc_frame.o ldl_frame.o ldl_stream.o $(OBJ_CMOCKA))
 	@ echo linking $@
 	@ $(CC) $(LDFLAGS) $^ -o $@
 
+# frame encryption and authentication sanity check
 $(DIR_BIN)/tc_frame_with_encryption: CFLAGS += -DLDL_ENABLE_SX1272
 $(DIR_BIN)/tc_frame_with_encryption: CFLAGS += -DLDL_ENABLE_SX1276
-$(DIR_BIN)/tc_frame_with_encryption: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_frame_with_encryption.o mock_ldl_system.o mock_ldl_chip.o $(OBJ_CMOCKA))
+$(DIR_BIN)/tc_frame_with_encryption: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_frame_with_encryption.o mock_ldl_system.o $(OBJ_CMOCKA))
 	@ echo linking $@
 	@ $(CC) $(LDFLAGS) $^ -o $@
 
+# test that MAC can receive input signals correctly
 $(DIR_BIN)/tc_input: CFLAGS += -DLDL_ENABLE_SX1272
 $(DIR_BIN)/tc_input: CFLAGS += -DLDL_ENABLE_SX1276
-$(DIR_BIN)/tc_input: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_input.o mock_ldl_system.o mock_ldl_chip.o $(OBJ_CMOCKA))
+$(DIR_BIN)/tc_input: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_input.o mock_ldl_system.o $(OBJ_CMOCKA))
 	@ echo linking $@
 	@ $(CC) $(LDFLAGS) $^ -o $@
 
+# test that MAC timers work correctly
 $(DIR_BIN)/tc_timer: CFLAGS += -DLDL_ENABLE_SX1272
 $(DIR_BIN)/tc_timer: CFLAGS += -DLDL_ENABLE_SX1276
-$(DIR_BIN)/tc_timer: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_timer.o mock_ldl_system.o mock_ldl_chip.o $(OBJ_CMOCKA))
+$(DIR_BIN)/tc_timer: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_timer.o mock_ldl_system.o $(OBJ_CMOCKA))
 	@ echo linking $@
 	@ $(CC) $(LDFLAGS) $^ -o $@
 
+# check mac_command codec
 $(DIR_BIN)/tc_mac_commands: $(addprefix $(DIR_BUILD)/, tc_mac_commands.o ldl_mac_commands.o ldl_stream.o $(OBJ_CMOCKA))
+	@ echo linking $@
+	@ $(CC) $(LDFLAGS) $^ -o $@
+
+# check sx1272 without sx1276
+$(DIR_BIN)/tc_sx1272_without_sx1276: CFLAGS += -DLDL_ENABLE_SX1272
+$(DIR_BIN)/tc_sx1272_without_sx1276: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_dummy.o mock_ldl_system.o $(OBJ_CMOCKA))
+	@ echo linking $@
+	@ $(CC) $(LDFLAGS) $^ -o $@
+
+# check sx1276 without sx1272
+$(DIR_BIN)/tc_sx1276_without_sx1272: CFLAGS += -DLDL_ENABLE_SX1276
+$(DIR_BIN)/tc_sx1276_without_sx1272: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_dummy.o mock_ldl_system.o $(OBJ_CMOCKA))
 	@ echo linking $@
 	@ $(CC) $(LDFLAGS) $^ -o $@

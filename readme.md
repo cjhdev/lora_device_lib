@@ -106,11 +106,13 @@ This project repository can be imported directly into an MBED project and
 the MBED tooling will find the wrapper.
 
 It is important to keep in mind that LDL is still experimental. This means that things may not work properly and that
-interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_device_lib/releases) commits for best results.
+interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_device_lib/releases) commits for best results
+and read [history.md](history.md) if updating from an older version.
 
 ## Features
 
-- LoRaWAN 1.1
+- Small memory footprint*
+- LoRaWAN 1.1 subset
 - Class A
 - OTAA
     - frequency and mask CFLists
@@ -140,7 +142,7 @@ interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_de
     - EU_433
     - US_902_928
     - AU_915_928
-- Supported radios (run-time option)
+- Non-blocking radio driver with run-time configuration
     - SX1272
     - SX1276
 - [Interface documentation](https://cjhdev.github.io/lora_device_lib_api/)
@@ -151,12 +153,14 @@ interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_de
     - [documentation example](examples/doxygen/example.c)
     - [chip interface example](examples/chip_interface)
 
+*compared to LoRaMAC-Node.
+
 ## Limitations
 
 - Class B and C not supported
 - FSK modulation not supported
 - ABP not supported
-- Rejoin not supported
+- 1.1 Rejoin not supported
 - **Experimental**
 
 ## Documentation
@@ -166,12 +170,6 @@ interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_de
 - [history](history.md)
 - [design goals](design_goals.md)
 - [todo list](todo.md)
-
-## Commercial Support
-
-Commercial support is available from the author.
-
-contact@stackmechanic.com
 
 ## See Also
 

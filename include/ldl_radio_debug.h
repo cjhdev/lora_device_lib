@@ -1,4 +1,4 @@
-/* Copyright (c) 2019-2020 Cameron Harper
+/* Copyright (c) 2020 Cameron Harper
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -19,60 +19,43 @@
  *
  * */
 
-#ifndef LDL_SM_H
-#define LDL_SM_H
-
-/** @file */
+#ifndef LDL_RADIO_DEBUG_H
+#define LDL_RADIO_DEBUG_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "ldl_sm_internal.h"
-
 #include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 
-#define LDL_KEY_SIZE 16U
+#ifndef LDL_RADIO_DEBUG_LOG_SIZE
+#define LDL_RADIO_DEBUG_LOG_SIZE 40
+#endif
 
-struct ldl_key {
+struct ldl_radio;
 
-    uint8_t value[LDL_KEY_SIZE];
+struct ldl_radio_debug_log_entry {
+
+    uint8_t opcode;
+    uint8_t value;
+    uint8_t size;
 };
 
-/** default in-memory security module state */
-struct ldl_sm {
-#ifdef LDL_DISABLE_POINTONE
-    struct ldl_key keys[3U];
-#else
-    struct ldl_key keys[8U];
-#endif
+struct ldl_radio_debug_log {
+
+    struct ldl_radio_debug_log_entry log[LDL_RADIO_DEBUG_LOG_SIZE];
+    uint8_t pos;
+    bool overflow;
 };
 
-#ifdef LDL_DISABLE_POINTONE
-/**
- * Initialise Default Security Module with root key
- *
- * @param[in] self      #ldl_sm
- * @param[in] appKey    pointer to 16 byte field
- *
- * */
-void LDL_SM_init(struct ldl_sm *self, const void *appKey);
-#else
-/**
- * Initialise Default Security Module with root keys
- *
- * @param[in] self      #ldl_sm
- * @param[in] appKey    pointer to 16 byte field
- * @param[in] nwkKey    pointer to 16 byte field
- *
- * */
-void LDL_SM_init(struct ldl_sm *self, const void *appKey, const void *nwkKey);
-#endif
+void LDL_Radio_debugLogReset(struct ldl_radio *self);
+void LDL_Radio_debugLogPush(struct ldl_radio *self, uint8_t opcode, const uint8_t *data, uint8_t size);
+void LDL_Radio_debugLogFlush(struct ldl_radio *self, const char *fn);
 
 #ifdef __cplusplus
 }
 #endif
-
-/** @} */
 
 #endif

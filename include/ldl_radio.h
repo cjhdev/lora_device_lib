@@ -62,6 +62,7 @@ extern "C" {
 
 #include "ldl_platform.h"
 #include "ldl_radio_defs.h"
+#include "ldl_radio_debug.h"
 #include "ldl_chip.h"
 #include <stdint.h>
 #include <stdbool.h>
@@ -160,6 +161,10 @@ struct ldl_radio {
     int16_t tx_gain;
     uint8_t xtal_delay;
     volatile uint8_t dio_mapping1;
+
+#ifdef LDL_ENABLE_RADIO_DEBUG
+    struct ldl_radio_debug_log debug;
+#endif
 };
 
 /** @ref ldl_mac calls non-static radio functions through these function pointers
@@ -350,6 +355,38 @@ uint8_t LDL_Radio_getXTALDelay(struct ldl_radio *self);
  *
  * */
 uint32_t LDL_Radio_bwToNumber(enum ldl_signal_bandwidth bw);
+
+/** Convert type enum to a string
+ *
+ * @param[in] type
+ * @return string
+ *
+ * */
+const char *LDL_Radio_typeToString(enum ldl_radio_type type);
+
+/** Convert mode enum to a string
+ *
+ * @param[in] mode
+ * @return string
+ *
+ * */
+const char *LDL_Radio_modeToString(enum ldl_radio_mode mode);
+
+/** Convert xtal enum to a string
+ *
+ * @param[in] xtal
+ * @return string
+ *
+ * */
+const char *LDL_Radio_xtalToString(enum ldl_radio_xtal xtal);
+
+/** Convert pa enum to a string
+ *
+ * @param[in] pa
+ * @return string
+ *
+ * */
+const char *LDL_Radio_paToString(enum ldl_radio_pa pa);
 
 #ifdef __cplusplus
 }

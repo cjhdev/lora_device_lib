@@ -3,7 +3,7 @@ Porting Guide
 
 ## General
 
-- LDL interfaces, except those marked as interrupt-safe, must be accessed from a single thread of execution. 
+- LDL interfaces, except those marked as interrupt-safe, must be accessed from a single thread of execution.
 - If interrupt-safe interfaces are accessed from ISRs
     - LDL_SYSTEM_ENTER_CRITICAL() and LDL_SYSTEM_LEAVE_CRITICAL() must be defined
     - the ISR must have a higher priority than the non-interrupt thread of execution
@@ -134,7 +134,7 @@ sense to set `ldl_mac_init_arg.b` like so:
 
 LoRaWAN 1.1 redefined devNonce to be a 16 bit counter from zero where previously it had been
 a random number. The counter increments after each successful OTAA. A LoRaWAN 1.1 server
-will not accept a devNonce less than one it has seen before. LoRaWAN 1.1 implementations must therefore maintain this 
+will not accept a devNonce less than one it has seen before. LoRaWAN 1.1 implementations must therefore maintain this
 counter over the lifetime of the device if there is an expectation to enter join mode
 again before the root keys and/or joinEUI are refreshed.
 
@@ -149,7 +149,7 @@ LoRaWAN 1.1 renamed appNonce to joinNonce and declared it to be a counter of the
 by the server.
 
 When the joinAccept indicates that LoRaWAN 1.1 is in use, LDL will only accept the joinAccept if joinNonce is
-greater than the last cached joinNonce. 
+greater than the last cached joinNonce.
 
 LDL will push the updated value to the application as an argument to the LDL_MAC_JOIN_COMPLETE event. A cached
 value can be restored by passing it as an argument to LDL_MAC_init().
@@ -212,12 +212,12 @@ that keeps working in sleep mode
 LDL is designed to share a single thread of execution with other tasks.
 
 LDL works by scheduling time based events. Some of these events can be handled
-late without affecting the LoRaWAN, while others will cause serious problems like 
+late without affecting the LoRaWAN, while others will cause serious problems like
 missing frames.
 
 LDL provides the LDL_MAC_priority() interface so that a co-operative scheduler can
 check if another tasking running for the next CEIL(n) seconds will cause
-a problem for LDL. 
+a problem for LDL.
 
 ### Reducing/Changing Memory Use
 
@@ -225,7 +225,8 @@ Flash memory usage can be reduced by:
 
 - not enabling radio drivers which are not needed
 - not enabling regions which are not needed
-- reimplementing the default Security Module ([ldl_sm.c](src/ldl_sm.c)) to use a hardware peripheral 
+- reimplementing the default Security Module ([ldl_sm.c](src/ldl_sm.c)) to use a hardware peripheral
+- not defining LDL_INFO, LDL_DEBUG, LDL_TRACE_*
 
 Static RAM usage can be reduced by:
 
@@ -244,5 +245,61 @@ Initialise Radio with ldl_radio_init_arg.tx_gain set to a value you wish to boos
 or attenuate by.
 
 Note the value here is (dB x 10-2) so 2.4dB would be 240.
+
+### Configuring Radio Driver
+
+The radio driver needs to be configured to suit your hardware. The following
+configuration options exist:
+
+- Transceiver type (ldl_radio_init_arg.type)
+
+- Antenna transmit gain compensation (ldl_radio_init_arg.tx_gain)
+
+  Note that the value here is (dB x 10^-2) so 2.4dB would be 240.
+
+- PA amp selection (ldl_radio_init_arg.pa)
+
+  With SX1272/6 transceiver you need to tell the driver if it can use one
+  or both power amplifier circuits. This is because your hardware might not
+  implement switching required to use both.
+
+- XTAL selection (ldl_radio_init_arg.xtal)
+
+  The driver needs to know if the transceiver is clocked by a crystal or
+  external oscillator.
+
+- XTAL startup delay in milliseconds (ldl_radio_init_arg.xtal_delay)
+
+  A crystal will stabilise in less than one millisecond, but an external
+  oscillator might take several milliseconds. This value is returned
+  to MAC and used to set a delay between turning on the transceiver
+  and performing an operation.
+
+
+The rest should be explained in the chip interface documentation.
+
+### Debugging Radio Driver
+
+Not a porting issue, but if you need to see what is being written/read to
+the transceiver you can see this information printed by defining:
+
+- LDL_ENABLE_RADIO_DEBUG
+- LDL_TRACE_*
+
+Enabling this feature will increase RAM and flash usage. The RAM is used
+to buffer register accesses so that printing doesn't affect time
+sensitive operations. You probably shouldn't leave this on in releases
+since it is very verbose.
+
+### LoRaWAN 1.1 Errata
+
+There is an errata dated 26 Jan 2018 that changes the way Fopts are
+encrypted in 1.1 mode. This document is public but is still marked as
+proposed.
+
+By default this change is not applied to the source, but it can be enabled
+by defining:
+
+- LDL_ENABLE_POINTONE_ERRATA_A1
 
 
