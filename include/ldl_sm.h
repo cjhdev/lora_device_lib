@@ -28,6 +28,7 @@
 extern "C" {
 #endif
 
+#include "ldl_platform.h"
 #include "ldl_sm_internal.h"
 
 #include <stdint.h>
