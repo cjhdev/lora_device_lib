@@ -55,7 +55,7 @@ void LDL_OPS_syncDownCounter(struct ldl_mac *self, uint8_t port, uint16_t counte
 
     derived = deriveDownCounter(self, port, counter);
 
-    if((self->ctx.version > 0U) && (port == 0U)){
+    if((SESS_VERSION(self->ctx) > 0U) && (port == 0U)){
 
         self->ctx.nwkDown = (uint16_t)(derived >> 16);
     }
@@ -79,7 +79,7 @@ void LDL_OPS_deriveKeys(struct ldl_mac *self)
 
     self->sm_interface->begin_update_session_key(self->sm);
     {
-        if(self->ctx.version == 0U){
+        if(SESS_VERSION(self->ctx) == 0U){
 
             /* ptr[0] below */
             pos = 1U;
@@ -161,7 +161,7 @@ uint8_t LDL_OPS_prepareData(struct ldl_mac *self, const struct ldl_frame_data *f
         struct ldl_block A;
 
         /* encrypt fopt (LoRaWAN 1.1) */
-        if(self->ctx.version == 1U){
+        if(SESS_VERSION(self->ctx) == 1U){
 
 #ifdef LDL_ENABLE_POINTONE_ERRATA_A1
             /* as per errata 26 Jan 2018 */
@@ -195,7 +195,7 @@ void LDL_OPS_micDataFrame(struct ldl_mac *self, void *buffer, uint8_t size)
 
     micF = self->sm_interface->mic(self->sm, LDL_SM_KEY_FNWKSINT, &B0, sizeof(B0.value), buffer, size - sizeof(micF));
 
-    if(self->ctx.version == 1U){
+    if(SESS_VERSION(self->ctx) == 1U){
 
         micS = self->sm_interface->mic(self->sm, LDL_SM_KEY_SNWKSINT, &B1, sizeof(B1.value), buffer, size - sizeof(micS));
 
@@ -316,7 +316,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
         case FRAME_TYPE_DATA_CONFIRMED_DOWN:
 
             if(
-                ((self->ctx.version > 0) && (self->op == LDL_OP_REJOINING))
+                ((SESS_VERSION(self->ctx) > 0) && (self->op == LDL_OP_REJOINING))
                 ||
                 (self->op  == LDL_OP_DATA_UNCONFIRMED)
                 ||
@@ -332,7 +332,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                     struct ldl_block B;
                     struct ldl_block A;
 
-                    if((self->ctx.version == 1U) && f->ack){
+                    if((SESS_VERSION(self->ctx) == 1U) && f->ack){
 
                         initB(&B, (self->ctx.up-1U), 0U, 0U, false, f->devAddr, counter, len-sizeof(mic));
                     }
@@ -346,7 +346,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                     if(mic == f->mic){
 
                         /* V1.1 encrypts the opts */
-                        if(self->ctx.version == 1U){
+                        if(SESS_VERSION(self->ctx) == 1U){
 
 #ifdef LDL_ENABLE_POINTONE_ERRATA_A1
                             /* as per errata 26 Jan 2018 */
@@ -426,7 +426,7 @@ static void initB(struct ldl_block *b, uint16_t confirmCounter, uint8_t rate, ui
 
 static uint32_t deriveDownCounter(struct ldl_mac *self, uint8_t port, uint16_t counter)
 {
-    uint32_t mine = ((self->ctx.version > 0U) && (port == 0U)) ? (uint32_t)self->ctx.nwkDown : (uint32_t)self->ctx.appDown;
+    uint32_t mine = ((SESS_VERSION(self->ctx) > 0U) && (port == 0U)) ? (uint32_t)self->ctx.nwkDown : (uint32_t)self->ctx.appDown;
 
     mine = mine << 16;
 
