@@ -269,9 +269,11 @@ static bool getFrameType(uint8_t tag, enum ldl_frame_type *type)
         case FRAME_TYPE_DATA_CONFIRMED_DOWN:
             *type = FRAME_TYPE_DATA_CONFIRMED_DOWN;
             break;
+#ifndef LDL_DISABLE_POINTONE
         case FRAME_TYPE_REJOIN_REQ:
             *type = FRAME_TYPE_REJOIN_REQ;
             break;
+#endif            
         default:
             retval = false;
             break;
