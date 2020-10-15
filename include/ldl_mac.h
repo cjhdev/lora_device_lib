@@ -577,12 +577,16 @@ struct ldl_mac_init_arg {
 
     /** The rate at which #ldl_mac_init_arg.ticks() increments i.e. "ticks per second"
      *
+     * This is not required if LDL_PARAM_TPS has been defined.
+     *
      * Refer to porting.md for details.
      *
      * */
     uint32_t tps;
 
     /** #ldl_mac_init_arg.ticks() compensation parameter A
+     *
+     * This is not required if LDL_PARAM_A has been defined.
      *
      * Refer to porting.md for details.
      *
@@ -591,12 +595,16 @@ struct ldl_mac_init_arg {
 
     /** #ldl_mac_init_arg.ticks() compensation parameter B
      *
+     * This is not required if LDL_PARAM_B has been defined.
+     *
      * Refer to porting.md for details.
      *
      * */
     uint32_t b;
 
     /** Advance window open events by this many ticks
+     *
+     * This is not required if LDL_PARAM_ADVANCE has been defined.
      *
      * Useful if there is a constant and significant latency
      * between when a window is scheduled to open, and when
@@ -624,16 +632,16 @@ struct ldl_mac_init_arg {
  * - ldl_mac_init_arg.ticks
  * - ldl_mac_init_arg.joinEUI
  * - ldl_mac_init_arg.devEUI
- * - ldl_mac_init_arg.tps
+ * - ldl_mac_init_arg.tps (if LDL_PARAM_TPS is not defined)
  *
  * The following arguments are **OPTIONAL** (leave NULL or 0):
  *
  * - ldl_mac_init_arg.handler
  * - ldl_mac_init_arg.app
  * - ldl_mac_init_arg.session
- * - ldl_mac_init_arg.a
- * - ldl_mac_init_arg.b
- * - ldl_mac_init_arg.advance
+ * - ldl_mac_init_arg.a (if LDL_PARAM_A is not defined)
+ * - ldl_mac_init_arg.b (if LDL_PARAM_B is not defined)
+ * - ldl_mac_init_arg.advance (if LDL_PARAM_ADVANCE is not defined)
  * - ldl_mac_init_arg.devNonce
  * - ldl_mac_init_arg.joinNonce
  * - ldl_mac_init_arg.sm_interface

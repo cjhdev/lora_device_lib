@@ -226,7 +226,8 @@ Flash memory usage can be reduced by:
 - not enabling radio drivers which are not needed
 - not enabling regions which are not needed
 - reimplementing the default Security Module ([ldl_sm.c](src/ldl_sm.c)) to use a hardware peripheral
-- not defining LDL_INFO, LDL_DEBUG, LDL_TRACE_*
+- not defining LDL_INFO, LDL_DEBUG, LDL_ERROR, LDL_TRACE_*
+- defining LDL_PARAM_LDL, LDL_PARAM_A, LDL_PARAM_B, LDL_PARAM_ADVANCE at compile time
 
 Static RAM usage can be reduced by:
 

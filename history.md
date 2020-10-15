@@ -5,7 +5,7 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
-## 0.4.5
+## 0.4.5 (WIP)
 
 - changed LDL_DEBUG, LDL_INFO, LDL_ERROR to not insert __FUNCTION__ into format string
 - changed LDL_DEBUG, LDL_INFO, LDL_ERROR to not take APP argument
@@ -32,6 +32,10 @@ work in progress.
 - added examples/avr to keep an eye on whether LDL still fits on a 328P
 - changed LDL_Radio_getAirTime() to return result in milliseconds and not in a timebase of your choice
 - fixed most required MISRA 2012 warnings
+- added option of defining ldl_mac_init_arg.tps at compile time with LDL_PARAM_TPS
+- added option of defining ldl_mac_init_arg.a at compile time with LDL_PARAM_A
+- added option of defining ldl_mac_init_arg.b at compile time with LDL_PARAM_B
+- added option of defining ldl_mac_init_arg.advance at compile time with LDL_PARAM_ADVANCE
 
 ## 0.4.4
 

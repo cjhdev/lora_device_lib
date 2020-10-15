@@ -145,6 +145,7 @@ and read [history.md](history.md) if updating from an older version.
 - Non-blocking radio driver with run-time configuration
     - SX1272
     - SX1276
+- Linted to MISRA 2012
 - [Interface documentation](https://cjhdev.github.io/lora_device_lib_api/)
 - [Build options](https://cjhdev.github.io/lora_device_lib_api/group__ldl__build__options.html)
 - Examples
