@@ -87,6 +87,7 @@ namespace LDL {
 
         public:
 
+            DefaultSM(const void *app_key);
             DefaultSM(const void *app_key, const void *nwk_key);
     };
 

@@ -1,4 +1,5 @@
 {
+    "requires": ["platform", "drivers", "rtos", "rtos-api", "ldl", "mbed-trace", "events"],
     "config" : {
 
         "app_key" : {

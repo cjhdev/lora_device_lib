@@ -173,7 +173,7 @@ struct ldl_rejoin_param_setup_req {
 
 struct ldl_rejoin_param_setup_ans {
 
-    uint8_t timeOK;
+    bool timeOK;
 };
 
 struct ldl_downstream_cmd {

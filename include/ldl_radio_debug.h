@@ -51,7 +51,7 @@ struct ldl_radio_debug_log {
 };
 
 void LDL_Radio_debugLogReset(struct ldl_radio *self);
-void LDL_Radio_debugLogPush(struct ldl_radio *self, uint8_t opcode, const uint8_t *data, uint8_t size);
+void LDL_Radio_debugLogPush(struct ldl_radio *self, uint8_t opcode, const uint8_t *data, size_t size);
 void LDL_Radio_debugLogFlush(struct ldl_radio *self, const char *fn);
 
 #ifdef __cplusplus

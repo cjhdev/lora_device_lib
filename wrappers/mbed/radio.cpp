@@ -180,7 +180,7 @@ Radio::to_state(void *self)
     return &to_obj(self)->radio;
 }
 
-unsigned int
+uint32_t
 Radio::_read_entropy(struct ldl_radio *self)
 {
     return LDL_Radio_readEntropy(to_state(self));
@@ -205,7 +205,7 @@ Radio::_receive(struct ldl_radio *self, const struct ldl_radio_rx_setting *setti
 }
 
 void
-Radio::_interrupt_handler(void *self, enum ldl_radio_event event)
+Radio::_interrupt_handler(struct ldl_mac *self, enum ldl_radio_event event)
 {
     if(to_obj(self)->event_cb){
 

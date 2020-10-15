@@ -68,14 +68,6 @@ MAC::app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
 {
     MAC *self = to_obj(app);
 
-    static const char *bw[] = {
-        "125",
-        "250",
-        "500"
-    };
-
-    uint32_t timestamp = MAC::_ticks(app);
-
     switch(type){
     case LDL_MAC_STARTUP:
         if(self->entropy_cb){
@@ -97,105 +89,6 @@ MAC::app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
         self->data_cb(arg->rx.port, arg->rx.data, arg->rx.size);
         break;
 
-    default:
-        break;
-    }
-
-    switch(type){
-    case LDL_MAC_STARTUP:
-        tr_info("[%" PRIu32 "]STARTUP: ENTROPY=%u",
-            timestamp,
-            arg->startup.entropy
-        );
-        break;
-    case LDL_MAC_LINK_STATUS:
-        tr_info("[%" PRIu32 "]LINK_STATUS: M=%u GW=%u",
-            timestamp,
-            arg->link_status.margin,
-            arg->link_status.gwCount
-        );
-        break;
-    case LDL_MAC_CHIP_ERROR:
-        tr_info("[%" PRIu32 "]CHIP_ERROR", timestamp);
-        break;
-    case LDL_MAC_RESET:
-        tr_info("[%" PRIu32 "]RESET", timestamp);
-        break;
-    case LDL_MAC_TX_BEGIN:
-        tr_info("[%" PRIu32 "]TX_BEGIN: SZ=%u F=%" PRIu32 " SF=%u BW=%s P=%u",
-            timestamp,
-            arg->tx_begin.size,
-            arg->tx_begin.freq,
-            arg->tx_begin.sf,
-            bw[arg->tx_begin.bw],
-            arg->tx_begin.power
-        );
-        break;
-    case LDL_MAC_TX_COMPLETE:
-        self->signal = 1;
-        tr_info("[%" PRIu32 "]TX_COMPLETE", timestamp);
-        break;
-    case LDL_MAC_RX1_SLOT:
-    case LDL_MAC_RX2_SLOT:
-        self->signal = 0;
-        tr_info("[%" PRIu32 "]%s: F=%" PRIu32 " SF=%u BW=%s E=%" PRIu32 " M=%" PRIu32 " SYM=%" PRIu32,
-            timestamp,
-            (type == LDL_MAC_RX1_SLOT) ? "RX1_SLOT" : "RX2_SLOT",
-            arg->rx_slot.freq,
-            arg->rx_slot.sf,
-            bw[arg->rx_slot.bw],
-            arg->rx_slot.error,
-            arg->rx_slot.margin,
-            arg->rx_slot.timeout
-        );
-        break;
-    case LDL_MAC_DOWNSTREAM:
-        tr_info("[%" PRIu32 "]DOWNSTREAM: SZ=%u RSSI=%" PRIu16 " SNR=%" PRIu16,
-            timestamp,
-            arg->downstream.size,
-            arg->downstream.rssi,
-            arg->downstream.snr
-        );
-        break;
-    case LDL_MAC_JOIN_COMPLETE:
-        tr_info("[%" PRIu32 "]JOIN_COMPLETE: JN=%" PRIu32 " NDN=%" PRIu16 " NETID=%" PRIu32 " DEVADDR=%" PRIu32,
-            timestamp,
-            arg->join_complete.joinNonce,
-            arg->join_complete.nextDevNonce,
-            arg->join_complete.netID,
-            arg->join_complete.devAddr
-        );
-        break;
-    case LDL_MAC_JOIN_TIMEOUT:
-        tr_info("[%" PRIu32 "]JOIN_TIMEOUT", timestamp);
-        break;
-    case LDL_MAC_RX:
-        tr_info("[%" PRIu32 "]RX: PORT=%u COUNT=%" PRIu16 " SIZE=%u",
-            timestamp,
-            arg->rx.port,
-            arg->rx.counter,
-            arg->rx.size
-        );
-        break;
-    case LDL_MAC_DATA_COMPLETE:
-        tr_info("[%" PRIu32 "]DATA_COMPLETE", timestamp);
-        break;
-    case LDL_MAC_DATA_TIMEOUT:
-        tr_info("[%" PRIu32 "]DATA_TIMEOUT", timestamp);
-        break;
-    case LDL_MAC_DATA_NAK:
-        tr_info("[%" PRIu32 "]DATA_NAK", timestamp);
-        break;
-    case LDL_MAC_SESSION_UPDATED:
-        tr_info("[%" PRIu32 "]SESSION_UPDATED", timestamp);
-        break;
-    case LDL_MAC_DEVICE_TIME:
-        tr_info("[%" PRIu32 "]DEVICE_TIME_ANS: SEC=%" PRIu32 " FRAC=%u",
-            timestamp,
-            arg->device_time.seconds,
-            arg->device_time.fractions
-        );
-        break;
     default:
         break;
     }
@@ -233,10 +126,6 @@ MAC::start(enum ldl_region region)
     session_size = store.get_session(&session, sizeof(session));
 
     arg.ticks = _ticks;
-    arg.tps = MBED_CONF_LDL_TPS;
-    arg.a = MBED_CONF_LDL_XTAL_ERROR_A;
-    arg.b = MBED_CONF_LDL_XTAL_ERROR_B;
-    arg.advance = MBED_CONF_LDL_ADVANCE;
 
     arg.rand = _rand;
     arg.get_battery_level = _get_battery_level;

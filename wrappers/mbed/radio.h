@@ -60,11 +60,11 @@ namespace LDL {
             static Radio *to_obj(void *self);
             static struct ldl_radio *to_state(void *self);
 
-            static unsigned int _read_entropy(struct ldl_radio *self);
+            static uint32_t _read_entropy(struct ldl_radio *self);
             static uint8_t _read_buffer(struct ldl_radio *self, struct ldl_radio_packet_metadata *meta, void *data, uint8_t max);
             static void _transmit(struct ldl_radio *self, const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);
             static void _receive(struct ldl_radio *self, const struct ldl_radio_rx_setting *settings);
-            static void _interrupt_handler(void *self, enum ldl_radio_event event);
+            static void _interrupt_handler(struct ldl_mac *self, enum ldl_radio_event event);
             static uint8_t _get_xtal_delay(struct ldl_radio *self);
             static void _set_mode(struct ldl_radio *self, enum ldl_radio_mode mode);
             static void _receive_entropy(struct ldl_radio *self);

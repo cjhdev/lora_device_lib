@@ -36,18 +36,22 @@
         },
         "tps" : {
             "help" : "this timebase works with all the high level timer objects (so don't change it)",
+            "macro_name" : "LDL_PARAM_TPS",
             "value" : "1000000UL"
         },
         "advance" : {
             "help" : "advance timing of events by this many ticks (probably never required since xtal-error-b can provide fudge factor)",
+            "macro_name" : "LDL_PARAM_ADVANCE",
             "value" : "0UL"
         },
         "xtal-error-a" : {
             "help" : "(error = (seconds * xtal-error-a * 2) + xtal-error-b) with 1us tick",
+            "macro_name" : "LDL_PARAM_A",
             "value" : "0UL"
         },
         "xtal-error-b" : {
             "help" : "(error = (seconds * xtal-error-a * 2) + xtal-error-b) with 1us tick",
+            "macro_name" : "LDL_PARAM_B",
             "value" : "4000UL"
         },
         "default-rate" : {
@@ -63,6 +67,13 @@
             "help" : "Enable verbose radio debug messages (requires enable-verbose-debug)",
             "macro_name" : "LDL_ENABLE_RADIO_DEBUG",
             "value" : null
+        },
+
+        "disable-point-one" : {
+            "macro_name" : "LDL_DISABLE_POINTONE",
+            "value" : null
         }
+
+
     }
 }

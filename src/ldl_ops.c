@@ -25,6 +25,7 @@
 #include "ldl_system.h"
 #include "ldl_frame.h"
 #include "ldl_debug.h"
+#include "ldl_internal.h"
 #include <string.h>
 
 struct ldl_block {
@@ -190,16 +191,16 @@ void LDL_OPS_micDataFrame(struct ldl_mac *self, void *buffer, uint8_t size)
     uint32_t micS;
     uint32_t micF;
 
-    initB(&B0, 0U, 0U, 0U, true, self->ctx.devAddr, self->tx.counter, size - sizeof(micF));
-    initB(&B1, 0U, self->tx.rate, self->tx.chIndex, true, self->ctx.devAddr, self->tx.counter, size - sizeof(micS));
+    initB(&B0, 0U, 0U, 0U, true, self->ctx.devAddr, self->tx.counter, size - U8(sizeof(micF)));
+    initB(&B1, 0U, self->tx.rate, self->tx.chIndex, true, self->ctx.devAddr, self->tx.counter, size - U8(sizeof(micS)));
 
-    micF = self->sm_interface->mic(self->sm, LDL_SM_KEY_FNWKSINT, &B0, sizeof(B0.value), buffer, size - sizeof(micF));
+    micF = self->sm_interface->mic(self->sm, LDL_SM_KEY_FNWKSINT, &B0, U8(sizeof(B0.value)), buffer, size - U8(sizeof(micF)));
 
     if(SESS_VERSION(self->ctx) == 1U){
 
-        micS = self->sm_interface->mic(self->sm, LDL_SM_KEY_SNWKSINT, &B1, sizeof(B1.value), buffer, size - sizeof(micS));
+        micS = self->sm_interface->mic(self->sm, LDL_SM_KEY_SNWKSINT, &B1, U8(sizeof(B1.value)), buffer, size - U8(sizeof(micS)));
 
-        LDL_Frame_updateMIC(buffer, size, ((micF << 16) | (micS & 0xffffUL)));
+        LDL_Frame_updateMIC(buffer, size, ((micF << 16) | (micS & U32(0xffff))));
     }
     else{
 
@@ -214,7 +215,7 @@ uint8_t LDL_OPS_prepareJoinRequest(struct ldl_mac *self, const struct ldl_frame_
 
     retval = LDL_Frame_putJoinRequest(f, out, max);
 
-    mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_NWK, NULL, 0U, out, retval-sizeof(mic));
+    mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_NWK, NULL, 0U, out, retval - U8(sizeof(mic)));
 
     LDL_Frame_updateMIC(out, retval, mic);
 
@@ -232,6 +233,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
 
         switch(f->type){
         default:
+            /* impossible */
             break;
 
         case FRAME_TYPE_JOIN_ACCEPT:
@@ -274,7 +276,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                             pos += putEUI(&hdr.value[pos], self->joinEUI);
                             pos += putU16(&hdr.value[pos], self->devNonce);
 
-                            mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_JSINT, &hdr, pos, in, len-sizeof(mic));
+                            mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_JSINT, &hdr, pos, in, len - U8(sizeof(mic)));
 
                             if(f->mic == mic){
 
@@ -282,18 +284,20 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                             }
                             else{
 
-                                LDL_DEBUG(self->app, "%s: joinAccept MIC failed", __FUNCTION__)
+                                /* MIC failed */
+                                LDL_DEBUG("joinAccept MIC failed")
                             }
                         }
                         else{
 
-                            LDL_DEBUG(self->app, "%s: invalid joinNonce", __FUNCTION__)
+                            /* invalid joinNonce */
+                            LDL_DEBUG("invalid joinNonce")
                         }
                     }
                     else
-#endif                    
+#endif
                         {
-                        mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_NWK, NULL, 0U, in, len-sizeof(mic));
+                        mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_NWK, NULL, 0U, in, len - U8(sizeof(mic)));
 
                         if(f->mic == mic){
 
@@ -301,14 +305,16 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                         }
                         else{
 
-                            LDL_DEBUG(self->app, "%s: joinAccept MIC failed", __FUNCTION__)
+                            /* MIC failed */
+                            LDL_DEBUG("joinAccept MIC failed")
                         }
                     }
                 }
             }
             else{
 
-                LDL_DEBUG(self->app, "%s: unexpected frame type", __FUNCTION__)
+                /* unexpected frame type */
+                LDL_DEBUG("unexpected frame type")
             }
             break;
 
@@ -316,7 +322,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
         case FRAME_TYPE_DATA_CONFIRMED_DOWN:
 
             if(
-                ((SESS_VERSION(self->ctx) > 0) && (self->op == LDL_OP_REJOINING))
+                ((SESS_VERSION(self->ctx) > 0U) && (self->op == LDL_OP_REJOINING))
                 ||
                 (self->op  == LDL_OP_DATA_UNCONFIRMED)
                 ||
@@ -334,14 +340,14 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
 
                     if((SESS_VERSION(self->ctx) == 1U) && f->ack){
 
-                        initB(&B, (self->ctx.up-1U), 0U, 0U, false, f->devAddr, counter, len-sizeof(mic));
+                        initB(&B, U16(self->ctx.up-1U), 0U, 0U, false, f->devAddr, counter, len - U8(sizeof(mic)));
                     }
                     else{
 
-                        initB(&B, 0U, 0U, 0U, false, f->devAddr, counter, len-sizeof(mic));
+                        initB(&B, 0U, 0U, 0U, false, f->devAddr, counter, len - U8(sizeof(mic)));
                     }
 
-                    mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_SNWKSINT, &B, sizeof(B.value), in, len-sizeof(mic));
+                    mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_SNWKSINT, &B, U8(sizeof(B.value)), in, len - U8(sizeof(mic)));
 
                     if(mic == f->mic){
 
@@ -368,17 +374,20 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                     }
                     else{
 
-                        LDL_DEBUG(self->app, "%s: mic failed", __FUNCTION__)
+                        /* MIC failed */
+                        LDL_DEBUG("data MIC failed")
                     }
                 }
                 else{
 
-                    LDL_DEBUG(self->app, "%s: devaddr mismatch", __FUNCTION__)
+                    /* devaddr */
+                    LDL_DEBUG("devaddr mismatch")
                 }
             }
             else{
 
-                LDL_DEBUG(self->app, "%s: unexpected frame type", __FUNCTION__)
+                /* unexpected frame type */
+                LDL_DEBUG("unexpected frame type")
             }
 
             break;
@@ -386,7 +395,8 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
     }
     else{
 
-        LDL_DEBUG(self->app, "%s: invalid frame", __FUNCTION__)
+        /* invalid frame */
+        LDL_DEBUG("invalid frame")
     }
 
     return retval;
@@ -426,17 +436,17 @@ static void initB(struct ldl_block *b, uint16_t confirmCounter, uint8_t rate, ui
 
 static uint32_t deriveDownCounter(struct ldl_mac *self, uint8_t port, uint16_t counter)
 {
-    uint32_t mine = ((SESS_VERSION(self->ctx) > 0U) && (port == 0U)) ? (uint32_t)self->ctx.nwkDown : (uint32_t)self->ctx.appDown;
+    uint32_t mine = ((SESS_VERSION(self->ctx) > 0U) && (port == 0U)) ? U32(self->ctx.nwkDown) : U32(self->ctx.appDown);
 
     mine = mine << 16;
 
-    if((uint32_t)counter < mine){
+    if(U32(counter) < mine){
 
-        mine = mine + 0x10000UL + (uint32_t)counter;
+        mine = mine + U32(0x10000) + U32(counter);
     }
     else{
 
-        mine = mine + (uint32_t)counter;
+        mine = mine + U32(counter);
     }
 
     return mine;
@@ -465,27 +475,27 @@ static uint8_t putU8(uint8_t *buf, uint8_t value)
 
 static uint8_t putU16(uint8_t *buf, uint16_t value)
 {
-    buf[0] = value;
-    buf[1] = value >> 8;
+    buf[0] = U8(value);
+    buf[1] = U8(value >> 8);
 
     return 2U;
 }
 
 static uint8_t putU24(uint8_t *buf, uint32_t value)
 {
-    buf[0] = value;
-    buf[1] = value >> 8;
-    buf[2] = value >> 16;
+    buf[0] = U8(value);
+    buf[1] = U8(value >> 8);
+    buf[2] = U8(value >> 16);
 
     return 3U;
 }
 
 static uint8_t putU32(uint8_t *buf, uint32_t value)
 {
-    buf[0] = value;
-    buf[1] = value >> 8;
-    buf[2] = value >> 16;
-    buf[3] = value >> 24;
+    buf[0] = U8(value);
+    buf[1] = U8(value >> 8);
+    buf[2] = U8(value >> 16);
+    buf[3] = U8(value >> 24);
 
     return 4U;
 }

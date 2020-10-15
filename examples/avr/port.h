@@ -1,0 +1,27 @@
+#ifndef PORT_H
+#define PORT_H
+
+#include <util/atomic.h>
+
+#define LDL_ENABLE_SX1276
+#define LDL_ENABLE_EU_863_870
+#define LDL_ENABLE_STATIC_RX_BUFFER
+#define LDL_LITTLE_ENDIAN
+#define LDL_MAX_PACKET 64UL
+
+#define LDL_ENABLE_AVR
+
+#define LDL_DISABLE_CHECK
+#define LDL_DISABLE_DEVICE_TIME
+
+#define LDL_PARAM_TPS       1000000UL
+#define LDL_PARAM_A         40UL
+#define LDL_PARAM_B         0U
+#define LDL_PARAM_ADVANCE   0U
+
+#define LDL_DISABLE_POINTONE
+
+#define LDL_SYSTEM_ENTER_CRITICAL(APP) ATOMIC_BLOCK(ATOMIC_RESTORESTATE){
+#define LDL_SYSTEM_LEAVE_CRITICAL(APP) }
+
+#endif

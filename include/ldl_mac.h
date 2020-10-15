@@ -137,19 +137,7 @@ struct ldl_sm;
  *  */
 enum ldl_mac_response_type {
 
-    /** diagnostic event: radio chip did not respond as expected and will now be reset
-     *
-     * */
-    LDL_MAC_CHIP_ERROR,
-
-    /** diagnostic event: radio chip is in process of being reset
-     *
-     * MAC will send #LDL_MAC_STARTUP when it is ready again
-     *
-     * */
-    LDL_MAC_RESET,
-
-    /** MAC has started and is now ready for commands
+    /** Entropy has been collected by the radio driver
      *
      * */
     LDL_MAC_STARTUP,
@@ -157,10 +145,6 @@ enum ldl_mac_response_type {
     /** Join request was answered and MAC is now joined
      *
      * Receipt of this event also means:
-     *
-     * - Fresh sessions keys have been derived. The application
-     *   should ensure that these are cached if you are implementing
-     *   persistent sessions.
      *
      * - devNonce has been updated. The next devNonce
      *   is pushed with this event and should be cached so that
@@ -187,21 +171,6 @@ enum ldl_mac_response_type {
     /** LinkCheckAns */
     LDL_MAC_LINK_STATUS,
 
-    /** diagnostic event: RX1 window opened */
-    LDL_MAC_RX1_SLOT,
-
-    /** diagnostic event: RX2 window opened */
-    LDL_MAC_RX2_SLOT,
-
-    /** diagnostic event: a frame has been receieved in an RX window */
-    LDL_MAC_DOWNSTREAM,
-
-    /** diagnostic event: transmit complete */
-    LDL_MAC_TX_COMPLETE,
-
-    /** diagnostic event: transmit begin */
-    LDL_MAC_TX_BEGIN,
-
     /** #ldl_mac_session has changed
      *
      * The application can choose to save the session at this point
@@ -222,15 +191,6 @@ enum ldl_mac_response_type {
  *  */
 union ldl_mac_response_arg {
 
-    /** #LDL_MAC_DOWNSTREAM argument */
-    struct {
-
-        int16_t rssi;   /**< rssi of frame */
-        int16_t snr;    /**< snr of frame */
-        uint8_t size;   /**< size of frame */
-
-    } downstream;
-
     /** #LDL_MAC_RX argument */
     struct {
 
@@ -244,38 +204,15 @@ union ldl_mac_response_arg {
     /** #LDL_MAC_LINK_STATUS argument */
     struct {
 
-        int8_t margin;      /**< SNR margin */
+        uint8_t margin;      /**< SNR margin */
         uint8_t gwCount;    /**< number of gateways in range */
 
     } link_status;
 
-    /** #LDL_MAC_RX1_SLOT and #LDL_MAC_RX2_SLOT argument */
-    struct {
-
-        uint32_t margin;                /**< allowed error margin */
-        uint32_t error;                 /**< ticks passed since scheduled event */
-        uint32_t freq;                  /**< frequency */
-        enum ldl_signal_bandwidth bw;  /**< bandwidth */
-        enum ldl_spreading_factor sf;  /**< spreading factor */
-        uint32_t timeout;              /**< symbol timeout */
-
-    } rx_slot;
-
-    /** #LDL_MAC_TX_BEGIN argument */
-    struct {
-
-        uint32_t freq;                      /**< frequency */
-        enum ldl_spreading_factor sf;      /**< spreading factor */
-        enum ldl_signal_bandwidth bw;      /**< bandwidth */
-        uint8_t power;                      /**< LoRaWAN power setting @warning this is not dBm */
-        uint8_t size;                       /**< message size */
-
-    } tx_begin;
-
     /** #LDL_MAC_STARTUP argument */
     struct {
 
-        unsigned int entropy;               /**< srand seed from radio driver */
+        uint32_t entropy;               /**< srand seed from radio driver */
 
     } startup;
 
@@ -291,8 +228,8 @@ union ldl_mac_response_arg {
     /** #LDL_MAC_DEVICE_TIME argument */
     struct {
 
-        uint32_t seconds;
-        uint8_t fractions;
+        uint32_t seconds;   /**< seconds since jan 5 1980 */
+        uint8_t fractions;  /**< 1/255 of a second */
 
     } device_time;
 
@@ -382,6 +319,7 @@ enum ldl_band_index {
     LDL_BAND_5,
     LDL_BAND_GLOBAL,
     LDL_BAND_RETRY,
+    LDL_BAND_DUTY,
     LDL_BAND_MAX
 };
 
@@ -423,16 +361,14 @@ struct ldl_mac_channel {
 /** session cache */
 struct ldl_mac_session {
 
-    uint8_t session_version;    /* set to currentSessionVersion */
+    /* sanity check against accepting uninitialised memory as session */
+    uint8_t magic;
     bool joined;
     bool adr;
+
     /* 0: 1.0 backend, 1: 1.1 backend */
 #ifndef LDL_DISABLE_POINTONE
     uint8_t version;
-#define SESS_VERSION(sess) (sess.version)
-#else
-    // constant value, so the compiler can optimize out unneeded code paths
-#define SESS_VERSION(sess) (0)
 #endif
 
     enum ldl_region region;
@@ -483,6 +419,13 @@ struct ldl_mac_data_opts {
     uint8_t dither;         /**< seconds of dither to add to the transmit schedule (0..60) */
 };
 
+struct ldl_mac_time {
+
+    uint32_t ticks;
+    uint32_t remainder;
+};
+
+
 /** MAC layer data */
 struct ldl_mac {
 
@@ -498,19 +441,16 @@ struct ldl_mac {
     uint8_t buffer[LDL_MAX_PACKET];
     uint8_t bufferLen;
 
-    /* off-time in ms per band */
+    /* down-counters that use the 'time' timebase
+     *
+     * used for duty cycle timing per band among other things */
     uint32_t band[LDL_BAND_MAX];
-
-    uint32_t polled_band_ticks;
 
     uint16_t devNonce;
     uint32_t joinNonce;
 
     int16_t snr_min;    /* could be optimised: used to keep the snr min for the last rx settings */
     int16_t margin;     /* margin calculated for last DevStatusReq */
-
-    /* time of the last valid downlink in seconds */
-    uint32_t last_valid_downlink;
 
     /* the settings currently being used to TX */
     struct {
@@ -522,11 +462,8 @@ struct ldl_mac {
         uint8_t power;
     } tx;
 
-    uint32_t rx1_margin;
-    uint32_t rx2_margin;
-
-    uint32_t rx1_symbols;
-    uint32_t rx2_symbols;
+    uint16_t rx1_symbols;
+    uint16_t rx2_symbols;
 
     struct ldl_mac_session ctx;
 
@@ -541,18 +478,10 @@ struct ldl_mac {
     ldl_mac_response_fn handler;
     void *app;
 
-    bool rxParamSetupAns_pending;
-    bool dlChannelAns_pending;
-    bool rxtimingSetupAns_pending;
-    bool rekeyConf_pending;
-
     uint8_t adrAckCounter;
     bool adrAckReq;
 
-    uint32_t time;
-    uint32_t polled_time_ticks;
-
-    uint32_t service_start_time;
+    struct ldl_mac_time time;
 
     /* number of join/data trials */
     uint32_t trials;
@@ -565,11 +494,18 @@ struct ldl_mac {
     ldl_system_ticks_fn ticks;
     ldl_system_get_battery_level_fn get_battery_level;
 
-    /* xtal compensation */
+#ifndef LDL_PARAM_TPS
     uint32_t tps;
+#endif
+#ifndef LDL_PARAM_A
     uint32_t a;
+#endif
+#ifndef LDL_PARAM_B
     uint32_t b;
+#endif
+#ifndef LDL_PARAM_ADVANCE
     uint32_t advance;
+#endif
 
     uint8_t maxDutyCycle;
 };
@@ -986,7 +922,7 @@ bool LDL_MAC_ready(const struct ldl_mac *self);
  * */
 uint8_t LDL_MAC_mtu(const struct ldl_mac *self);
 
-/** Seconds since last valid downlink message
+/** Seconds since valid downlink message received
  *
  * A valid downlink is one that is:
  *
@@ -995,12 +931,13 @@ uint8_t LDL_MAC_mtu(const struct ldl_mac *self);
  * - able to be decrypted
  *
  * @param[in] self  #ldl_mac
+ *
  * @return seconds since last valid downlink
  *
- * @retval UINT32_MAX no valid downlink received
+ * @retval UINT32_MAX   no valid downlinks / not joined
  *
  * */
-uint32_t LDL_MAC_timeSinceValidDownlink(struct ldl_mac *self);
+uint32_t LDL_MAC_secondsSinceValidDownlink(struct ldl_mac *self);
 
 /** Set the aggregated duty cycle limit
  *
@@ -1048,29 +985,38 @@ bool LDL_MAC_priority(const struct ldl_mac *self, uint8_t interval);
  * Normally this will happen via the function pointer set as an
  * argument in LDL_Radio_setHandler().
  *
- * @param[in] ctx               cast to #ldl_mac
- * @param[in] #ldl_radio_event
+ * @param[in] self      #ldl_mac
+ * @param[in] event     #ldl_radio_event
+ *
+ * @note interrupt safe if LDL_SYSTEM_ENTER_CRITICAL() and LDL_SYSTEM_ENTER_CRITICAL() have been defined
+ *
+ * */
+void LDL_MAC_radioEvent(struct ldl_mac *self, enum ldl_radio_event event);
+
+/** LDL_MAC_radioEvent() but with ticks passed as argument
+ *
+ * Normally this will happen via the function pointer set as an
+ * argument in LDL_Radio_setHandler().
+ *
+ * @param[in] self      #ldl_mac
+ * @param[in] event     #ldl_radio_event
  * @param[in] ticks             timestamp from LDL_MAC_getTicks()
  *
  * @note interrupt safe if LDL_SYSTEM_ENTER_CRITICAL() and LDL_SYSTEM_ENTER_CRITICAL() have been defined
  *
  * */
-void LDL_MAC_radioEvent(void *ctx, enum ldl_radio_event event);
+void LDL_MAC_radioEventWithTicks(struct ldl_mac *self, enum ldl_radio_event event, uint32_t ticks);
 
-/** LDL_MAC_radioEvent() but with ticks passed in
- *
- *
- * */
-void LDL_MAC_radioEventWithTicks(void *ctx, enum ldl_radio_event event, uint32_t ticks);
-
-/** Get current tick value from LDL_System_ticks()
- * using #ldl_mac.app as argument
+/** Get current tick value
  *
  * @param[in] self  #ldl_mac
  * @return ticks
  *
  * */
 uint32_t LDL_MAC_getTicks(struct ldl_mac *self);
+
+const char *LDL_MAC_stateToString(enum ldl_mac_state state);
+const char *LDL_MAC_opToString(enum ldl_mac_operation op);
 
 /* for internal use only */
 bool LDL_MAC_addChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate);

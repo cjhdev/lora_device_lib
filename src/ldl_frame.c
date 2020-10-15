@@ -22,6 +22,7 @@
 #include "ldl_frame.h"
 #include "ldl_debug.h"
 #include "ldl_stream.h"
+#include "ldl_internal.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -41,7 +42,7 @@ void LDL_Frame_updateMIC(void *msg, uint8_t len, uint32_t mic)
 
         LDL_Stream_init(&s, msg, len);
 
-        (void)LDL_Stream_seekSet(&s, len - sizeof(mic));
+        (void)LDL_Stream_seekSet(&s, len - U8(sizeof(mic)));
 
         (void)LDL_Stream_putU32(&s, mic);
     }
@@ -57,7 +58,7 @@ uint8_t LDL_Frame_putData(const struct ldl_frame_data *f, void *out, uint8_t max
 
     (void)memset(off, 0, sizeof(*off));
 
-    (void)LDL_Stream_putU8(&s, ((uint8_t)f->type) << 5);
+    (void)LDL_Stream_putU8(&s, U8(f->type) << 5);
     (void)LDL_Stream_putU32(&s, f->devAddr);
     (void)LDL_Stream_putU8(&s, (f->adr ? 0x80U : 0U) | (f->adrAckReq ? 0x40U : 0U) | (f->ack ? 0x20U : 0U) | (f->pending ? 0x10U : 0U) | (f->optsLen & 0xfU));
     (void)LDL_Stream_putU16(&s, f->counter);
@@ -87,7 +88,7 @@ uint8_t LDL_Frame_putJoinRequest(const struct ldl_frame_join_request *f, void *o
 
     LDL_Stream_init(&s, out, max);
 
-    (void)LDL_Stream_putU8(&s, ((uint8_t)FRAME_TYPE_JOIN_REQ) << 5);
+    (void)LDL_Stream_putU8(&s, U8(FRAME_TYPE_JOIN_REQ) << 5);
     (void)LDL_Stream_putEUI(&s, f->joinEUI);
     (void)LDL_Stream_putEUI(&s, f->devEUI);
     (void)LDL_Stream_putU16(&s, f->devNonce);
@@ -105,8 +106,8 @@ uint8_t LDL_Frame_putRejoinRequest(const struct ldl_frame_rejoin_request *f, voi
 
     LDL_Stream_init(&s, out, max);
 
-    (void)LDL_Stream_putU8(&s, ((uint8_t)FRAME_TYPE_REJOIN_REQ) << 5);
-    (void)LDL_Stream_putU8(&s, f->type);
+    (void)LDL_Stream_putU8(&s, U8(FRAME_TYPE_REJOIN_REQ) << 5);
+    (void)LDL_Stream_putU8(&s, U8(f->type));
     (void)LDL_Stream_putU24(&s, f->netID);
     (void)LDL_Stream_putEUI(&s, f->devEUI);
     (void)LDL_Stream_putU16(&s, f->rjCount);
@@ -156,7 +157,7 @@ bool LDL_Frame_decode(struct ldl_frame_down *f, void *in, uint8_t len)
                 (void)LDL_Stream_getU8(&s, &dlSettings);
                 (void)LDL_Stream_getU8(&s, &f->rxDelay);
 
-                f->optNeg =             ((dlSettings & 0x80U) != 0);
+                f->optNeg =             ((dlSettings & 0x80U) != 0U);
                 f->rx1DataRateOffset =  (dlSettings >> 4) & 0x7U;
                 f->rx2DataRate =        dlSettings & 0xfU;
 
@@ -167,7 +168,7 @@ bool LDL_Frame_decode(struct ldl_frame_down *f, void *in, uint8_t len)
 
                     f->cfList = &ptr[LDL_Stream_tell(&s)];
                     f->cfListLen = 16U;
-                    (void)LDL_Stream_seekCur(&s, f->cfListLen);
+                    (void)LDL_Stream_seekCur(&s, (int16_t)f->cfListLen);
                 }
 
                 (void)LDL_Stream_getU32(&s, &f->mic);
@@ -197,16 +198,16 @@ bool LDL_Frame_decode(struct ldl_frame_down *f, void *in, uint8_t len)
                 (void)LDL_Stream_getU16(&s, &f->counter);
 
                 f->opts = (f->optsLen > 0U) ? &ptr[LDL_Stream_tell(&s)] : NULL;
-                (void)LDL_Stream_seekCur(&s, f->optsLen);
+                (void)LDL_Stream_seekCur(&s, (int16_t)f->optsLen);
 
                 if(LDL_Stream_remaining(&s) > sizeof(f->mic)){
 
                     f->dataPresent = true;
 
                     (void)LDL_Stream_getU8(&s, &f->port);
-                    f->dataLen = LDL_Stream_remaining(&s) - sizeof(f->mic);
+                    f->dataLen = LDL_Stream_remaining(&s) - U8(sizeof(f->mic));
                     f->data = (f->dataLen == 0U) ? NULL : &ptr[LDL_Stream_tell(&s)];
-                    (void)LDL_Stream_seekCur(&s, f->dataLen);
+                    (void)LDL_Stream_seekCur(&s, (int16_t)f->dataLen);
                 }
 
                 (void)LDL_Stream_getU32(&s, &f->mic);
@@ -214,7 +215,7 @@ bool LDL_Frame_decode(struct ldl_frame_down *f, void *in, uint8_t len)
                 if(!LDL_Stream_error(&s)){
 
                     /* cannot have fopts when data is present and port == 0 */
-                    if(!(f->dataPresent && (f->optsLen > 0) && (f->port == 0U))){
+                    if(!(f->dataPresent && (f->optsLen > 0U) && (f->port == 0U))){
 
                         retval = true;
                     }
@@ -230,13 +231,13 @@ bool LDL_Frame_decode(struct ldl_frame_down *f, void *in, uint8_t len)
 uint8_t LDL_Frame_dataOverhead(void)
 {
     /* DevAddr + FCtrl + FCnt + FOpts + FPort */
-    return (4U + 1U + 2U) + (1U);
+    return (4 + 1 + 2) + (1);
 }
 
 uint8_t LDL_Frame_phyOverhead(void)
 {
     /* MHDR + MIC */
-    return 1U + 4U;
+    return 1 + 4;
 }
 
 
@@ -251,29 +252,29 @@ static bool getFrameType(uint8_t tag, enum ldl_frame_type *type)
         retval = true;
 
         switch((tag >> 5)){
-        case FRAME_TYPE_JOIN_REQ:
+        case U8(FRAME_TYPE_JOIN_REQ):
             *type = FRAME_TYPE_JOIN_REQ;
             break;
-        case FRAME_TYPE_JOIN_ACCEPT:
+        case U8(FRAME_TYPE_JOIN_ACCEPT):
             *type = FRAME_TYPE_JOIN_ACCEPT;
             break;
-        case FRAME_TYPE_DATA_UNCONFIRMED_UP:
+        case U8(FRAME_TYPE_DATA_UNCONFIRMED_UP):
             *type = FRAME_TYPE_DATA_UNCONFIRMED_UP;
             break;
-        case FRAME_TYPE_DATA_UNCONFIRMED_DOWN:
+        case U8(FRAME_TYPE_DATA_UNCONFIRMED_DOWN):
             *type = FRAME_TYPE_DATA_UNCONFIRMED_DOWN;
             break;
-        case FRAME_TYPE_DATA_CONFIRMED_UP:
+        case U8(FRAME_TYPE_DATA_CONFIRMED_UP):
             *type = FRAME_TYPE_DATA_CONFIRMED_UP;
             break;
-        case FRAME_TYPE_DATA_CONFIRMED_DOWN:
+        case U8(FRAME_TYPE_DATA_CONFIRMED_DOWN):
             *type = FRAME_TYPE_DATA_CONFIRMED_DOWN;
             break;
 #ifndef LDL_DISABLE_POINTONE
-        case FRAME_TYPE_REJOIN_REQ:
+        case U8(FRAME_TYPE_REJOIN_REQ):
             *type = FRAME_TYPE_REJOIN_REQ;
             break;
-#endif            
+#endif
         default:
             retval = false;
             break;

@@ -46,7 +46,7 @@
      * @param[in] APP   from #ldl_mac_init_arg.app or NULL if not available
      *
      * */
-    #define LDL_ERROR(APP,...)
+    #define LDL_ERROR(...)
 #endif
 
 #ifndef LDL_INFO
@@ -63,14 +63,15 @@
      * @param[in] APP   from #ldl_mac_init_arg.app or NULL if not available
      *
      * */
-    #define LDL_INFO(APP,...)
+    #define LDL_INFO(...)
 #endif
 
 #ifndef LDL_TRACE_BEGIN
-#define LDL_TRACE_BEGIN()
+    #define LDL_TRACE_BEGIN()
 #endif
 
 #ifndef LDL_TRACE_PART
+    #define LDL_TRACE_DISABLED
     #define LDL_TRACE_PART(...)
 #endif
 
@@ -108,7 +109,7 @@
      * @param[in] APP   from #ldl_mac_init_arg.app or NULL if not available
      *
      * */
-    #define LDL_DEBUG(APP, ...)
+    #define LDL_DEBUG(...)
 #endif
 
 #ifndef LDL_ASSERT

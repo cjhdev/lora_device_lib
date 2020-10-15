@@ -22,6 +22,7 @@
 #include "ldl_ctr.h"
 #include "ldl_aes.h"
 #include "ldl_debug.h"
+#include "ldl_internal.h"
 
 #include <string.h>
 
@@ -57,7 +58,7 @@ void LDL_CTR_encrypt(struct ldl_aes_ctx *ctx, const void *iv, const void *in, vo
 
     for(i=0U; i < k; i++){
 
-        size = ((len - pos) >= (uint8_t)sizeof(a)) ? (uint8_t)sizeof(a) : (len - pos);
+        size = ((len - pos) >= U8(sizeof(a))) ? U8(sizeof(a)) : (len - pos);
 
         (void)memset(pld, 0, sizeof(pld));
 
@@ -73,7 +74,7 @@ void LDL_CTR_encrypt(struct ldl_aes_ctx *ctx, const void *iv, const void *in, vo
 
         (void)memcpy(&ptr_out[pos], pld, size);
 
-        pos += (uint8_t)sizeof(a);
+        pos += U8(sizeof(a));
     }
 }
 

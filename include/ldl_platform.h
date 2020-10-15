@@ -185,6 +185,47 @@
     #define LDL_ENABLE_RADIO_DEBUG
     #undef LDL_ENABLE_RADIO_DEBUG
 
+    /**
+     * Define to remove delays that are normally inserted in front of
+     * operations and retries. These delays are essential for ensuring
+     * groups of devices don't continually talk over themselves in the field,
+     * but slow down development sometimes.
+     *
+     * Recommend only using this for nodes that are on your desk and under
+     * development.
+     *
+     * */
+    #define LDL_ENABLE_FAST_DEBUG
+    #undef LDL_ENABLE_FAST_DEBUG
+
+    /**
+     * Define to set #ldl_mac_init_arg.tps at compile time
+     *
+     * */
+    #define LDL_PARAM_TPS
+    #undef LDL_PARAM_TPS
+
+    /**
+     * Define to set #ldl_mac_init_arg.a at compile time
+     *
+     * */
+    #define LDL_PARAM_A
+    #undef LDL_PARAM_A
+
+    /**
+     * Define to set #ldl_mac_init_arg.b at compile time
+     *
+     * */
+    #define LDL_PARAM_B
+    #undef LDL_PARAM_B
+
+    /**
+     * Define to set #ldl_mac_init_arg.advance at compile time
+     *
+     * */
+    #define LDL_PARAM_ADVANCE
+    #undef LDL_PARAM_ADVANCE
+
 #endif
 
 #ifdef LDL_TARGET_INCLUDE

@@ -19,44 +19,27 @@
  *
  * */
 
-#ifndef MBED_LDL_PORT_H
-#define MBED_LDL_PORT_H
+#ifndef LDL_INTERNAL_H
+#define LDL_INTERNAL_H
 
-#include "mbed_assert.h"
-#include "mbed_trace.h"
-#include "mbed_critical.h"
+#include <stdint.h>
 
-#define TRACE_GROUP "LDL"
+#include "ldl_platform.h"
 
-#define LDL_ASSERT(X) MBED_ASSERT(X);
+/* these macros are used to cast literals to a specific width
+ *
+ * It's pedantic but PCLINT in MISRA 2012 mode complains a lot about widths
+ *
+ *  */
+#define U32(X) ((uint32_t)(X))
+#define U16(X) ((uint16_t)(X))
+#define S16(X) ((int16_t)(X))
+#define U8(X) ((uint8_t)(X))
 
-#define LDL_INFO(FMT, ...) tr_info(FMT, ##__VA_ARGS__);
-
-#define LDL_DEBUG(FMT, ...) tr_debug(FMT, ##__VA_ARGS__);
-
-#define LDL_ERROR(FMT, ...)  tr_error(FMT, ##__VA_ARGS__);
-
-#ifdef __cplusplus
-extern "C" {
+#ifdef LDL_DISABLE_POINTONE
+    #define SESS_VERSION(sess) (0U)
+#else
+    #define SESS_VERSION(sess) sess.version
 #endif
-
-void my_trace_begin(void);
-void my_trace_part(const char *fmt, ...);
-void my_trace_hex(const uint8_t *ptr, size_t len);
-void my_trace_bitstring(const uint8_t *ptr, size_t len);
-void my_trace_end(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#define LDL_TRACE_BEGIN() my_trace_begin();
-#define LDL_TRACE_PART(...) my_trace_part(__VA_ARGS__);
-#define LDL_TRACE_HEX(PTR, LEN) my_trace_hex(PTR, LEN);
-#define LDL_TRACE_BIT_STRING(PTR, LEN) my_trace_bitstring(PTR, LEN);
-#define LDL_TRACE_FINAL() my_trace_end();
-
-#define LDL_SYSTEM_ENTER_CRITICAL(APP)  core_util_critical_section_enter();
-#define LDL_SYSTEM_LEAVE_CRITICAL(APP)  core_util_critical_section_exit();
 
 #endif

@@ -126,7 +126,7 @@ struct ldl_radio_rx_setting {
     uint32_t freq;
     enum ldl_signal_bandwidth bw;
     enum ldl_spreading_factor sf;
-    uint32_t timeout;
+    uint16_t timeout;
     uint8_t max;
 };
 
@@ -143,7 +143,9 @@ enum ldl_radio_pa {
     LDL_RADIO_PA_BOOST  /**< use BOOST */
 };
 
-typedef void (*ldl_radio_event_fn)(void *mac, enum ldl_radio_event event);
+struct ldl_mac;
+
+typedef void (*ldl_radio_event_fn)(struct ldl_mac *self, enum ldl_radio_event event);
 
 /** Radio state */
 struct ldl_radio {
@@ -151,7 +153,7 @@ struct ldl_radio {
     void *chip;
     enum ldl_radio_pa pa;
     enum ldl_radio_type type;
-    void *cb_ctx;
+    struct ldl_mac *cb_ctx;
     ldl_radio_event_fn cb;
     ldl_chip_write_fn chip_write;
     ldl_chip_read_fn chip_read;
@@ -175,7 +177,7 @@ struct ldl_radio {
 struct ldl_radio_interface {
 
     void (*set_mode)(struct ldl_radio *self, enum ldl_radio_mode mode); /**< LDL_Radio_setMode() */
-    unsigned int (*read_entropy)(struct ldl_radio *self);               /**< LDL_Radio_readEntropy() */
+    uint32_t (*read_entropy)(struct ldl_radio *self);               /**< LDL_Radio_readEntropy() */
     uint8_t (*read_buffer) (struct ldl_radio *self, struct ldl_radio_packet_metadata *meta, void *data, uint8_t max);       /**< LDL_Radio_readBuffer() */
     void (*transmit)(struct ldl_radio *self, const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);   /**< LDL_Radio_transmit() */
     void (*receive)(struct ldl_radio *self, const struct ldl_radio_rx_setting *settings);                                   /**< LDL_Radio_receive() */
@@ -252,7 +254,7 @@ void LDL_Radio_handleInterrupt(struct ldl_radio *self, uint8_t n);
  * @param[in] handler   LDL_MAC_radioEvent() or an intermediate
  *
  * */
-void LDL_Radio_setEventCallback(struct ldl_radio *self, void *ctx, ldl_radio_event_fn handler);
+void LDL_Radio_setEventCallback(struct ldl_radio *self, struct ldl_mac *ctx, ldl_radio_event_fn cb);
 
 /** Get minimum SNR for a given spreading factor
  *
@@ -315,7 +317,7 @@ uint8_t LDL_Radio_readBuffer(struct ldl_radio *self, struct ldl_radio_packet_met
  * @return entropy
  *
  * */
-unsigned int LDL_Radio_readEntropy(struct ldl_radio *self);
+uint32_t LDL_Radio_readEntropy(struct ldl_radio *self);
 
 /** Configure radio to receive entropy
  *
@@ -328,16 +330,15 @@ void LDL_Radio_receiveEntropy(struct ldl_radio *self);
 
 /** Time taken to transmit a message of certain size
  *
- * @param[in] tps   ticks per second timebase (1KHz to 1MHz)
  * @param[in] bw
  * @param[in] sf
  * @param[in] size
  * @param[in] crc
  *
- * @retval time in ticks (LDL_System_tps() timebase)
+ * @retval milliseconds
  *
  * */
-uint32_t LDL_Radio_getAirTime(uint32_t tps, enum ldl_signal_bandwidth bw, enum ldl_spreading_factor sf, uint8_t size, bool crc);
+uint32_t LDL_Radio_getAirTime(enum ldl_signal_bandwidth bw, enum ldl_spreading_factor sf, uint8_t size, bool crc);
 
 /** Get the time it takes to start and stabilise the XTAL
  *

@@ -38,7 +38,7 @@ void LDL_Radio_debugLogReset(struct ldl_radio *self)
     self->debug.overflow = false;
 }
 
-void LDL_Radio_debugLogPush(struct ldl_radio *self, uint8_t opcode, const uint8_t *data, uint8_t size)
+void LDL_Radio_debugLogPush(struct ldl_radio *self, uint8_t opcode, const uint8_t *data, size_t size)
 {
     LDL_ASSERT(size > 0)
 
@@ -46,7 +46,7 @@ void LDL_Radio_debugLogPush(struct ldl_radio *self, uint8_t opcode, const uint8_
 
         self->debug.log[self->debug.pos].opcode = opcode;
         self->debug.log[self->debug.pos].value = *data;
-        self->debug.log[self->debug.pos].size = size;
+        self->debug.log[self->debug.pos].size = U8(size);
         self->debug.pos++;
     }
     else{

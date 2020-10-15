@@ -195,17 +195,11 @@ void app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
         (void)arg->join_complete.devAddr;
         break;
 
-    case LDL_MAC_CHIP_ERROR:
-    case LDL_MAC_RESET:
     case LDL_MAC_JOIN_TIMEOUT:
     case LDL_MAC_DATA_COMPLETE:
     case LDL_MAC_DATA_TIMEOUT:
     case LDL_MAC_DATA_NAK:
     case LDL_MAC_LINK_STATUS:
-    case LDL_MAC_RX1_SLOT:
-    case LDL_MAC_RX2_SLOT:
-    case LDL_MAC_TX_COMPLETE:
-    case LDL_MAC_TX_BEGIN:
     default:
         break;
     }

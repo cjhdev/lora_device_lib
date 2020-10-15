@@ -1,6 +1,38 @@
 Release History
 ===============
 
+Note that versions are only "released" when there is a git tag with the same name.
+If you have checked out master, the top version listed here may be a
+work in progress.
+
+## 0.4.5
+
+- changed LDL_DEBUG, LDL_INFO, LDL_ERROR to not insert __FUNCTION__ into format string
+- changed LDL_DEBUG, LDL_INFO, LDL_ERROR to not take APP argument
+- reworked log messages and levels
+- added LDL_ENABLE_FAST_DEBUG build option which removes extra delays and dithering required
+  for use in the field but which slow down development
+- added 1.0.x memory saving enhancements (contributed by frbehrens)
+- added confirmed downlink acknowledgement logic (contributed by frbehrens)
+- fixed bug where data downlinks were not being passed to applications (contributed by frbehrens)
+- added 1.0.x default key store optimisation
+- changed band timers to use gps timebase (1/256Hz timebase)
+- changed time tracker to use gps timebase
+- removed logic for detecting and handling late RX windows since this won't normally occur
+- removed LDL_MAC_timeSinceValidDownlink()
+- removed unused ldl_mac fields
+- removed events that are not useful to the application (and replaced with log messages)
+    - removed LDL_MAC_CHIP_ERROR event
+    - removed LDL_MAC_RESET event
+    - removed LDL_MAC_RX1_SLOT event
+    - removed LDL_MAC_RX2_SLOT event
+    - removed LDL_MAC_DOWNSTREAM
+    - removed LDL_MAC_TX_BEGIN
+    - removed LDL_MAC_TX_COMPLETE
+- added examples/avr to keep an eye on whether LDL still fits on a 328P
+- changed LDL_Radio_getAirTime() to return result in milliseconds and not in a timebase of your choice
+- fixed most required MISRA 2012 warnings
+
 ## 0.4.4
 
 - fixed bug where frequency set by MAC commands was 1/100th of the required value (i.e. I forgot to multiply by 100).

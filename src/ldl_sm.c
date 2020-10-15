@@ -25,6 +25,7 @@
 #include "ldl_cmac.h"
 #include "ldl_ctr.h"
 #include "ldl_debug.h"
+#include "ldl_internal.h"
 
 #include <string.h>
 
@@ -103,7 +104,7 @@ uint32_t LDL_SM_mic(struct ldl_sm *self, enum ldl_sm_key desc, const void *hdr, 
     LDL_CMAC_init(&ctx, &aes_ctx);
     LDL_CMAC_update(&ctx, hdr, hdrLen);
     LDL_CMAC_update(&ctx, data, dataLen);
-    LDL_CMAC_finish(&ctx, &mic, sizeof(mic));
+    LDL_CMAC_finish(&ctx, &mic, U8(sizeof(mic)));
 
     /* intepret the 4th byte as most significant */
     retval = mic[3];

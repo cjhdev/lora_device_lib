@@ -24,6 +24,7 @@
 #include "ldl_aes.h"
 #include "ldl_cmac.h"
 #include "ldl_debug.h"
+#include "ldl_internal.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -75,11 +76,11 @@ void LDL_CMAC_update(struct ldl_cmac_ctx *ctx, const void *data, uint8_t len)
     uint8_t pos = 0U;
     const uint8_t *in = (const uint8_t *)data;
 
-    part =  ctx->size % (uint8_t)sizeof(ctx->m);
+    part =  ctx->size % U8(sizeof(ctx->m));
 
     if(len > 0U){
 
-        if(((part == 0U) && (ctx->size > 0U)) || ((part + len) > sizeof(ctx->m))){
+        if(((part == 0U) && (ctx->size > 0U)) || ((part + len) > U8(sizeof(ctx->m)))){
 
             /* sometimes a whole extra block will already be cached, process it */
             if((part == 0U) && (ctx->size > 0U)){
@@ -89,10 +90,10 @@ void LDL_CMAC_update(struct ldl_cmac_ctx *ctx, const void *data, uint8_t len)
             }
 
             /* number of new blocks to process */
-            blocks = (part + len) / sizeof(ctx->m);
+            blocks = (part + len) / U8(sizeof(ctx->m));
 
             /* do not process the last new block */
-            if(((part + len) % sizeof(ctx->m)) == 0U){
+            if(((part + len) % U8(sizeof(ctx->m))) == 0U){
 
                 blocks -= 1U;
             }
@@ -102,7 +103,7 @@ void LDL_CMAC_update(struct ldl_cmac_ctx *ctx, const void *data, uint8_t len)
             for(i=0U; i < blocks; i++){
 
                 (void)memcpy(&ctx->m[part], &in[pos], sizeof(ctx->m) - part);
-                pos += sizeof(ctx->m) - part;
+                pos += U8(sizeof(ctx->m)) - part;
 
                 part = 0U;
 
@@ -111,7 +112,9 @@ void LDL_CMAC_update(struct ldl_cmac_ctx *ctx, const void *data, uint8_t len)
             }
         }
 
-        (void)memcpy(&ctx->m[part], &in[pos], len - pos);
+        uint8_t tmp = len - pos;
+
+        (void)memcpy(&ctx->m[part], &in[pos], tmp);
         ctx->size += len;
     }
 }
