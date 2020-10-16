@@ -320,6 +320,9 @@ enum ldl_band_index {
     LDL_BAND_GLOBAL,
     LDL_BAND_RETRY,
     LDL_BAND_DUTY,
+#ifdef LDL_ENABLE_CLASS_B
+    LDL_BAND_BEACON,
+#endif
     LDL_BAND_MAX
 };
 
@@ -508,6 +511,15 @@ struct ldl_mac {
 #endif
 
     uint8_t maxDutyCycle;
+
+#ifdef LDL_ENABLE_CLASS_B
+
+    bool beaconModeEnabled;
+#ifndef LDL_PARAM_BEACON_INTERVAL
+    uint32_t beaconInterval;
+#endif
+
+#endif
 };
 
 /** passed as an argument to LDL_MAC_init()
@@ -612,6 +624,13 @@ struct ldl_mac_init_arg {
      *
      * */
     uint32_t advance;
+
+    /** Beacon interval in seconds (Class B only)
+     *
+     * This is not required if LDL_PARAM_BEACON_INTERVAL has been defined.
+     *
+     * */
+    uint32_t beaconInterval;
 };
 
 
@@ -1023,8 +1042,8 @@ void LDL_MAC_radioEventWithTicks(struct ldl_mac *self, enum ldl_radio_event even
  * */
 uint32_t LDL_MAC_getTicks(struct ldl_mac *self);
 
-const char *LDL_MAC_stateToString(enum ldl_mac_state state);
-const char *LDL_MAC_opToString(enum ldl_mac_operation op);
+void LDL_MAC_setBeaconMode(struct ldl_mac *self, bool value);
+bool LDL_MAC_getBeaconMode(struct ldl_mac *self);
 
 /* for internal use only */
 bool LDL_MAC_addChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate);

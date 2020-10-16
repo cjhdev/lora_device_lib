@@ -34,6 +34,18 @@ static uint8_t typeToTag(enum ldl_mac_cmd_type type);
 static bool tagToType(uint8_t tag, enum ldl_mac_cmd_type *type);
 
 static const struct type_to_tag tags[] = {
+#ifndef LDL_DISABLE_POINTONE
+    {11U, LDL_CMD_REKEY},
+    {12U, LDL_CMD_ADR_PARAM_SETUP},
+    {14U, LDL_CMD_FORCE_REJOIN},
+    {15U, LDL_CMD_REJOIN_PARAM_SETUP},
+#endif
+#ifdef LDL_ENABLE_CLASS_B
+    {16U, LDL_CMD_PING_SLOT_INFO},
+    {17U, LDL_CMD_PING_SLOT_CHANNEL},
+    {18U, LDL_CMD_BEACON_TIMING},
+    {19U, LDL_CMD_BEACON_FREQ},
+#endif
     {2U, LDL_CMD_LINK_CHECK},
     {3U, LDL_CMD_LINK_ADR},
     {4U, LDL_CMD_DUTY_CYCLE},
@@ -43,13 +55,7 @@ static const struct type_to_tag tags[] = {
     {8U, LDL_CMD_RX_TIMING_SETUP},
     {9U, LDL_CMD_TX_PARAM_SETUP},
     {10U, LDL_CMD_DL_CHANNEL},
-    {13U, LDL_CMD_DEVICE_TIME},
-#ifndef LDL_DISABLE_POINTONE
-    {11U, LDL_CMD_REKEY},
-    {12U, LDL_CMD_ADR_PARAM_SETUP},
-    {14U, LDL_CMD_FORCE_REJOIN},
-    {15U, LDL_CMD_REJOIN_PARAM_SETUP}
-#endif
+    {13U, LDL_CMD_DEVICE_TIME}
 };
 
 /* functions **********************************************************/
@@ -79,6 +85,7 @@ uint8_t LDL_MAC_sizeofCommandUp(enum ldl_mac_cmd_type type)
     case LDL_CMD_TX_PARAM_SETUP:
     case LDL_CMD_ADR_PARAM_SETUP:
     case LDL_CMD_DEVICE_TIME:
+    case LDL_CMD_BEACON_TIMING:
         retval = 1U;
         break;
     case LDL_CMD_LINK_ADR:
@@ -87,11 +94,16 @@ uint8_t LDL_MAC_sizeofCommandUp(enum ldl_mac_cmd_type type)
     case LDL_CMD_DL_CHANNEL:
     case LDL_CMD_REKEY:
     case LDL_CMD_REJOIN_PARAM_SETUP:
+    case LDL_CMD_PING_SLOT_INFO:
+    case LDL_CMD_BEACON_FREQ:
         retval = 2U;
         break;
     case LDL_CMD_DEV_STATUS:
     case LDL_CMD_FORCE_REJOIN:
         retval = 3U;
+        break;
+    case LDL_CMD_PING_SLOT_CHANNEL:
+        retval = 5U;
         break;
     }
 
@@ -191,6 +203,33 @@ void LDL_MAC_putRejoinParamSetupAns(struct ldl_stream *s, struct ldl_rejoin_para
     (void)LDL_Stream_putU8(s, typeToTag(LDL_CMD_REJOIN_PARAM_SETUP));
     (void)LDL_Stream_putU8(s, buf);
 }
+
+#ifdef LDL_ENABLE_CLASS_B
+void LDL_MAC_putPingSlotInfoReq(struct ldl_stream *s, const struct ldl_ping_slot_info_req *value)
+{
+    (void)LDL_Stream_putU8(s, typeToTag(LDL_CMD_PING_SLOT_INFO));
+    (void)LDL_Stream_putU8(s, value->periodicity & 7U);
+}
+
+void LDL_MAC_putPingSlotChannelAns(struct ldl_stream *s, const struct ldl_ping_slot_channel_ans *value)
+{
+    uint8_t buf = (value->dataRateOK ? 2U : 0U) | (value->channelFreqOK ? 1U : 0U);
+
+    (void)LDL_Stream_putU8(s, typeToTag(LDL_CMD_PING_SLOT_CHANNEL));
+    (void)LDL_Stream_putU8(s, buf);
+}
+
+void LDL_MAC_putBeaconTimingReq(struct ldl_stream *s)
+{
+    (void)LDL_Stream_putU8(s, typeToTag(LDL_CMD_BEACON_TIMING));
+}
+
+void LDL_MAC_putBeaconFreqAns(struct ldl_stream *s, const struct ldl_beacon_freq_ans *value)
+{
+    (void)LDL_Stream_putU8(s, typeToTag(LDL_CMD_BEACON_FREQ));
+    (void)LDL_Stream_putU8(s, value->beaconFrequencyOK ? 1U : 0U);
+}
+#endif
 
 bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd)
 {
@@ -338,6 +377,34 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
                 cmd->fields.rejoinParamSetup.maxTimeN = buf >> 4;
                 cmd->fields.rejoinParamSetup.maxCountN = buf & 0xfU;
             }
+                break;
+#endif
+#ifdef LDL_ENABLE_CLASS_B
+            case LDL_CMD_PING_SLOT_INFO:
+
+                // no args
+                break;
+
+            case LDL_CMD_PING_SLOT_CHANNEL:
+
+                (void)LDL_Stream_getU24(s, &cmd->fields.pingSlotChannel.frequency);
+                (void)LDL_Stream_getU8(s, &cmd->fields.pingSlotChannel.dr);
+
+                cmd->fields.pingSlotChannel.frequency *= 100UL;
+                cmd->fields.pingSlotChannel.dr &= 0xfU;
+                break;
+
+            case LDL_CMD_BEACON_TIMING:
+
+                (void)LDL_Stream_getU16(s, &cmd->fields.beaconTiming.delay);
+                (void)LDL_Stream_getU8(s, &cmd->fields.beaconTiming.channel);
+                break;
+
+            case LDL_CMD_BEACON_FREQ:
+
+                (void)LDL_Stream_getU24(s, &cmd->fields.pingSlotChannel.frequency);
+
+                cmd->fields.beaconFreq.freq *= 100UL;
                 break;
 #endif
             }

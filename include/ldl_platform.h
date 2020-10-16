@@ -226,6 +226,22 @@
     #define LDL_PARAM_ADVANCE
     #undef LDL_PARAM_ADVANCE
 
+    /**
+     * Define to set #ldl_mac_init_arg.beaconInterval at compile time
+     *
+     * */
+    #define LDL_PARAM_BEACON_INTERVAL
+    #undef LDL_PARAM_BEACON_INTERVAL
+
+    /**
+     * Define to enable class B features
+     *
+     * Currently a work in progress.
+     *
+     * */
+    #define LDL_ENABLE_CLASS_B
+    #undef LDL_ENABLE_CLASS_B
+
 #endif
 
 #ifdef LDL_TARGET_INCLUDE

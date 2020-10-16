@@ -62,6 +62,12 @@ enum {
     #define GET_ADVANCE() self->advance
 #endif
 
+#ifdef LDL_PARAM_BEACON_INTERVAL
+    #define GET_BEACON_INTERVAL() (U32(LDL_PARAM_BEACON_INTERVAL) * U32(256))
+#else
+    #define GET_BEACON_INTERVAL() (self->beaconInterval * U32(256));
+#endif
+
 /* static function prototypes *****************************************/
 
 static void processInit(struct ldl_mac *self);
@@ -188,6 +194,14 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
 
         initSession(self, region);
     }
+
+#ifdef LDL_ENABLE_CLASS_B
+#ifndef LDL_PARAM_BEACON_INTERVAL
+    self->beaconPeriod = (arg->beaconPeriod == 0U) ? U32(128): arg->beaconPeriod
+#else
+    LDL_PEDANTIC(GET_BEACON_INTERVAL() != 0U)
+#endif
+#endif
 
     debugSession(self);
 
@@ -590,6 +604,11 @@ uint8_t LDL_MAC_mtu(const struct ldl_mac *self)
         overhead += commandIsPending(self, LDL_CMD_ADR_PARAM_SETUP) ? LDL_MAC_sizeofCommandUp(LDL_CMD_ADR_PARAM_SETUP) : 0U;
         overhead += commandIsPending(self, LDL_CMD_REJOIN_PARAM_SETUP) ? LDL_MAC_sizeofCommandUp(LDL_CMD_REJOIN_PARAM_SETUP) : 0U;
 #endif
+#ifdef LDL_ENABLE_CLASS_B
+        overhead += commandIsPending(self, LDL_CMD_PING_SLOT_INFO) ? LDL_MAC_sizeofCommandUp(LDL_CMD_PING_SLOT_INFO) : 0U;
+        overhead += commandIsPending(self, LDL_CMD_PING_SLOT_CHANNEL) ? LDL_MAC_sizeofCommandUp(LDL_CMD_PING_SLOT_CHANNEL) : 0U;
+        overhead += commandIsPending(self, LDL_CMD_BEACON_FREQ) ? LDL_MAC_sizeofCommandUp(LDL_CMD_BEACON_FREQ) : 0U;
+#endif
     }
 
     return (overhead > max) ? 0U : U8(max - overhead);
@@ -829,6 +848,23 @@ uint32_t LDL_MAC_getTicks(struct ldl_mac *self)
     return self->ticks(self->app);
 }
 
+#ifdef LDL_ENABLE_CLASS_B
+void LDL_MAC_setBeaconMode(struct ldl_mac *self, bool value)
+{
+    self->beaconModeEnabled = value;
+}
+
+bool LDL_MAC_getBeaconMode(struct ldl_mac *self)
+{
+    return self->beaconModeEnabled;
+}
+
+enum ldl_mac_beacon_state LDL_MAC_getBeaconState(struct ldl_mac *self)
+{
+    return self->beaconState;
+}
+#endif
+
 /* static functions ***************************************************/
 
 static void processInit(struct ldl_mac *self)
@@ -881,7 +917,7 @@ static void processStartup(struct ldl_mac *self)
 
         self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_STANDBY);
 
-        ms = (uint32_t)self->radio_interface->get_xtal_delay(self->radio);
+        ms = U32(self->radio_interface->get_xtal_delay(self->radio));
 
         LDL_MAC_timerSet(self, LDL_TIMER_WAITA, msToTicks(self, ms));
 
@@ -2168,6 +2204,17 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             arg.device_time.seconds = cmd.fields.deviceTime.seconds;
             arg.device_time.fractions = cmd.fields.deviceTime.fractions;
 
+#ifdef LDL_ENABLE_CLASS_B
+            if(self->beaconModeEnabled){
+
+                if(self->beaconState == LDL_MAC_BEACON_STATE_GET_TIME){
+
+                    uint32_t time = (arg.device_time.seconds << 8) | U32(arg.device_time.fractions);
+
+                    self->bands[LDL_BAND_BEACON] = GET_BEACON_INTERVAL() - (time % GET_BEACON_INTERVAL());
+                }
+            }
+#endif
             LDL_DEBUG("device_time_ans: seconds=%" PRIu32 " fractions=%u",
                 arg.device_time.seconds,
                 arg.device_time.fractions
@@ -2691,6 +2738,7 @@ static uint32_t timeUntilNextBandEvent(const struct ldl_mac *self)
     uint32_t retval = UINT32_MAX;
     size_t i;
 
+    /* note that this will return UINT32_MAX if all band timers are zero */
     for(i=0U; i < (sizeof(self->band)/sizeof(*self->band)); i++){
 
         if(self->band[i] > 0U){

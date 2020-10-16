@@ -47,7 +47,12 @@ enum ldl_mac_cmd_type {
     LDL_CMD_ADR_PARAM_SETUP,
     LDL_CMD_DEVICE_TIME,
     LDL_CMD_FORCE_REJOIN,
-    LDL_CMD_REJOIN_PARAM_SETUP
+    LDL_CMD_REJOIN_PARAM_SETUP,
+
+    LDL_CMD_PING_SLOT_INFO,
+    LDL_CMD_PING_SLOT_CHANNEL,
+    LDL_CMD_BEACON_TIMING,      /* depreciated in favor of LDL_CMD_DEVICE_TIME */
+    LDL_CMD_BEACON_FREQ
 };
 
 struct ldl_link_check_ans {
@@ -176,6 +181,39 @@ struct ldl_rejoin_param_setup_ans {
     bool timeOK;
 };
 
+struct ldl_ping_slot_info_req {
+
+    uint8_t periodicity;
+};
+
+struct ldl_beacon_freq_req {
+
+    uint32_t freq;
+};
+
+struct ldl_beacon_freq_ans {
+
+    bool beaconFrequencyOK;
+};
+
+struct ldl_ping_slot_channel_req {
+
+    uint32_t frequency;
+    uint8_t dr;
+};
+
+struct ldl_ping_slot_channel_ans {
+
+    bool dataRateOK;
+    bool channelFreqOK;
+};
+
+struct ldl_beacon_timing_ans {
+
+    uint16_t delay;
+    uint8_t channel;
+};
+
 struct ldl_downstream_cmd {
 
     enum ldl_mac_cmd_type type;
@@ -196,6 +234,11 @@ struct ldl_downstream_cmd {
         struct ldl_device_time_ans deviceTime;
         struct ldl_force_rejoin_req forceRejoin;
         struct ldl_rejoin_param_setup_req rejoinParamSetup;
+#ifdef LDL_ENABLE_CLASS_B
+        struct ldl_ping_slot_channel_req pingSlotChannel;
+        struct ldl_beacon_timing_ans beaconTiming;
+        struct ldl_beacon_freq_req beaconFreq;
+#endif
 
     } fields;
 };
@@ -216,6 +259,13 @@ struct ldl_upstream_cmd {
         /* tx_param_setup_ans */
         struct ldl_rekey_ind rekey;
         struct ldl_rejoin_param_setup_ans rejoinParamSetup;
+
+#ifdef LDL_ENABLE_CLASS_B
+        struct ldl_ping_slot_info_req pingSlotInfo;
+        struct ldl_ping_slot_channel_ans pingSlotChannel;
+        struct ldl_beacon_timing_ans beaconTiming;
+        struct ldl_beacon_freq_ans beaconFreq;
+#endif
 
     } fields;
 };
