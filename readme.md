@@ -171,6 +171,7 @@ and read [history.md](history.md) if updating from an older version.
 - [history](history.md)
 - [design goals](design_goals.md)
 - [todo list](todo.md)
+- [contribution guidelines](contributing.md)
 
 ## See Also
 
