@@ -43,20 +43,16 @@ enum ldl_mac_cmd_type {
     LDL_CMD_TX_PARAM_SETUP,
     LDL_CMD_DL_CHANNEL,
 
-#ifndef LDL_DISABLE_POINTONE
     LDL_CMD_REKEY,
     LDL_CMD_ADR_PARAM_SETUP,
     LDL_CMD_DEVICE_TIME,
     LDL_CMD_FORCE_REJOIN,
     LDL_CMD_REJOIN_PARAM_SETUP,
-#endif
 
-#ifdef LDL_ENABLE_CLASS_B
     LDL_CMD_PING_SLOT_INFO,
     LDL_CMD_PING_SLOT_CHANNEL,
     LDL_CMD_BEACON_TIMING,      /* depreciated in favor of LDL_CMD_DEVICE_TIME */
     LDL_CMD_BEACON_FREQ
-#endif
 };
 
 struct ldl_link_check_ans {

@@ -425,7 +425,19 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
 
 static uint8_t typeToTag(enum ldl_mac_cmd_type type)
 {
-    return tags[type].tag;
+    uint8_t retval = 0U;
+    uint8_t i;
+
+    for(i=0U; i < (sizeof(tags)/sizeof(*tags)); i++){
+
+        if(tags[i].type == type){
+
+            retval = tags[i].tag;
+            break;
+        }
+    }
+
+    return retval;
 }
 
 static bool tagToType(uint8_t tag, enum ldl_mac_cmd_type *type)
