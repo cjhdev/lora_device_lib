@@ -34,6 +34,16 @@ static uint8_t typeToTag(enum ldl_mac_cmd_type type);
 static bool tagToType(uint8_t tag, enum ldl_mac_cmd_type *type);
 
 static const struct type_to_tag tags[] = {
+    {2U, LDL_CMD_LINK_CHECK},
+    {3U, LDL_CMD_LINK_ADR},
+    {4U, LDL_CMD_DUTY_CYCLE},
+    {5U, LDL_CMD_RX_PARAM_SETUP},
+    {6U, LDL_CMD_DEV_STATUS},
+    {7U, LDL_CMD_NEW_CHANNEL},
+    {8U, LDL_CMD_RX_TIMING_SETUP},
+    {9U, LDL_CMD_TX_PARAM_SETUP},
+    {10U, LDL_CMD_DL_CHANNEL},
+    {13U, LDL_CMD_DEVICE_TIME},
 #ifndef LDL_DISABLE_POINTONE
     {11U, LDL_CMD_REKEY},
     {12U, LDL_CMD_ADR_PARAM_SETUP},
@@ -46,16 +56,7 @@ static const struct type_to_tag tags[] = {
     {18U, LDL_CMD_BEACON_TIMING},
     {19U, LDL_CMD_BEACON_FREQ},
 #endif
-    {2U, LDL_CMD_LINK_CHECK},
-    {3U, LDL_CMD_LINK_ADR},
-    {4U, LDL_CMD_DUTY_CYCLE},
-    {5U, LDL_CMD_RX_PARAM_SETUP},
-    {6U, LDL_CMD_DEV_STATUS},
-    {7U, LDL_CMD_NEW_CHANNEL},
-    {8U, LDL_CMD_RX_TIMING_SETUP},
-    {9U, LDL_CMD_TX_PARAM_SETUP},
-    {10U, LDL_CMD_DL_CHANNEL},
-    {13U, LDL_CMD_DEVICE_TIME}
+
 };
 
 /* functions **********************************************************/
@@ -85,7 +86,6 @@ uint8_t LDL_MAC_sizeofCommandUp(enum ldl_mac_cmd_type type)
     case LDL_CMD_TX_PARAM_SETUP:
     case LDL_CMD_ADR_PARAM_SETUP:
     case LDL_CMD_DEVICE_TIME:
-    case LDL_CMD_BEACON_TIMING:
         retval = 1U;
         break;
     case LDL_CMD_LINK_ADR:
@@ -94,17 +94,24 @@ uint8_t LDL_MAC_sizeofCommandUp(enum ldl_mac_cmd_type type)
     case LDL_CMD_DL_CHANNEL:
     case LDL_CMD_REKEY:
     case LDL_CMD_REJOIN_PARAM_SETUP:
-    case LDL_CMD_PING_SLOT_INFO:
-    case LDL_CMD_BEACON_FREQ:
         retval = 2U;
         break;
     case LDL_CMD_DEV_STATUS:
     case LDL_CMD_FORCE_REJOIN:
         retval = 3U;
         break;
+#ifdef LDL_ENABLE_CLASS_B
+    case LDL_CMD_BEACON_TIMING:
+        retval = 1U;
+        break;
+    case LDL_CMD_PING_SLOT_INFO:
+    case LDL_CMD_BEACON_FREQ:
+        retval = 2U;
+        break;
     case LDL_CMD_PING_SLOT_CHANNEL:
         retval = 5U;
         break;
+#endif
     }
 
     return retval;
