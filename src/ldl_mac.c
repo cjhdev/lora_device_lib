@@ -39,25 +39,25 @@ enum {
 };
 
 #ifdef LDL_PARAM_TPS
-    #define GET_TPS() LDL_PARAM_TPS
+    #define GET_TPS() U32(LDL_PARAM_TPS)
 #else
     #define GET_TPS() self->tps
 #endif
 
 #ifdef LDL_PARAM_A
-    #define GET_A() LDL_PARAM_A
+    #define GET_A() U32(LDL_PARAM_A)
 #else
     #define GET_A() self->a
 #endif
 
 #ifdef LDL_PARAM_B
-    #define GET_B() LDL_PARAM_B
+    #define GET_B() U32(LDL_PARAM_B)
 #else
     #define GET_B() self->b
 #endif
 
 #ifdef LDL_PARAM_ADVANCE
-    #define GET_ADVANCE() LDL_PARAM_ADVANCE
+    #define GET_ADVANCE() U32(LDL_PARAM_ADVANCE)
 #else
     #define GET_ADVANCE() self->advance
 #endif
@@ -2987,7 +2987,7 @@ static uint32_t defaultRand(void *app)
     (void)app;
 
     /* I assure you that this is random */
-    return 42;
+    return 42U;
 }
 
 static uint8_t defaultBatteryLevel(void *app)
