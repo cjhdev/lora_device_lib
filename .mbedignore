@@ -3,5 +3,6 @@ pclint/*
 secrets/*
 test/*
 vendor/*
-wrappers/arduino/*
+wrappers/ruby/*
 examples/*
+tmp/*

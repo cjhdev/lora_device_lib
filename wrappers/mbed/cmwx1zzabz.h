@@ -19,44 +19,51 @@
  *
  * */
 
-#include "radio.h"
-#include "ldl_system.h"
-#include "ldl_radio.h"
+#ifndef MBED_LDL_CMWX1ZZABZ_H
+#define MBED_LDL_CMWX1ZZABZ_H
 
-using namespace LDL;
+#include "sx1276.h"
 
-/* constructors *******************************************************/
+namespace LDL {
 
-/* static protected ***************************************************/
+    /**
+     * A module that aggregates:
+     *
+     * - SX1276
+     * - TCXO with power switch
+     * - switches for engaging RFI, RFO, and BOOST
+     * - dedicated SPI peripheral
+     *
+     * Inherits radio so that it can be passed to the MAC.
+     *
+     * */
+    class CMWX1ZZABZ : public Radio {
 
-Radio *
-Radio::to_radio(void *self)
-{
-    return static_cast<Radio *>(self);
-}
+        protected:
 
-void
-Radio::_interrupt_handler(struct ldl_mac *self, enum ldl_radio_event event)
-{
-    if(to_radio(self)->event_cb){
+            SPI spi;
 
-        to_radio(self)->event_cb(event);
-    }
-}
+            DigitalOut enable_boost;
+            DigitalOut enable_rfo;
+            DigitalOut enable_rfi;
+            DigitalInOut enable_tcxo;
 
-/* protected **********************************************************/
+            SX1276 radio;
 
+            void set_mode(enum ldl_chip_mode mode);
 
-/* public *************************************************************/
+            void handle_event(enum ldl_radio_event event);
 
-void
-Radio::set_event_handler(Callback<void(enum ldl_radio_event)> handler)
-{
-    event_cb = handler;
-}
+        public:
 
-Radio *
-Radio::get_state()
-{
-    return this;
-}
+            CMWX1ZZABZ(
+                PinName enable_tcxo,
+                int16_t tx_gain = 0
+            );
+
+            const struct ldl_radio_interface *get_interface();
+            Radio *get_state();
+    };
+};
+
+#endif

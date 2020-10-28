@@ -5,7 +5,7 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
-## 0.4.5 (WIP)
+## 0.4.5
 
 - changed LDL_DEBUG, LDL_INFO, LDL_ERROR to not insert __FUNCTION__ into format string
 - changed LDL_DEBUG, LDL_INFO, LDL_ERROR to not take APP argument
@@ -36,6 +36,8 @@ work in progress.
 - added option of defining ldl_mac_init_arg.a at compile time with LDL_PARAM_A
 - added option of defining ldl_mac_init_arg.b at compile time with LDL_PARAM_B
 - added option of defining ldl_mac_init_arg.advance at compile time with LDL_PARAM_ADVANCE
+- refactored MBED radio wrapper so that CMWX1ZZABZ aggregates rather than inherits SX1276
+- refactored CMWX1ZZABZ driver to use fixed pin mapping (since it is fixed) which further simplifies its use
 
 ## 0.4.4
 

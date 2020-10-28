@@ -13,9 +13,6 @@ const uint8_t nwk_key[] = MBED_CONF_APP_NWK_KEY;
 const uint8_t dev_eui[] = MBED_CONF_APP_DEV_EUI;
 const uint8_t join_eui[] = MBED_CONF_APP_JOIN_EUI;
 
-/* pin mapping for the DISCO_L072CZ_LRWAN1 */
-SPI spi(PA_7, PA_6, PB_3);
-
 LDL::DefaultSM sm(app_key, nwk_key);
 
 LDL::DefaultStore store(dev_eui, join_eui);
@@ -24,14 +21,12 @@ int main()
 {
     mbed_trace_init();
 
+    /* PA_12 is where the reference design puts the TCXO on/off
+     * control line, and also where you will find it on the LRWAN
+     * kit.
+     *
+     * */
     static LDL::CMWX1ZZABZ radio(
-        spi,
-        PA_15,      // nss
-        PC_0,       // reset
-        PB_4, PB_1, // DIO0, DIO1
-        PC_1,       // enable_boost
-        PC_2,       // enable_rfo
-        PA_1,       // enable_rfi
         PA_12       // enable_tcxo
     );
 

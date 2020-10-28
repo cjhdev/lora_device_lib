@@ -133,8 +133,8 @@ MAC::start(enum ldl_region region)
     arg.app = this;
     arg.handler = app_handler;
 
-    arg.radio = (struct ldl_radio *)(&radio);
-    arg.radio_interface = &radio.interface;
+    arg.radio = (struct ldl_radio *)radio.get_state();
+    arg.radio_interface = radio.get_interface();
 
     arg.sm = (struct ldl_sm *)(&sm);
     arg.sm_interface = &sm.interface;

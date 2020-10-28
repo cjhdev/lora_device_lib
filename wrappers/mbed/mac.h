@@ -27,7 +27,9 @@
 #include "ldl_mac.h"
 #include "ldl_system.h"
 
-#include "radio.h"
+#include "sx1272.h"
+#include "sx1276.h"
+#include "cmwx1zzabz.h"
 #include "sm.h"
 #include "store.h"
 

@@ -19,38 +19,51 @@
  *
  * */
 
-#ifndef MBED_LDL_RADIO_H
-#define MBED_LDL_RADIO_H
+#ifndef MBED_LDL_SX1272_H
+#define MBED_LDL_SX1272_H
 
-#include "mbed.h"
-#include "ldl_radio.h"
-#include "ldl_system.h"
+#include "spi_radio.h"
 
 namespace LDL {
 
-    /** Radio driver base class
-     *
-     * Users should instantiate one of the subclasses named for the
-     * transciever or module they wish to drive.
-     *
-     * */
-    class Radio {
+    class SX1272 : public SPIRadio {
 
         protected:
 
-            static Radio *to_radio(void *self);
+            DigitalInOut reset;
+            InterruptIn dio0;
+            InterruptIn dio1;
 
-            Callback<void(enum ldl_radio_event)> event_cb;
+            Callback<void(enum ldl_chip_mode)> chip_mode_cb;
 
-            static void _interrupt_handler(struct ldl_mac *self, enum ldl_radio_event event);
+            static void _chip_set_mode(void *self, enum ldl_chip_mode mode);
+
+            static void _chip_set_mode(enum ldl_chip_mode mode);
+            void chip_set_mode(enum ldl_chip_mode mode);
+
+            void dio0_handler();
+            void dio1_handler();
 
         public:
 
-            void set_event_handler(Callback<void(enum ldl_radio_event)> handler);
-
-            virtual Radio *get_state();
-            virtual const struct ldl_radio_interface *get_interface() = 0;
+            SX1272(
+                SPI& spi,
+                PinName nss,
+                PinName reset,
+                PinName dio0,
+                PinName dio1,
+                PinName dio2 = NC,
+                PinName dio3 = NC,
+                PinName dio4 = NC,
+                PinName dio5 = NC,
+                enum ldl_radio_pa pa = LDL_RADIO_PA_RFO,
+                int16_t tx_gain = 0,
+                enum ldl_radio_xtal xtal = LDL_RADIO_XTAL_CRYSTAL,
+                uint8_t xtal_delay = 1UL,
+                Callback<void(enum ldl_chip_mode)> = nullptr
+            );
     };
+
 };
 
 #endif

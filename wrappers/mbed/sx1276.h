@@ -19,44 +19,49 @@
  *
  * */
 
-#include "radio.h"
-#include "ldl_system.h"
-#include "ldl_radio.h"
+#ifndef MBED_LDL_SX1276_H
+#define MBED_LDL_SX1276_H
 
-using namespace LDL;
+#include "spi_radio.h"
 
-/* constructors *******************************************************/
+namespace LDL {
 
-/* static protected ***************************************************/
+    class SX1276 : public SPIRadio {
 
-Radio *
-Radio::to_radio(void *self)
-{
-    return static_cast<Radio *>(self);
-}
+        protected:
 
-void
-Radio::_interrupt_handler(struct ldl_mac *self, enum ldl_radio_event event)
-{
-    if(to_radio(self)->event_cb){
+            DigitalInOut reset;
+            InterruptIn dio0;
+            InterruptIn dio1;
 
-        to_radio(self)->event_cb(event);
-    }
-}
+            Callback<void(enum ldl_chip_mode)> chip_mode_cb;
 
-/* protected **********************************************************/
+            static void _chip_set_mode(void *self, enum ldl_chip_mode mode);
+            void chip_set_mode(enum ldl_chip_mode mode);
 
+            void dio0_handler();
+            void dio1_handler();
 
-/* public *************************************************************/
+        public:
 
-void
-Radio::set_event_handler(Callback<void(enum ldl_radio_event)> handler)
-{
-    event_cb = handler;
-}
+            SX1276(
+                SPI& spi,
+                PinName nss,
+                PinName reset,
+                PinName dio0,
+                PinName dio1,
+                PinName dio2 = NC,
+                PinName dio3 = NC,
+                PinName dio4 = NC,
+                PinName dio5 = NC,
+                enum ldl_radio_pa pa = LDL_RADIO_PA_RFO,
+                int16_t tx_gain = 0,
+                enum ldl_radio_xtal xtal = LDL_RADIO_XTAL_CRYSTAL,
+                uint8_t xtal_delay = 1UL,
+                Callback<void(enum ldl_chip_mode)> = nullptr
+            );
+    };
 
-Radio *
-Radio::get_state()
-{
-    return this;
-}
+};
+
+#endif
