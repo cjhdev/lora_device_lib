@@ -5,6 +5,10 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
+## 0.4.6
+
+- added Ruby wrapper and example
+
 ## 0.4.5
 
 - changed LDL_DEBUG, LDL_INFO, LDL_ERROR to not insert __FUNCTION__ into format string

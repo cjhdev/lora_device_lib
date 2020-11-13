@@ -4,7 +4,7 @@
 DIR_PROJECT_ROOT := $(shell cd ../..;pwd)
 
 # change this to point to your container
-DOCKER := docker run --mount type=bind,source=$(DIR_PROJECT_ROOT),destination=/mbed/lora_device_lib -ti --rm --user 1000:1000 -v $(shell pwd):/mbed:cached my-mbed-cli
+DOCKER := docker run -ti --rm --user 1000:1000 --mount type=bind,source=$(DIR_PROJECT_ROOT),destination=/mbed/lora_device_lib  -v $(shell pwd):/mbed:cached my-mbed-cli
 
 # special MBED name for target
 DEVICE ?= DISCO_L072CZ_LRWAN1
@@ -36,6 +36,9 @@ JLINK 	   := JLinkExe
 DIR_BUILD := BUILD/$(DEVICE)/GCC_ARM-DEBUG
 
 compile: $(DIR_BUILD)/mbed.elf
+
+init:
+	git clone https://github.com/ARMmbed/mbed-os
 
 $(DIR_BUILD)/mbed.elf:
 	$(MBED) compile -m $(DEVICE) -t GCC_ARM --profile debug
@@ -79,7 +82,7 @@ clean:
 	rm -f .gdbinit upload_flash.jlink
 	rm -rf $(DIR_BUILD)
 
-.PHONY: clean gdb_server $(DIR_BUILD)/mbed.elf upload_flash.jlink .gdbinit config
+.PHONY: clean gdb_server $(DIR_BUILD)/mbed.elf upload_flash.jlink .gdbinit config init
 
 config:
 	$(MBED) compile --config -v

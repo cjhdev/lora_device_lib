@@ -1,0 +1,19 @@
+require 'rake/testtask'
+require 'rake/extensiontask'
+require 'fileutils'
+
+task :compile => [:clean]
+
+Rake::ExtensionTask.new  do |ext|
+  ext.name = "ext_ldl"
+  ext.ext_dir = "wrappers/ruby/ext/ldl/ext_ldl"
+  ext.lib_dir = "wrappers/ruby/lib/ldl"
+end
+
+Rake::TestTask.new do |t|
+  t.name = :test
+  t.libs << "wrappers/ruby/lib"
+  t.test_files = FileList["wrappers/ruby/test/**/*_test.rb"]
+end
+
+task :default => :test
