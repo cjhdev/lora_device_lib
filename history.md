@@ -8,6 +8,7 @@ work in progress.
 ## 0.4.6
 
 - added Ruby wrapper and example
+- changed LDL_TIMER_BAND to interrupt less frequently
 
 ## 0.4.5
 

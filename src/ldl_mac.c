@@ -435,17 +435,15 @@ void LDL_MAC_process(struct ldl_mac *self)
 
     time = timeUntilNextBandEvent(self);
 
-    /* transfer band events to the timer if they will occur in the next
-     * 90 seconds */
-    if(time < (U32(90) * timeTPS)){
+	/* transfer next band event to band timer */
+	if(time < (INT32_MAX/GET_TPS()*timeTPS)){
 
-        LDL_MAC_timerSet(self, LDL_TIMER_BAND, timeToTicks(self, time));
-    }
-    else{
+		LDL_MAC_timerSet(self, LDL_TIMER_BAND, timeToTicks(self, time));
+	}
+	else{
 
-        /* check again 60 seconds from now */
-        LDL_MAC_timerSet(self, LDL_TIMER_BAND, U32(60) * GET_TPS());
-    }
+		LDL_MAC_timerSet(self, LDL_TIMER_BAND, INT32_MAX/GET_TPS()*INT32_MAX);
+	}
 }
 
 uint32_t LDL_MAC_ticksUntilNextEvent(const struct ldl_mac *self)
@@ -2706,14 +2704,11 @@ static void processBands(struct ldl_mac *self)
 
         self->time.ticks = ticks;
 
-        if(since <= U32(INT32_MAX)){
+		uint32_t fraction = ((since % GET_TPS()) * timeTPS) + self->time.remainder;
 
-            uint32_t fraction = ((since % GET_TPS()) * timeTPS) + self->time.remainder;
+		time = ((since / GET_TPS()) * timeTPS) + (fraction / GET_TPS());
 
-            time = ((since / GET_TPS()) * timeTPS) + (fraction / GET_TPS());
-
-            self->time.remainder = fraction % GET_TPS();
-        }
+		self->time.remainder = fraction % GET_TPS();        
     }
 
     /* decrement down counters with time */

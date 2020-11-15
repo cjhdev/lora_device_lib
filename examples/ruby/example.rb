@@ -18,6 +18,8 @@ opts = {
 scenario = Scenario.new(**opts) do |device|
 
   device.mac.otaa
+
+  sleep
   
 end
 
