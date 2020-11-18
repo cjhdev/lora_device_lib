@@ -19,6 +19,7 @@
  *
  * */
 
+#include "ldl_internal.h"
 #include "ldl_radio_debug.h"
 #include "ldl_radio.h"
 #include "ldl_debug.h"
@@ -99,6 +100,7 @@ static void debugRegister(struct ldl_radio *self, const char *fn, const struct l
 
         LDL_TRACE_PART("RegOpMode): reg=0x%02X value=0x%02X ", reg, data)
 
+#ifdef LDL_ENABLE_SX1272
         if(self->type == LDL_RADIO_SX1272){
 
             LDL_TRACE_PART("LongRangeMode=%u AccessSharedRegister=%s Mode=%s",
@@ -107,7 +109,9 @@ static void debugRegister(struct ldl_radio *self, const char *fn, const struct l
                 opMode[data & 7]
             )
         }
-        else{
+        else
+#endif        
+        {
 
             LDL_TRACE_PART("LongRangeMode=%u AccessSharedRegister=%s LowFrequencyModeOn=%u Mode=%s",
                 (data >> 7) & 1U,
@@ -122,6 +126,7 @@ static void debugRegister(struct ldl_radio *self, const char *fn, const struct l
 
         LDL_TRACE_PART("RegModemConfig1): reg=0x%02X value=0x%02X ", reg, data)
 
+#ifdef LDL_ENABLE_SX1272
         if(self->type == LDL_RADIO_SX1272){
 
             LDL_TRACE_PART("Bw=%u CodingRate=%u ImplicitHeaderModeOn=%u RxPayloadCrcOn=%u LowDataRateOptimize=%u",
@@ -132,7 +137,9 @@ static void debugRegister(struct ldl_radio *self, const char *fn, const struct l
                 data & 1U
             )
         }
-        else{
+        else
+#endif        
+        {
 
             LDL_TRACE_PART("Bw=%u CodingRate=%u ImplicitHeaderModeOn=%u",
                 (data >> 4) & 0xfU,
@@ -146,6 +153,7 @@ static void debugRegister(struct ldl_radio *self, const char *fn, const struct l
 
         LDL_TRACE_PART("RegModemConfig2): reg=0x%02X value=0x%02X ", reg, data)
 
+#ifdef LDL_ENABLE_SX1272
         if(self->type == LDL_RADIO_SX1272){
 
             LDL_TRACE_PART("SpreadingFactor=%u TxContinuousMode=%u AgcAutoOn=%u SymbTimeout=%u",
@@ -155,7 +163,9 @@ static void debugRegister(struct ldl_radio *self, const char *fn, const struct l
                 data & 3U
             )
         }
-        else{
+        else
+#endif        
+        {
 
             LDL_TRACE_PART("SpreadingFactor=%u TxContinuousMode=%u RxPayloadCrcOn=%u SymbTimeout=%u",
                 (data >> 4 & 0xfU),
@@ -295,6 +305,7 @@ static void debugRegister(struct ldl_radio *self, const char *fn, const struct l
 
         LDL_TRACE_PART("RegLna): reg=0x%02X value=0x%02X ", reg, data)
 
+#ifdef LDL_ENABLE_SX1272
         if(self->type == LDL_RADIO_SX1272){
 
             LDL_TRACE_PART("LnaGain=%u LnaBoost=%u",
@@ -302,7 +313,9 @@ static void debugRegister(struct ldl_radio *self, const char *fn, const struct l
                 data & 3U
             )
         }
-        else{
+        else
+#endif        
+        {
 
             LDL_TRACE_PART("LnaGain=%u LnaBoostLf=%u LnaBoostHf=%u",
                 (data >> 5) & 7U,
