@@ -121,7 +121,6 @@ static uint32_t getRetryDuty(const struct ldl_mac *self);
 
 static uint32_t msToTime(uint32_t ms);
 static uint32_t msToTicks(const struct ldl_mac *self, uint32_t ms);
-static uint32_t timeToTicks(const struct ldl_mac *self, uint32_t time);
 
 static const uint32_t timeTPS = U32(0x100);
 static const uint8_t sessionMagicNumber = 0xdbU;
@@ -361,6 +360,7 @@ void LDL_MAC_cancel(struct ldl_mac *self)
 void LDL_MAC_process(struct ldl_mac *self)
 {
     uint32_t time;
+    uint32_t ticks;
 
     LDL_PEDANTIC(self != NULL)
 
@@ -435,15 +435,17 @@ void LDL_MAC_process(struct ldl_mac *self)
 
     time = timeUntilNextBandEvent(self);
 
-	/* transfer next band event to band timer */
-	if(time < (INT32_MAX/GET_TPS()*timeTPS)){
+    /* transfer next band event to band timer */
+    if(time < (INT32_MAX/GET_TPS()*timeTPS)){
 
-		LDL_MAC_timerSet(self, LDL_TIMER_BAND, timeToTicks(self, time));
-	}
-	else{
+        ticks = ((time / timeTPS) + (((time % timeTPS) > 0U) ? U32(1) : U32(0))) * GET_TPS();
+    }
+    else{
 
-		LDL_MAC_timerSet(self, LDL_TIMER_BAND, INT32_MAX/GET_TPS()*INT32_MAX);
-	}
+        ticks = INT32_MAX/GET_TPS()*INT32_MAX;
+    }
+
+    LDL_MAC_timerSet(self, LDL_TIMER_BAND, ticks);
 }
 
 uint32_t LDL_MAC_ticksUntilNextEvent(const struct ldl_mac *self)
@@ -2694,7 +2696,7 @@ static uint32_t timerDelta(uint32_t timeout, uint32_t time)
 static void processBands(struct ldl_mac *self)
 {
     size_t i;
-    uint32_t time = 0U;
+    uint32_t time = 0;
 
     /* time tracking via ticks */
     {
@@ -2704,21 +2706,21 @@ static void processBands(struct ldl_mac *self)
 
         self->time.ticks = ticks;
 
-		uint32_t fraction = ((since % GET_TPS()) * timeTPS) + self->time.remainder;
+        uint32_t fraction = ((since % GET_TPS()) * timeTPS) + self->time.remainder;
 
-		time = ((since / GET_TPS()) * timeTPS) + (fraction / GET_TPS());
+        time = ((since / GET_TPS()) * timeTPS) + (fraction / GET_TPS());
 
-		self->time.remainder = fraction % GET_TPS();        
+        self->time.remainder = fraction % GET_TPS();
     }
 
     /* decrement down counters with time */
-    for(i=0U; i < (sizeof(self->band)/sizeof(*self->band)); i++){
+    for(i=0; i < sizeof(self->band)/sizeof(*self->band); i++){
 
         if(self->band[i] > 0U){
 
             if(self->band[i] < time){
 
-              self->band[i] = 0U;
+              self->band[i] = 0;
             }
             else{
 
@@ -2910,12 +2912,6 @@ static uint32_t msToTicks(const struct ldl_mac *self, uint32_t ms)
     uint32_t t = ms * GET_TPS();
 
     return (t / U32(1000)) + (((t % U32(1000)) > 0U) ? U32(1) : U32(0));
-}
-
-static uint32_t timeToTicks(const struct ldl_mac *self, uint32_t time)
-{
-    /* round down */
-    return  ((time * GET_TPS()) / timeTPS);
 }
 
 static uint32_t timeUntilNextChannel(const struct ldl_mac *self, uint8_t rate)
