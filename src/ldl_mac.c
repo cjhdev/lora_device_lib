@@ -1,4 +1,4 @@
-/* Copyright (c) 2019-2020 Cameron Harper
+/* Copyright (c) 2019-2021 Cameron Harper
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -68,29 +68,46 @@ enum {
     #define GET_BEACON_INTERVAL() (self->beaconInterval * U32(256));
 #endif
 
+#ifdef LDL_DISABLE_SF12
+    #define MIN_RATE 1
+#else
+    #define MIN_RATE 0
+#endif
+
 /* static function prototypes *****************************************/
 
+
 static void processInit(struct ldl_mac *self);
-static void processReset(struct ldl_mac *self);
-static void processStartup(struct ldl_mac *self);
-static void processWaitRadio(struct ldl_mac *self);
-static void processWaitTX(struct ldl_mac *self);
-static void processTX(struct ldl_mac *self);
-static void processRX(struct ldl_mac *self);
-static void processWaitRX1(struct ldl_mac *self);
-static void processWaitRX2(struct ldl_mac *self);
-static void processWaitRXEntropy(struct ldl_mac *self);
-static void processRX2Lockout(struct ldl_mac *self);
-static void processWaitRetry(struct ldl_mac *self);
+static void processRadioReset(struct ldl_mac *self, enum ldl_mac_sme event);
+
+static void processRadioBoot(struct ldl_mac *self, enum ldl_mac_sme event);
+
+static void processWait(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag);
+
+static void processWaitOTAA(struct ldl_mac *self, enum ldl_mac_sme event);
+
+static void processStartRadioForEntropy(struct ldl_mac *self, enum ldl_mac_sme event);
+static void processEntropy(struct ldl_mac *self, enum ldl_mac_sme event);
+
+static void processStartRadioForTX(struct ldl_mac *self, enum ldl_mac_sme event);
+static void processTX(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag);
+
+static void processStartRadioForRX1(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag);
+static void processStartRadioForRX2(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag);
+static void processRX(struct ldl_mac *self, enum ldl_mac_sme event);
+
+static void processRX2Lockout(struct ldl_mac *self, enum ldl_mac_sme event);
 
 static void debugSession(struct ldl_mac *self);
 static uint32_t extraSymbols(uint32_t xtal_error, uint32_t symbol_period);
 static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confirmed, uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts);
 static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len);
-static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prevChIndex, uint32_t limit, uint8_t *chIndex, uint32_t *freq);
-static void registerTime(struct ldl_mac *self, uint32_t freq, uint32_t time);
+static bool selectChannel(const struct ldl_mac *self, uint8_t desired_rate, uint32_t limit, struct ldl_mac_tx *tx);
+static uint8_t requiredRate(uint8_t desired, uint8_t min, uint8_t max);
+static void selectJoinChannelAndRate(struct ldl_mac *self, struct ldl_mac_tx *tx);
+static void registerTime(struct ldl_mac *self, const struct ldl_mac_tx *tx);
 static bool getChannel(const struct ldl_mac *self, uint8_t chIndex, uint32_t *freq, uint8_t *minRate, uint8_t *maxRate);
-static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rate, uint32_t limit);
+static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint32_t limit);
 static void initSession(struct ldl_mac *self, enum ldl_region region);
 static void forgetNetwork(struct ldl_mac *self);
 static bool setChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate);
@@ -99,14 +116,13 @@ static bool unmaskChannel(uint8_t *mask, size_t max, enum ldl_region region, uin
 static void unmaskAllChannels(uint8_t *mask, size_t max);
 static bool channelIsMasked(const uint8_t *mask, size_t max, enum ldl_region region, uint8_t chIndex);
 static uint32_t symbolPeriod(uint32_t tps, enum ldl_spreading_factor sf, enum ldl_signal_bandwidth bw);
-static bool timeUntilAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rate, uint32_t *time);
+static uint32_t timeUntilAvailable(const struct ldl_mac *self, uint8_t chIndex);
 static bool rateSettingIsValid(enum ldl_region region, uint8_t rate);
 static bool adaptRate(struct ldl_mac *self);
-static void processBands(struct ldl_mac *self);
-static uint32_t timeUntilNextBandEvent(const struct ldl_mac *self);
-static void finaliseUnconfirmedUp(struct ldl_mac *self);
+static bool processBands(struct ldl_mac *self);
+static void setNextBandEvent(struct ldl_mac *self);
 static void downlinkMissingHandler(struct ldl_mac *self);
-static uint32_t timeUntilNextChannel(const struct ldl_mac *self, uint8_t rate);
+static uint32_t timeUntilNextChannel(const struct ldl_mac *self);
 static uint32_t timerDelta(uint32_t timeout, uint32_t time);
 static void pushSessionUpdate(struct ldl_mac *self);
 static void dummyResponseHandler(void *app, enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg);
@@ -116,11 +132,20 @@ static void clearPendingCommand(struct ldl_mac *self, enum ldl_mac_cmd_type type
 static void setPendingCommand(struct ldl_mac *self, enum ldl_mac_cmd_type type);
 static uint32_t defaultRand(void *app);
 static uint8_t defaultBatteryLevel(void *app);
-static void refreshDayCounter(struct ldl_mac *self);
-static uint32_t getRetryDuty(const struct ldl_mac *self);
+static uint32_t getOTAAOffTime(const struct ldl_mac *self);
+static void handleRadioError(struct ldl_mac *self);
+#ifndef LDL_DISABLE_TX_PARAM_SETUP
+static bool uplinkDwell(uint8_t tx_param_setup);
+#endif
 
 static uint32_t msToTime(uint32_t ms);
 static uint32_t msToTicks(const struct ldl_mac *self, uint32_t ms);
+
+static void inputArm(struct ldl_mac *self);
+static void inputDisarm(struct ldl_mac *self);
+static bool inputCheck(struct ldl_mac *self, uint32_t *lag);
+static void inputSignal(struct ldl_mac *self, uint32_t ticks);
+static bool inputPending(const struct ldl_mac *self);
 
 static const uint32_t timeTPS = U32(0x100);
 static const uint8_t sessionMagicNumber = 0xdbU;
@@ -132,11 +157,13 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
     LDL_PEDANTIC(self != NULL)
     LDL_PEDANTIC(arg != NULL)
 
-
     LDL_PEDANTIC(arg->joinEUI != NULL)
     LDL_PEDANTIC(arg->devEUI != NULL)
     LDL_PEDANTIC(arg->devEUI != NULL)
     LDL_PEDANTIC(arg->ticks != NULL);
+
+    LDL_PEDANTIC(arg->radio_interface != NULL);
+    LDL_PEDANTIC(arg->sm_interface != NULL);
 
     (void)memset(self, 0, sizeof(*self));
 
@@ -154,8 +181,12 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
 #ifndef LDL_PARAM_ADVANCE
     self->advance = arg->advance;
 #endif
+#ifdef LDL_ENABLE_OTAA_DITHER
+    self->otaaDither = arg->otaaDither;
+#endif
 
-    LDL_PEDANTIC(GET_TPS() >= U32(1000))    /* ideally 1M >= tps >= 1K */
+    /* 1M >= tps >= 1K */
+    LDL_PEDANTIC((GET_TPS() >= U32(1000)) && (GET_TPS() <= U32(1000000)))
 
     self->ticks = arg->ticks;
     self->rand = (arg->rand != NULL) ? arg->rand : defaultRand;
@@ -165,10 +196,10 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
     self->handler = (arg->handler != NULL) ? arg->handler : dummyResponseHandler;
 
     self->radio = arg->radio;
-    self->radio_interface = (arg->radio_interface != NULL) ? arg->radio_interface : &LDL_Radio_interface;
+    self->radio_interface = arg->radio_interface;
 
     self->sm = arg->sm;
-    self->sm_interface = (arg->sm_interface != NULL) ? arg->sm_interface : &LDL_SM_interface;
+    self->sm_interface = arg->sm_interface;
 
     self->devNonce = arg->devNonce;
     self->joinNonce = arg->joinNonce;
@@ -202,17 +233,41 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
 #endif
 #endif
 
-    debugSession(self);
-
-    self->band[LDL_BAND_GLOBAL] = (uint32_t)LDL_STARTUP_DELAY;
+    self->band[LDL_BAND_GLOBAL] = msToTime(U32(LDL_STARTUP_DELAY));
 
     self->time.ticks = self->ticks(self->app);
 
-    self->state = LDL_STATE_INIT;
+    LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
 
-    /* wait 100ms for POR to stabilise */
-    LDL_MAC_timerSet(self, LDL_TIMER_WAITA, GET_TPS()/8U);
+    debugSession(self);
 }
+
+enum ldl_mac_status LDL_MAC_entropy(struct ldl_mac *self)
+{
+    LDL_PEDANTIC(self != NULL)
+
+    enum ldl_mac_status retval;
+
+    if(self->op == LDL_OP_NONE){
+
+        self->op = LDL_OP_ENTROPY;
+
+        if(self->state == LDL_STATE_IDLE){
+
+            self->state = LDL_STATE_RADIO_BOOT;
+            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
+        }
+
+        retval = LDL_STATUS_OK;
+    }
+    else{
+
+        retval = LDL_STATUS_BUSY;
+    }
+
+    return retval;
+}
+
 
 enum ldl_mac_operation LDL_MAC_op(const struct ldl_mac *self)
 {
@@ -242,69 +297,48 @@ enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self)
 {
     struct ldl_frame_join_request f;
     enum ldl_mac_status retval;
-    uint32_t delay = 0U;
 
     LDL_PEDANTIC(self != NULL)
 
-    if(self->state == LDL_STATE_IDLE){
+    if(self->ctx.joined){
 
-        if(self->ctx.joined){
+        retval = LDL_STATUS_JOINED;
+    }
+    else if(self->op == LDL_OP_NONE){
 
-            LDL_MAC_forget(self);
+        self->trials = 0;
+        self->day = U32(60) * U32(60) * U32(24) * timeTPS;
+
+        f.joinEUI = self->joinEUI;
+        f.devEUI = self->devEUI;
+
+#if defined(LDL_ENABLE_L2_1_0_3)
+        self->devNonce = self->rand(self->app);
+#endif
+
+#if defined(LDL_ENABLE_L2_1_1)
+        LDL_OPS_deriveJoinKeys(self);
+#endif
+
+        f.devNonce = self->devNonce;
+
+        self->bufferLen = LDL_OPS_prepareJoinRequest(self, &f, self->buffer, U8(sizeof(self->buffer)));
+
+        self->tx.power = 0;
+
+        selectJoinChannelAndRate(self, &self->tx);
+
+        self->op = LDL_OP_JOINING;
+
+        if(self->state == LDL_STATE_IDLE){
+
+            self->state = LDL_STATE_WAIT_OTAA;
+            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
         }
 
-        self->trials = 0U;
+        retval = LDL_STATUS_OK;
 
-        self->tx.rate = LDL_Region_getJoinRate(self->ctx.region, self->trials);
-        self->band[LDL_BAND_RETRY] = 0U;
-        self->tx.power = 0U;
-
-        if(self->band[LDL_BAND_GLOBAL] == 0UL){
-
-            if(selectChannel(self, self->tx.rate, self->tx.chIndex, 0U, &self->tx.chIndex, &self->tx.freq)){
-
-#ifndef LDL_DISABLE_POINTONE
-                LDL_OPS_deriveJoinKeys(self);
-#endif
-
-                f.joinEUI = self->joinEUI;
-                f.devEUI = self->devEUI;
-
-#ifdef LDL_DISABLE_POINTONE
-#ifndef LDL_DISABLE_RANDOM_DEV_NONCE
-                /* LoRAWAN 1.0.2 and 1.0.3 uses random nonce */
-                self->devNonce = self->rand(self->app);
-#endif
-#endif
-                f.devNonce = self->devNonce;
-
-                self->bufferLen = LDL_OPS_prepareJoinRequest(self, &f, self->buffer, (uint8_t)sizeof(self->buffer));
-
-#ifndef LDL_ENABLE_FAST_DEBUG
-                delay = self->rand(self->app) % (U32(60)*GET_TPS());
-#endif
-                LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
-
-                self->state = LDL_STATE_WAIT_TX;
-                self->op = LDL_OP_JOINING;
-                retval = LDL_STATUS_OK;
-
-                self->band[LDL_BAND_DUTY] = 0U;
-
-                LDL_DEBUG("ticks=%" PRIu32 " delay=%" PRIu32 "",
-                    self->ticks(self->app),
-                    delay
-                )
-            }
-            else{
-
-                retval = LDL_STATUS_NOCHANNEL;
-            }
-        }
-        else{
-
-            retval = LDL_STATUS_NOCHANNEL;
-        }
+        LDL_DEBUG("OTAA is pending")
     }
     else{
 
@@ -327,6 +361,8 @@ void LDL_MAC_forget(struct ldl_mac *self)
 
     if(self->ctx.joined){
 
+        self->band[LDL_BAND_GLOBAL] = 0;
+
         forgetNetwork(self);
 
         pushSessionUpdate(self);
@@ -337,115 +373,166 @@ void LDL_MAC_cancel(struct ldl_mac *self)
 {
     LDL_PEDANTIC(self != NULL)
 
-    if(self->state != LDL_STATE_INIT){
+    enum ldl_mac_operation op = self->op;
 
-        switch(self->op){
-        case LDL_OP_RESET:
-        case LDL_OP_ENTROPY:
-        case LDL_OP_NONE:
-            break;
-        case LDL_OP_JOINING:
-        case LDL_OP_REJOINING:
-        case LDL_OP_DATA_UNCONFIRMED:
-        case LDL_OP_DATA_CONFIRMED:
-        default:
-            self->state = LDL_STATE_IDLE;
-            self->op = LDL_OP_NONE;
-            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
-            break;
+    self->op = LDL_OP_NONE;
+
+    switch(self->state){
+    default:
+
+        LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
+        LDL_MAC_timerClear(self, LDL_TIMER_WAITB);
+        inputDisarm(self);
+
+        /* ensure the radio will return to a useful state */
+        self->state = LDL_STATE_RADIO_RESET;
+        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_RESET);
+        break;
+
+    /* no need to touch radio in these states */
+    case LDL_STATE_INIT:
+    case LDL_STATE_RADIO_RESET:
+    case LDL_STATE_RADIO_BOOT:
+        break;
+    }
+
+    if(self->state == LDL_STATE_TX){
+
+#ifdef LDL_ENABLE_TEST_MODE
+        if(!self->unlimitedDutyCycle)
+#endif
+        {
+            registerTime(self, &self->tx);
         }
+    }
+
+    switch(op){
+    default:
+    case LDL_OP_NONE:
+        /* do nothing */
+        break;
+    case LDL_OP_ENTROPY:
+    case LDL_OP_JOINING:
+    case LDL_OP_REJOINING:
+    case LDL_OP_DATA_UNCONFIRMED:
+    case LDL_OP_DATA_CONFIRMED:
+
+        self->handler(self->app, LDL_MAC_OP_CANCELLED, NULL);
+        break;
     }
 }
 
 void LDL_MAC_process(struct ldl_mac *self)
 {
-    uint32_t time;
-    uint32_t ticks;
-
     LDL_PEDANTIC(self != NULL)
 
-    processBands(self);
+    enum ldl_mac_sme event;
+    uint32_t lag;
+    bool channel_ready;
 
-    switch(self->state){
-    default:
-    case LDL_STATE_IDLE:
-        /* do nothing */
-        break;
-    case LDL_STATE_INIT:
+    channel_ready = processBands(self);
 
-        processInit(self);
-        break;
+    if(inputCheck(self, &lag)){
 
-    case LDL_STATE_RESET:
-
-        processReset(self);
-        break;
-
-    case LDL_STATE_STARTUP:
-
-        processStartup(self);
-        break;
-
-    case LDL_STATE_WAIT_TX:
-
-        processWaitTX(self);
-        break;
-
-    case LDL_STATE_WAIT_RADIO:
-
-        processWaitRadio(self);
-        break;
-
-    case LDL_STATE_WAIT_RX_ENTROPY:
-
-        processWaitRXEntropy(self);
-        break;
-
-    case LDL_STATE_TX:
-
-        processTX(self);
-        break;
-
-    case LDL_STATE_WAIT_RX1:
-
-        processWaitRX1(self);
-        break;
-
-    case LDL_STATE_WAIT_RX2:
-
-        processWaitRX2(self);
-        break;
-
-    case LDL_STATE_RX1:
-    case LDL_STATE_RX2:
-
-        processRX(self);
-        break;
-
-    case LDL_STATE_RX2_LOCKOUT:
-
-        processRX2Lockout(self);
-        break;
-
-    case LDL_STATE_WAIT_RETRY:
-
-        processWaitRetry(self);
-        break;
+        event = LDL_SME_INTERRUPT;
     }
+    else if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &lag)){
 
-    time = timeUntilNextBandEvent(self);
+        event = LDL_SME_TIMER_A;
+    }
+    else if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITB, &lag)){
 
-    /* transfer next band event to band timer */
-    if(time < (INT32_MAX/GET_TPS()*timeTPS)){
+        event = LDL_SME_TIMER_B;
+    }
+    else if(channel_ready){
 
-        ticks = ((time / timeTPS) + (((time % timeTPS) > 0U) ? U32(1) : U32(0))) * GET_TPS();
+        event = LDL_SME_BAND;
     }
     else{
 
-        ticks = INT32_MAX/GET_TPS()*INT32_MAX;
+        event = LDL_SME_NONE;
     }
 
-    LDL_MAC_timerSet(self, LDL_TIMER_BAND, ticks);
+    if(event != LDL_SME_NONE){
+
+        switch(self->state){
+        default:
+        case LDL_STATE_IDLE:
+            /* do nothing */
+            break;
+
+        case LDL_STATE_INIT:
+
+            processInit(self);
+            break;
+
+        case LDL_STATE_RADIO_RESET:
+
+            processRadioReset(self, event);
+            break;
+
+        case LDL_STATE_RADIO_BOOT:
+
+            processRadioBoot(self, event);
+            break;
+
+        case LDL_STATE_WAIT_ENTROPY:
+        case LDL_STATE_WAIT_TX:
+        case LDL_STATE_WAIT_RX1:
+        case LDL_STATE_WAIT_RX2:
+
+            processWait(self, event, lag);
+            break;
+
+        case LDL_STATE_START_RADIO_FOR_ENTROPY:
+
+            processStartRadioForEntropy(self, event);
+            break;
+
+        case LDL_STATE_ENTROPY:
+
+            processEntropy(self, event);
+            break;
+
+        case LDL_STATE_WAIT_OTAA:
+
+            processWaitOTAA(self, event);
+            break;
+
+        case LDL_STATE_START_RADIO_FOR_TX:
+
+            processStartRadioForTX(self, event);
+            break;
+
+        case LDL_STATE_TX:
+
+            processTX(self, event, lag);
+            break;
+
+        case LDL_STATE_START_RADIO_FOR_RX1:
+
+            processStartRadioForRX1(self, event, lag);
+            break;
+
+        case LDL_STATE_START_RADIO_FOR_RX2:
+
+            processStartRadioForRX2(self, event, lag);
+            break;
+
+        case LDL_STATE_RX1:
+        case LDL_STATE_RX2:
+
+            processRX(self, event);
+            break;
+
+        case LDL_STATE_RX2_LOCKOUT:
+
+            processRX2Lockout(self, event);
+            break;
+        }
+    }
+
+    setNextBandEvent(self);
 }
 
 uint32_t LDL_MAC_ticksUntilNextEvent(const struct ldl_mac *self)
@@ -454,7 +541,7 @@ uint32_t LDL_MAC_ticksUntilNextEvent(const struct ldl_mac *self)
 
     uint32_t retval = 0U;
 
-    if(!LDL_MAC_inputPending(self)){
+    if(!inputPending(self)){
 
         retval = LDL_MAC_timerTicksUntilNext(self);
     }
@@ -544,36 +631,22 @@ bool LDL_MAC_ready(const struct ldl_mac *self)
 
     if(self->state == LDL_STATE_IDLE){
 
-        retval = (timeUntilNextChannel(self, self->ctx.rate) == 0UL);
+        retval = (timeUntilNextChannel(self) == 0U);
     }
 
     return retval;
 }
 
-void LDL_MAC_radioEvent(struct ldl_mac *self, enum ldl_radio_event event)
+void LDL_MAC_radioEvent(struct ldl_mac *self)
 {
-    LDL_MAC_radioEventWithTicks(self, event, self->ticks(self->app));
+    LDL_MAC_radioEventWithTicks(self, self->ticks(self->app));
 }
 
-void LDL_MAC_radioEventWithTicks(struct ldl_mac *self, enum ldl_radio_event event, uint32_t ticks)
+void LDL_MAC_radioEventWithTicks(struct ldl_mac *self, uint32_t ticks)
 {
     LDL_PEDANTIC(self != NULL)
 
-    switch(event){
-    case LDL_RADIO_EVENT_TX_COMPLETE:
-        LDL_MAC_inputSignal(self, LDL_INPUT_TX_COMPLETE, ticks);
-        break;
-    case LDL_RADIO_EVENT_RX_READY:
-        LDL_MAC_inputSignal(self, LDL_INPUT_RX_READY, ticks);
-        break;
-    case LDL_RADIO_EVENT_RX_TIMEOUT:
-        LDL_MAC_inputSignal(self, LDL_INPUT_RX_TIMEOUT, ticks);
-        break;
-    case LDL_RADIO_EVENT_NONE:
-    default:
-        /* do nothing */
-        break;
-    }
+    inputSignal(self, ticks);
 }
 
 uint8_t LDL_MAC_mtu(const struct ldl_mac *self)
@@ -584,9 +657,27 @@ uint8_t LDL_MAC_mtu(const struct ldl_mac *self)
     enum ldl_spreading_factor sf;
     uint8_t max = 0U;
     uint8_t overhead = LDL_Frame_dataOverhead();
+    size_t i;
+    uint8_t min_rate;
+    uint8_t max_rate;
+    uint8_t rate = self->ctx.rate;
+    uint32_t freq;
 
-    /* which rate?? */
-    LDL_Region_convertRate(self->ctx.region, self->ctx.rate, &sf, &bw, &max);
+    for(i=0; i<LDL_Region_numChannels(self->ctx.region); i++){
+
+        if(!channelIsMasked(self->ctx.chMask, sizeof(self->ctx.chMask), self->ctx.region, U8(i))){
+
+            if(getChannel(self, U8(i), &freq, &min_rate, &max_rate)){
+
+                if(freq > 0U){
+
+                    rate = requiredRate(rate, min_rate, max_rate);
+                }
+            }
+        }
+    }
+
+    LDL_Region_convertRate(self->ctx.region, rate, &sf, &bw, &max);
 
     LDL_PEDANTIC(LDL_Frame_dataOverhead() < max)
 
@@ -599,7 +690,7 @@ uint8_t LDL_MAC_mtu(const struct ldl_mac *self)
         overhead += commandIsPending(self, LDL_CMD_NEW_CHANNEL) ? LDL_MAC_sizeofCommandUp(LDL_CMD_NEW_CHANNEL) : 0U;
         overhead += commandIsPending(self, LDL_CMD_RX_TIMING_SETUP) ? LDL_MAC_sizeofCommandUp(LDL_CMD_RX_TIMING_SETUP) : 0U;
         overhead += commandIsPending(self, LDL_CMD_DL_CHANNEL) ? LDL_MAC_sizeofCommandUp(LDL_CMD_DL_CHANNEL) : 0U;
-#ifndef LDL_DISABLE_POINTONE
+#if defined(LDL_ENABLE_L2_1_1)
         overhead += commandIsPending(self, LDL_CMD_REKEY) ? LDL_MAC_sizeofCommandUp(LDL_CMD_REKEY) : 0U;
         overhead += commandIsPending(self, LDL_CMD_ADR_PARAM_SETUP) ? LDL_MAC_sizeofCommandUp(LDL_CMD_ADR_PARAM_SETUP) : 0U;
         overhead += commandIsPending(self, LDL_CMD_REJOIN_PARAM_SETUP) ? LDL_MAC_sizeofCommandUp(LDL_CMD_REJOIN_PARAM_SETUP) : 0U;
@@ -644,12 +735,16 @@ bool LDL_MAC_maskChannel(struct ldl_mac *self, uint8_t chIndex)
 {
     LDL_PEDANTIC(self != NULL)
 
+    LDL_DEBUG("chIndex=%u", chIndex)
+
     return maskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->ctx.region, chIndex);
 }
 
 bool LDL_MAC_unmaskChannel(struct ldl_mac *self, uint8_t chIndex)
 {
     LDL_PEDANTIC(self != NULL)
+
+    LDL_DEBUG("chIndex=%u", chIndex)
 
     return unmaskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->ctx.region, chIndex);
 }
@@ -664,7 +759,17 @@ void LDL_MAC_timerSet(struct ldl_mac *self, enum ldl_timer_inst timer, uint32_t 
     LDL_SYSTEM_LEAVE_CRITICAL(self->app)
 }
 
-bool LDL_MAC_timerCheck(struct ldl_mac *self, enum ldl_timer_inst timer, uint32_t *error)
+void LDL_MAC_timerAppend(struct ldl_mac *self, enum ldl_timer_inst timer, uint32_t timeout)
+{
+    LDL_SYSTEM_ENTER_CRITICAL(self->app)
+
+    self->timers[timer].time += (timeout & U32(INT32_MAX));
+    self->timers[timer].armed = true;
+
+    LDL_SYSTEM_LEAVE_CRITICAL(self->app)
+}
+
+bool LDL_MAC_timerCheck(struct ldl_mac *self, enum ldl_timer_inst timer, uint32_t *lag)
 {
     bool retval = false;
     uint32_t time;
@@ -678,7 +783,7 @@ bool LDL_MAC_timerCheck(struct ldl_mac *self, enum ldl_timer_inst timer, uint32_
         if(timerDelta(self->timers[timer].time, time) < U32(INT32_MAX)){
 
             self->timers[timer].armed = false;
-            *error = timerDelta(self->timers[timer].time, time);
+            *lag = timerDelta(self->timers[timer].time, time);
             retval = true;
         }
     }
@@ -701,7 +806,7 @@ uint32_t LDL_MAC_timerTicksUntilNext(const struct ldl_mac *self)
 
     time = self->ticks(self->app);
 
-    for(i=0U; i < (sizeof(self->timers)/sizeof(*self->timers)); i++){
+    for(i=0U; i < sizeof(self->timers)/sizeof(*self->timers); i++){
 
         LDL_SYSTEM_ENTER_CRITICAL(self->app)
 
@@ -731,7 +836,7 @@ uint32_t LDL_MAC_timerTicksUntilNext(const struct ldl_mac *self)
     return retval;
 }
 
-uint32_t LDL_MAC_timerTicksUntil(const struct ldl_mac *self, enum ldl_timer_inst timer, uint32_t *error)
+uint32_t LDL_MAC_timerTicksUntil(const struct ldl_mac *self, enum ldl_timer_inst timer, uint32_t *lag)
 {
     uint32_t retval = UINT32_MAX;
     uint32_t time;
@@ -742,9 +847,9 @@ uint32_t LDL_MAC_timerTicksUntil(const struct ldl_mac *self, enum ldl_timer_inst
 
         time = self->ticks(self->app);
 
-        *error = timerDelta(self->timers[timer].time, time);
+        *lag = timerDelta(self->timers[timer].time, time);
 
-        if(*error <= U32(INT32_MAX)){
+        if(*lag <= U32(INT32_MAX)){
 
             retval = 0U;
         }
@@ -757,63 +862,6 @@ uint32_t LDL_MAC_timerTicksUntil(const struct ldl_mac *self, enum ldl_timer_inst
     LDL_SYSTEM_LEAVE_CRITICAL(self->app)
 
     return retval;
-}
-
-void LDL_MAC_inputSignal(struct ldl_mac *self, enum ldl_input_type type, uint32_t ticks)
-{
-    LDL_SYSTEM_ENTER_CRITICAL(self->app)
-
-    if(self->inputs.state == 0U){
-
-        if((self->inputs.armed & (1U << type)) > 0U){
-
-            self->inputs.time = ticks;
-            self->inputs.state = (1U << type);
-        }
-    }
-
-    LDL_SYSTEM_LEAVE_CRITICAL(self->app)
-}
-
-void LDL_MAC_inputArm(struct ldl_mac *self, enum ldl_input_type type)
-{
-    LDL_SYSTEM_ENTER_CRITICAL(self->app)
-
-    self->inputs.armed |= (1U << type);
-
-    LDL_SYSTEM_LEAVE_CRITICAL(self->app)
-}
-
-bool LDL_MAC_inputCheck(const struct ldl_mac *self, enum ldl_input_type type, uint32_t *error)
-{
-    bool retval = false;
-
-    LDL_SYSTEM_ENTER_CRITICAL(self->app)
-
-    if((self->inputs.state & (1U << type)) > 0U){
-
-        *error = timerDelta(self->inputs.time, self->ticks(self->app));
-        retval = true;
-    }
-
-    LDL_SYSTEM_LEAVE_CRITICAL(self->app)
-
-    return retval;
-}
-
-void LDL_MAC_inputClear(struct ldl_mac *self)
-{
-    LDL_SYSTEM_ENTER_CRITICAL(self->app)
-
-    self->inputs.state = 0U;
-    self->inputs.armed = 0U;
-
-    LDL_SYSTEM_LEAVE_CRITICAL(self->app)
-}
-
-bool LDL_MAC_inputPending(const struct ldl_mac *self)
-{
-    return (self->inputs.state != 0U);
 }
 
 bool LDL_MAC_priority(const struct ldl_mac *self, uint8_t interval)
@@ -865,136 +913,322 @@ enum ldl_mac_beacon_state LDL_MAC_getBeaconState(struct ldl_mac *self)
 }
 #endif
 
+#ifdef LDL_ENABLE_TEST_MODE
+void LDL_MAC_setUnlimitedDutyCycle(struct ldl_mac *self, bool value)
+{
+    LDL_PEDANTIC(self != NULL)
+
+    self->unlimitedDutyCycle = value;
+}
+#endif
+
 /* static functions ***************************************************/
 
 static void processInit(struct ldl_mac *self)
 {
-    uint32_t error;
+    self->state = LDL_STATE_RADIO_RESET;
 
-    if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
+    self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_RESET);
 
-        self->state = LDL_STATE_RESET;
-        self->op = LDL_OP_RESET;
+    /* >100us */
+    LDL_MAC_timerSet(self, LDL_TIMER_WAITA, GET_TPS()/U32(1024));
 
-        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_RESET);
-
-        /* >100us */
-        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, GET_TPS()/1024U);
-
-        LDL_DEBUG("set radio reset: ticks=%" PRIu32 "",
-            self->ticks(self->app)
-        )
-    }
+    LDL_DEBUG("set radio reset: ticks=%" PRIu32 "",
+        self->ticks(self->app)
+    )
 }
 
-static void processReset(struct ldl_mac *self)
+static void processRadioReset(struct ldl_mac *self, enum ldl_mac_sme event)
 {
-    uint32_t error;
+    switch(event){
+    case LDL_SME_TIMER_A:
 
-    if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
-
-        self->state = LDL_STATE_STARTUP;
-        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
+        self->state = LDL_STATE_RADIO_BOOT;
+        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_BOOT);
 
         /* >5ms to startup */
-        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, GET_TPS()/128U);
+        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, GET_TPS()/U32(128));
 
         LDL_DEBUG("clear radio reset: ticks=%" PRIu32 "",
             self->ticks(self->app)
         )
+        break;
+
+    case LDL_SME_BAND:
+        break;
+
+    default:
+
+        LDL_ERROR("unexpected")
+        break;
     }
 }
 
-static void processStartup(struct ldl_mac *self)
+static void processRadioBoot(struct ldl_mac *self, enum ldl_mac_sme event)
 {
-    uint32_t error;
-    uint32_t ms;
-
-    if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
-
-        self->op = LDL_OP_ENTROPY;
-        self->state = LDL_STATE_WAIT_RADIO;
-
-        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_STANDBY);
-
-        ms = U32(self->radio_interface->get_xtal_delay(self->radio));
-
-        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, msToTicks(self, ms));
-
-        LDL_DEBUG("start xtal: ticks=%" PRIu32 " delay=%" PRIu32 "",
-            self->ticks(self->app),
-            msToTicks(self, ms)
-        )
-    }
-}
-
-static void processWaitRadio(struct ldl_mac *self)
-{
-    uint32_t error;
-    struct ldl_radio_tx_setting tx_setting;
-    uint32_t ms;
-    uint8_t mtu;
-
-    if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
+    switch(event){
+    case LDL_SME_TIMER_A:
 
         switch(self->op){
-        default:
-            /* impossible */
-            break;
-
         case LDL_OP_ENTROPY:
 
-            self->radio_interface->receive_entropy(self->radio);
-            self->state = LDL_STATE_WAIT_RX_ENTROPY;
+            self->state = LDL_STATE_WAIT_ENTROPY;
+            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
+            break;
 
-            /* ~1ms */
-            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, GET_TPS()/1024U);
+        case LDL_OP_JOINING:
 
-            LDL_DEBUG("listen for entropy: ticks=%" PRIu32 "", self->ticks(self->app))
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
+            self->state = LDL_STATE_WAIT_OTAA;
+            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
             break;
 
         case LDL_OP_DATA_CONFIRMED:
         case LDL_OP_DATA_UNCONFIRMED:
-        case LDL_OP_JOINING:
 
-            LDL_Region_convertRate(self->ctx.region, self->tx.rate, &tx_setting.sf, &tx_setting.bw, &mtu);
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
+            self->state = LDL_STATE_WAIT_TX;
+            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
+            break;
 
-            tx_setting.dbm = LDL_Region_getTXPower(self->ctx.region, self->tx.power);
-
-            tx_setting.freq = self->tx.freq;
-
-            ms = LDL_Radio_getAirTime(tx_setting.bw, tx_setting.sf, self->bufferLen, true);
-
-            LDL_MAC_inputClear(self);
-            LDL_MAC_inputArm(self, LDL_INPUT_TX_COMPLETE);
-
-            self->radio_interface->transmit(self->radio, &tx_setting, self->buffer, self->bufferLen);
-
-            registerTime(self, self->tx.freq, msToTime(ms));
-
-            self->state = LDL_STATE_TX;
-
-            /* reset the radio if the tx complete interrupt doesn't appear after double the expected time */
-            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, msToTicks(self, ms) << 1U);
-
-            LDL_INFO("tx begin")
-            LDL_DEBUG("ticks=%" PRIu32 " freq=%" PRIu32 " power=%u  bw=%" PRIu32 " sf=%u size=%u",
-                self->ticks(self->app),
-                self->tx.freq,
-                self->tx.power,
-                LDL_Radio_bwToNumber(tx_setting.bw),
-                U8(tx_setting.sf),
-                self->bufferLen
-            )
-
+        default:
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
+            self->state = LDL_STATE_IDLE;
             break;
         }
+        break;
+
+    case LDL_SME_BAND:
+        break;
+
+    default:
+
+        LDL_ERROR("unexpected")
+        break;
     }
 }
 
-static void processTX(struct ldl_mac *self)
+static void processStartRadioForEntropy(struct ldl_mac *self, enum ldl_mac_sme event)
 {
-    uint32_t error;
+    switch(event){
+    case LDL_SME_TIMER_A:
+
+        self->radio_interface->receive_entropy(self->radio);
+
+        self->state = LDL_STATE_ENTROPY;
+
+        /* ~1ms */
+        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, GET_TPS()/U32(1024));
+
+        LDL_DEBUG("listen for entropy: ticks=%" PRIu32 "", self->ticks(self->app))
+        break;
+
+    case LDL_SME_BAND:
+        break;
+
+    default:
+
+        LDL_ERROR("unexpected")
+        break;
+    }
+}
+
+static void processEntropy(struct ldl_mac *self, enum ldl_mac_sme event)
+{
+    union ldl_mac_response_arg arg;
+
+    switch(event){
+    case LDL_SME_TIMER_A:
+
+        arg.entropy.value = self->radio_interface->read_entropy(self->radio);
+
+        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
+
+        self->state = LDL_STATE_IDLE;
+        self->op = LDL_OP_NONE;
+
+        LDL_DEBUG("read entropy: ticks=%" PRIu32 " entropy=%" PRIu32 "",
+            self->ticks(self->app),
+            arg.entropy.value
+        )
+
+        self->handler(self->app, LDL_MAC_ENTROPY, &arg);
+        break;
+
+    case LDL_SME_BAND:
+        break;
+
+    default:
+        LDL_ERROR("unexpected")
+        break;
+    }
+}
+
+static void processWaitOTAA(struct ldl_mac *self, enum ldl_mac_sme event)
+{
+    uint32_t delay;
+
+    if(self->band[LDL_BAND_GLOBAL] == 0U){
+
+#ifdef LDL_ENABLE_OTAA_DITHER
+        if(self->otaaDither > 0U){
+
+            delay = self->rand(self->app) % (GET_TPS()*U32(self->otaaDither));
+        }
+        else{
+
+            delay = 0;
+        }
+#else
+        delay = self->rand(self->app) % (GET_TPS()*U32(30));
+#endif
+        LDL_DEBUG("add dither to otaa: ticks=%" PRIu32 " delay=%" PRIu32 "",
+            self->ticks(self->app),
+            delay
+        )
+
+        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
+        self->state = LDL_STATE_WAIT_TX;
+    }
+}
+
+static void processWait(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag)
+{
+    uint32_t delay;
+    enum ldl_timer_inst timer;
+
+    switch(event){
+    case LDL_SME_TIMER_A:
+    case LDL_SME_TIMER_B:
+
+        delay = msToTicks(self, LDL_PARAM_XTAL_DELAY);
+
+        switch(self->state){
+        default:
+        case LDL_STATE_WAIT_TX:
+            self->state = LDL_STATE_START_RADIO_FOR_TX;
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_TX);
+            timer = LDL_TIMER_WAITA;
+            break;
+        case LDL_STATE_WAIT_RX1:
+            self->state = LDL_STATE_START_RADIO_FOR_RX1;
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_RX);
+            timer = LDL_TIMER_WAITA;
+            break;
+        case LDL_STATE_WAIT_RX2:
+            self->state = LDL_STATE_START_RADIO_FOR_RX2;
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_RX);
+            timer = LDL_TIMER_WAITB;
+            break;
+        case LDL_STATE_WAIT_ENTROPY:
+            self->state = LDL_STATE_START_RADIO_FOR_ENTROPY;
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_RX);
+            timer = LDL_TIMER_WAITA;
+            break;
+        }
+
+        delay = (lag > delay) ? 0U : (delay - lag);
+
+        LDL_MAC_timerAppend(self, timer, delay);
+#if 0
+        LDL_DEBUG("start xtal: ticks=%" PRIu32 " delay=%" PRIu32 "",
+            self->ticks(self->app),
+            delay
+        )
+#endif
+        break;
+
+    case LDL_SME_BAND:
+        break;
+
+    default:
+
+        LDL_ERROR("unexpected")
+        break;
+    }
+}
+
+static void processStartRadioForTX(struct ldl_mac *self, enum ldl_mac_sme event)
+{
+    struct ldl_radio_tx_setting tx_setting;
+    uint8_t mtu;
+    uint32_t ms;
+
+    switch(event){
+    case LDL_SME_TIMER_A:
+
+        LDL_Region_convertRate(self->ctx.region, self->tx.rate, &tx_setting.sf, &tx_setting.bw, &mtu);
+
+        tx_setting.dbm = LDL_Region_getTXPower(self->ctx.region, self->tx.power);
+
+#ifndef LDL_DISABLE_TX_PARAM_SETUP
+        if(LDL_Region_txParamSetupImplemented(self->ctx.region)){
+
+            static const int8_t maxEIRP[] = {
+                8,
+                10,
+                12,
+                13,
+                14,
+                16,
+                18,
+                20,
+                21,
+                24,
+                26,
+                27,
+                29,
+                30,
+                33,
+                36
+            };
+
+            tx_setting.max_eirp = (int16_t)maxEIRP[self->ctx.tx_param_setup & 0xfU];
+            tx_setting.max_eirp *= 100;
+        }
+        else
+#endif
+        {
+            tx_setting.max_eirp = INT16_MAX;
+        }
+
+        tx_setting.freq = self->tx.freq;
+
+        ms = LDL_Radio_getAirTime(tx_setting.bw, tx_setting.sf, self->bufferLen, true);
+
+        self->tx.airTime = msToTime(ms);
+
+        inputArm(self);
+
+        self->radio_interface->transmit(self->radio, &tx_setting, self->buffer, self->bufferLen);
+
+        self->state = LDL_STATE_TX;
+
+        /* reset the radio if the tx complete interrupt doesn't appear after double the expected time */
+        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, msToTicks(self, ms) << 1);
+
+        LDL_INFO("tx begin")
+        LDL_DEBUG("ticks=%" PRIu32 " freq=%" PRIu32 " power=%u  bw=%" PRIu32 " sf=%u size=%u",
+            self->ticks(self->app),
+            self->tx.freq,
+            self->tx.power,
+            LDL_Radio_bwToNumber(tx_setting.bw),
+            U8(tx_setting.sf),
+            self->bufferLen
+        )
+        break;
+
+    case LDL_SME_BAND:
+        break;
+
+    default:
+        LDL_ERROR("unexpected")
+        break;
+    }
+}
+
+static void processTX(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag)
+{
     uint32_t waitSeconds;
     uint32_t waitTicks;
     uint32_t advance;
@@ -1007,121 +1241,139 @@ static void processTX(struct ldl_mac *self)
     uint32_t xtal_error;
     uint8_t mtu;
     uint32_t margin;
+    struct ldl_radio_status status;
 
-    if(LDL_MAC_inputCheck(self, LDL_INPUT_TX_COMPLETE, &error)){
+    switch(event){
+    case LDL_SME_INTERRUPT:
 
-        /* reset ACK flag after transmission */
-        self->ctx.pending_ACK = 0U;
-
-        /* the wait interval is always measured in whole seconds */
-        waitSeconds = (self->op == LDL_OP_JOINING) ? U32(LDL_Region_getJA1Delay(self->ctx.region)) : U32(self->ctx.rx1Delay);
-
-        /* the ideal interval measured in ticks */
-        waitTicks = waitSeconds * GET_TPS();
-
-        /* sources of timing advance common to both slots are:
-         *
-         * - self->advance: interrupt response time + radio RX ramp up
-         * - error: ticks since tx complete event
-         *
-         * */
-        advance = GET_ADVANCE() + error;
-
-        /* RX1 */
+#ifdef LDL_ENABLE_TEST_MODE
+        if(!self->unlimitedDutyCycle)
+#endif
         {
-            LDL_Region_getRX1DataRate(self->ctx.region, self->tx.rate, self->ctx.rx1DROffset, &rate);
-            LDL_Region_convertRate(self->ctx.region, rate, &sf, &bw, &mtu);
-
-            xtal_error = (waitSeconds * GET_A() * U32(2)) + GET_B();
-
-            extra_symbols = extraSymbols(xtal_error, symbolPeriod(GET_TPS(), sf, bw));
-
-            /* we need a minimum of 3 extra symbols */
-            extra_symbols = (extra_symbols < U32(3)) ? U32(3) : extra_symbols;
-
-            margin = extra_symbols * symbolPeriod(GET_TPS(), sf, bw);
-            self->rx1_symbols = U16(5) + U16(extra_symbols);
-
-            /* advance timer by time required for extra symbols */
-            advanceA = advance + (margin/U32(2));
+            registerTime(self, &self->tx);
         }
 
-        /* RX2 */
-        {
-            LDL_Region_convertRate(self->ctx.region, self->ctx.rx2DataRate, &sf, &bw, &mtu);
+        self->radio_interface->get_status(self->radio, &status);
 
-            xtal_error += (GET_A() * U32(2));
+        if(status.tx){
 
-            extra_symbols = extraSymbols(xtal_error, symbolPeriod(GET_TPS(), sf, bw));
+            self->pendingACK = false;
 
-            /* we need a minimum of 3 extra symbols */
-            extra_symbols = (extra_symbols < U32(3)) ? U32(3) : extra_symbols;
+            /* the wait interval is always measured in whole seconds */
+            waitSeconds = (self->op == LDL_OP_JOINING) ? U32(LDL_Region_getJA1Delay(self->ctx.region)) : U32(self->ctx.rx1Delay);
 
-            margin = extra_symbols * symbolPeriod(GET_TPS(), sf, bw);
-            self->rx2_symbols = U16(5) + U16(extra_symbols);
+            /* the ideal interval measured in ticks */
+            waitTicks = waitSeconds * GET_TPS();
 
-            /* advance timer by time required for extra symbols */
-            advanceB = advance + (margin/U32(2));
-        }
+            advance = GET_ADVANCE() + lag + msToTicks(self, LDL_PARAM_XTAL_DELAY);
 
-        if(advanceB <= (waitTicks + GET_TPS())){
+            /* RX1 */
+            {
+                LDL_Region_getRX1DataRate(self->ctx.region, self->tx.rate, self->ctx.rx1DROffset, &rate);
+                LDL_Region_convertRate(self->ctx.region, rate, &sf, &bw, &mtu);
 
-            LDL_MAC_timerSet(self, LDL_TIMER_WAITB, waitTicks + GET_TPS() - advanceB);
+                xtal_error = (waitSeconds * GET_A() * U32(2)) + GET_B();
 
-            if(advanceA <= waitTicks){
+                extra_symbols = extraSymbols(xtal_error, symbolPeriod(GET_TPS(), sf, bw));
 
-                LDL_MAC_timerSet(self, LDL_TIMER_WAITA, waitTicks - advanceA);
-                self->state = LDL_STATE_WAIT_RX1;
+                /* we need a minimum of 3 extra symbols */
+                extra_symbols = (extra_symbols < U32(3)) ? U32(3) : extra_symbols;
+
+                margin = extra_symbols * symbolPeriod(GET_TPS(), sf, bw);
+                self->rx1_symbols = U16(5) + U16(extra_symbols);
+
+                /* advance timer by time required for extra symbols */
+                advanceA = advance + (margin/U32(2));
+            }
+
+            /* RX2 */
+            {
+                LDL_Region_convertRate(self->ctx.region, self->ctx.rx2DataRate, &sf, &bw, &mtu);
+
+                xtal_error += (GET_A() * U32(2));
+
+                extra_symbols = extraSymbols(xtal_error, symbolPeriod(GET_TPS(), sf, bw));
+
+                /* we need a minimum of 3 extra symbols */
+                extra_symbols = (extra_symbols < U32(3)) ? U32(3) : extra_symbols;
+
+                margin = extra_symbols * symbolPeriod(GET_TPS(), sf, bw);
+                self->rx2_symbols = U16(5) + U16(extra_symbols);
+
+                /* advance timer by time required for extra symbols */
+                advanceB = advance + (margin/U32(2));
+            }
+
+            if(advanceB <= (waitTicks + GET_TPS())){
+
+                LDL_MAC_timerSet(self, LDL_TIMER_WAITB, waitTicks + GET_TPS() - advanceB);
+
+                if(advanceA <= waitTicks){
+
+                    LDL_MAC_timerSet(self, LDL_TIMER_WAITA, waitTicks - advanceA);
+                    self->state = LDL_STATE_WAIT_RX1;
+                }
+                else{
+
+                    LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
+                    self->state = LDL_STATE_WAIT_RX2;
+                }
             }
             else{
 
+                self->state = LDL_STATE_WAIT_RX2;
                 LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
+                LDL_MAC_timerSet(self, LDL_TIMER_WAITB, 0U);
                 self->state = LDL_STATE_WAIT_RX2;
             }
+
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_HOLD);
+
+            LDL_INFO("tx complete")
+            LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
         }
         else{
 
-            self->state = LDL_STATE_WAIT_RX2;
-            LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
-            LDL_MAC_timerSet(self, LDL_TIMER_WAITB, 0U);
-            self->state = LDL_STATE_WAIT_RX2;
+            LDL_ERROR("unexpected event")
+            LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
+            handleRadioError(self);
         }
+        break;
 
-        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_STANDBY);
-        LDL_MAC_inputClear(self);
+    case LDL_SME_TIMER_A:
 
-        LDL_INFO("tx complete")
-        LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
-    }
-    else if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
-
-        LDL_MAC_inputClear(self);
-
-        self->state = LDL_STATE_RESET;
-        self->op = LDL_OP_RESET;
-
-        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_RESET);
-
-        /* >100us */
-        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (GET_TPS()/U32(1024)));
+#ifdef LDL_ENABLE_TEST_MODE
+        if(!self->unlimitedDutyCycle)
+#endif
+        {
+            registerTime(self, &self->tx);
+        }
 
         LDL_ERROR("radio timeout")
         LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
-    }
-    else{
+        handleRadioError(self);
+        break;
 
-        /* nothing */
+    case LDL_SME_BAND:
+        break;
+
+    default:
+
+        LDL_ERROR("unexpected")
+        break;
     }
 }
 
-static void processWaitRX1(struct ldl_mac *self)
+static void processStartRadioForRX1(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag)
 {
-    uint32_t error;
     struct ldl_radio_rx_setting radio_setting;
     uint32_t freq;
     uint8_t rate;
 
-    if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
+    (void)lag;
+
+    switch(event){
+    case LDL_SME_TIMER_A:
 
         LDL_Region_getRX1DataRate(self->ctx.region, self->tx.rate, self->ctx.rx1DROffset, &rate);
         LDL_Region_getRX1Freq(self->ctx.region, self->tx.freq, self->tx.chIndex, &freq);
@@ -1135,9 +1387,7 @@ static void processWaitRX1(struct ldl_mac *self)
         radio_setting.freq = freq;
         radio_setting.timeout = self->rx1_symbols;
 
-        LDL_MAC_inputClear(self);
-        LDL_MAC_inputArm(self, LDL_INPUT_RX_READY);
-        LDL_MAC_inputArm(self, LDL_INPUT_RX_TIMEOUT);
+        inputArm(self);
 
         self->radio_interface->receive(self->radio, &radio_setting);
 
@@ -1147,24 +1397,32 @@ static void processWaitRX1(struct ldl_mac *self)
         self->snr_min = LDL_Radio_getMinSNR(radio_setting.sf);
 
         LDL_INFO("rx1 slot")
-        LDL_DEBUG("ticks=%" PRIu32 " timeout=%" PRIu16 " error=%" PRIu32 " freq=%" PRIu32 " bw=%" PRIu32 " sf=%u",
+        LDL_DEBUG("ticks=%" PRIu32 " timeout=%" PRIu16 " lag=%" PRIu32 " freq=%" PRIu32 " bw=%" PRIu32 " sf=%u",
             self->ticks(self->app),
             self->rx1_symbols,
-            error,
+            lag,
             freq,
             LDL_Radio_bwToNumber(radio_setting.bw),
             U8(radio_setting.sf)
         )
+        break;
+
+    case LDL_SME_BAND:
+        break;
+
+    default:
+
+        LDL_ERROR("unexpected event: %i", event)
+        break;
     }
 }
 
-static void processWaitRX2(struct ldl_mac *self)
+static void processStartRadioForRX2(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag)
 {
-    uint32_t error;
+    struct ldl_radio_rx_setting radio_setting;
 
-    if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITB, &error)){
-
-        struct ldl_radio_rx_setting radio_setting;
+    switch(event){
+    case LDL_SME_TIMER_B:
 
         LDL_Region_convertRate(self->ctx.region, self->ctx.rx2DataRate, &radio_setting.sf, &radio_setting.bw, &radio_setting.max);
 
@@ -1175,9 +1433,7 @@ static void processWaitRX2(struct ldl_mac *self)
         radio_setting.freq = self->ctx.rx2Freq;
         radio_setting.timeout = self->rx2_symbols;
 
-        LDL_MAC_inputClear(self);
-        LDL_MAC_inputArm(self, LDL_INPUT_RX_READY);
-        LDL_MAC_inputArm(self, LDL_INPUT_RX_TIMEOUT);
+        inputArm(self);
 
         self->radio_interface->receive(self->radio, &radio_setting);
 
@@ -1187,20 +1443,28 @@ static void processWaitRX2(struct ldl_mac *self)
         self->snr_min = LDL_Radio_getMinSNR(radio_setting.sf);
 
         LDL_INFO("rx2 slot")
-        LDL_DEBUG("ticks=%" PRIu32 " timeout=%" PRIu16 " error=%" PRIu32 " freq=%" PRIu32 " bw=%" PRIu32 " sf=%u",
+        LDL_DEBUG("ticks=%" PRIu32 " timeout=%" PRIu16 " lag=%" PRIu32 " freq=%" PRIu32 " bw=%" PRIu32 " sf=%u",
             self->ticks(self->app),
             self->rx2_symbols,
-            error,
+            lag,
             self->ctx.rx2Freq,
             LDL_Radio_bwToNumber(radio_setting.bw),
             U8(radio_setting.sf)
         )
+        break;
+
+    case LDL_SME_BAND:
+        break;
+
+    default:
+
+        LDL_ERROR("unexpected event: %i", event)
+        break;
     }
 }
 
-static void processRX(struct ldl_mac *self)
+static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
 {
-    uint32_t error;
     struct ldl_frame_down frame;
 #ifdef LDL_ENABLE_STATIC_RX_BUFFER
     uint8_t *buffer = self->rx_buffer;
@@ -1217,291 +1481,291 @@ static void processRX(struct ldl_mac *self)
     union ldl_mac_response_arg arg;
     uint32_t ms;
 
-    if(LDL_MAC_inputCheck(self, LDL_INPUT_RX_READY, &error)){
+    struct ldl_radio_status status;
 
-        LDL_MAC_inputClear(self);
+    switch(event){
+    case LDL_SME_INTERRUPT:
 
-        LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
-        LDL_MAC_timerClear(self, LDL_TIMER_WAITB);
+        self->radio_interface->get_status(self->radio, &status);
 
-        len = self->radio_interface->read_buffer(self->radio, &meta, buffer, LDL_MAX_PACKET);
+        if(status.rx){
 
-        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
+            LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
+            LDL_MAC_timerClear(self, LDL_TIMER_WAITB);
 
-        self->margin = meta.snr - self->snr_min;
-
-        LDL_DEBUG("downlink: ticks=%" PRIu32 " rssi=%d snr=%d snr_margin=%d size=%u",
-            self->ticks(self->app),
-            meta.rssi,
-            meta.snr,
-            self->margin,
-            len
-        )
-
-        if(LDL_OPS_receiveFrame(self, &frame, buffer, len)){
-
-            switch(frame.type){
-            default:
-            case FRAME_TYPE_JOIN_ACCEPT:
-
-                forgetNetwork(self);
-
-                self->ctx.joined = true;
-
-                if(self->ctx.adr){
-
-                    /* keep the joining rate */
-                    self->ctx.rate = self->tx.rate;
-                }
-
-                self->ctx.rx1DROffset = frame.rx1DataRateOffset;
-                self->ctx.rx2DataRate = frame.rx2DataRate;
-                self->ctx.rx1Delay = frame.rxDelay;
-
-                if(frame.cfList != NULL){
-
-                    LDL_Region_processCFList(self->ctx.region, self, frame.cfList, frame.cfListLen);
-                }
-
-                self->ctx.devAddr = frame.devAddr;
-#ifndef LDL_DISABLE_POINTONE
-                self->ctx.version = (frame.optNeg) ? 1U : 0U;
-#endif
-
-                /* cache this so that the session keys can be re-derived */
-                self->ctx.netID = frame.netID;
-                self->ctx.joinNonce = frame.joinNonce;
-                self->ctx.devNonce = self->devNonce;
-
-                self->joinNonce = frame.joinNonce;
-
-                if(SESS_VERSION(self->ctx) > 0U){
-
-                    setPendingCommand(self, LDL_CMD_REKEY);
-                }
-
-                LDL_OPS_deriveKeys(self);
-
-                self->joinNonce++;
-                self->devNonce++;
-
-                LDL_INFO("join accept: joinNonce=%" PRIu32 " nextDevNonce=%" PRIu16 " netID=%" PRIu32 " devAddr=%" PRIu32 "",
-                    self->joinNonce,
-                    self->devNonce,
-                    self->ctx.netID,
-                    self->ctx.devAddr
-                )
-
-                arg.join_complete.joinNonce = self->joinNonce;
-                arg.join_complete.nextDevNonce = self->devNonce;
-                arg.join_complete.netID = self->ctx.netID;
-                arg.join_complete.devAddr = self->ctx.devAddr;
-
-                self->handler(self->app, LDL_MAC_JOIN_COMPLETE, &arg);
-
-                self->state = LDL_STATE_IDLE;
-                self->op = LDL_OP_NONE;
-                break;
-
-            case FRAME_TYPE_DATA_CONFIRMED_DOWN:
-            case FRAME_TYPE_DATA_UNCONFIRMED_DOWN:
-
-                self->ctx.pending_ACK = (frame.type == FRAME_TYPE_DATA_CONFIRMED_DOWN) ? 1U : self->ctx.pending_ACK;
-
-                LDL_OPS_syncDownCounter(self, frame.port, frame.counter);
-
-                clearPendingCommand(self, LDL_CMD_RX_PARAM_SETUP);
-                clearPendingCommand(self, LDL_CMD_DL_CHANNEL);
-                clearPendingCommand(self, LDL_CMD_RX_TIMING_SETUP);
-
-                self->adrAckCounter = 0U;
-                self->adrAckReq = false;
-
-                fopts = frame.opts;
-                foptsLen = frame.optsLen;
-
-                if(frame.data != NULL){
-
-                    if(frame.port == 0U){
-
-                        fopts = frame.data;
-                        foptsLen = frame.dataLen;
-                    }
-                    else{
-
-                        arg.rx.counter = frame.counter;
-                        arg.rx.port = frame.port;
-                        arg.rx.data = frame.data;
-                        arg.rx.size = frame.dataLen;
-
-                        self->handler(self->app, LDL_MAC_RX, &arg);
-                    }
-                }
-
-                processCommands(self, fopts, foptsLen);
-
-                switch(self->op){
-                default:
-                case LDL_OP_DATA_UNCONFIRMED:
-
-                    self->handler(self->app, LDL_MAC_DATA_COMPLETE, NULL);
-                    break;
-
-                case LDL_OP_DATA_CONFIRMED:
-
-                    if(frame.ack){
-
-                        self->handler(self->app, LDL_MAC_DATA_COMPLETE, NULL);
-                    }
-                    else{
-
-                        /* I don't know why this would ever happen */
-                        self->handler(self->app, LDL_MAC_DATA_NAK, NULL);
-                    }
-                    break;
-
-                case LDL_OP_REJOINING:
-                    break;
-                }
-
-                self->state = LDL_STATE_IDLE;
-                self->op = LDL_OP_NONE;
-                break;
-            }
-
-            pushSessionUpdate(self);
-        }
-        else{
-
-            downlinkMissingHandler(self);
-        }
-    }
-    else if(LDL_MAC_inputCheck(self, LDL_INPUT_RX_TIMEOUT, &error)){
-
-        LDL_MAC_inputClear(self);
-
-        if(self->state == LDL_STATE_RX2){
+            len = self->radio_interface->read_buffer(self->radio, &meta, buffer, LDL_MAX_PACKET);
 
             self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
 
-            LDL_MAC_timerClear(self, LDL_TIMER_WAITB);
+            self->margin = meta.snr - self->snr_min;
 
-            LDL_Region_convertRate(self->ctx.region, self->tx.rate, &sf, &bw, &mtu);
+            LDL_DEBUG("downlink: ticks=%" PRIu32 " rssi=%d snr=%d snr_margin=%d size=%u",
+                self->ticks(self->app),
+                meta.rssi,
+                meta.snr,
+                self->margin,
+                len
+            )
 
-            ms = LDL_Radio_getAirTime(bw, sf, mtu, false);
+            if(LDL_OPS_receiveFrame(self, &frame, buffer, len)){
 
-            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, msToTicks(self, ms));
+                switch(frame.type){
+                default:
+                case FRAME_TYPE_JOIN_ACCEPT:
 
-            self->state = LDL_STATE_RX2_LOCKOUT;
+                    forgetNetwork(self);
+
+                    self->ctx.joined = true;
+
+                    if(self->ctx.adr){
+
+                        /* keep the joining rate */
+                        self->ctx.rate = LDL_Region_getJoinRate(self->ctx.region, self->trials);
+                    }
+
+                    self->ctx.rx1DROffset = frame.rx1DataRateOffset;
+                    self->ctx.rx2DataRate = frame.rx2DataRate;
+                    self->ctx.rx1Delay = frame.rxDelay;
+
+                    if(frame.cfList != NULL){
+
+                        LDL_Region_processCFList(self->ctx.region, self, frame.cfList, frame.cfListLen);
+                    }
+
+                    self->ctx.devAddr = frame.devAddr;
+
+#if defined(LDL_ENABLE_L2_1_1)
+                    self->ctx.version = (frame.optNeg) ? 1U : 0U;
+
+                    if(SESS_VERSION(self->ctx) > 0U){
+
+                        setPendingCommand(self, LDL_CMD_REKEY);
+                    }
+#endif
+                    /* cache this so that the session keys can be re-derived */
+                    self->ctx.netID = frame.netID;
+                    self->ctx.joinNonce = frame.joinNonce;
+                    self->ctx.devNonce = self->devNonce;
+
+                    self->joinNonce = frame.joinNonce;
+
+                    LDL_OPS_deriveKeys(self);
+
+                    self->joinNonce++;
+                    self->devNonce++;
+
+                    LDL_INFO("join accept: joinNonce=%" PRIu32 " nextDevNonce=%" PRIu16 " netID=%" PRIu32 " devAddr=%" PRIu32 "",
+                        self->joinNonce,
+                        self->devNonce,
+                        self->ctx.netID,
+                        self->ctx.devAddr
+                    )
+
+                    arg.join_complete.joinNonce = self->joinNonce;
+                    arg.join_complete.nextDevNonce = self->devNonce;
+                    arg.join_complete.netID = self->ctx.netID;
+                    arg.join_complete.devAddr = self->ctx.devAddr;
+
+                    self->band[LDL_BAND_GLOBAL] = 0;
+                    self->day = 0;
+                    self->state = LDL_STATE_IDLE;
+                    self->op = LDL_OP_NONE;
+
+                    self->handler(self->app, LDL_MAC_JOIN_COMPLETE, &arg);
+                    break;
+
+                case FRAME_TYPE_DATA_CONFIRMED_DOWN:
+                case FRAME_TYPE_DATA_UNCONFIRMED_DOWN:
+
+                    self->pendingACK = (frame.type == FRAME_TYPE_DATA_CONFIRMED_DOWN);
+
+                    LDL_OPS_syncDownCounter(self, frame.port, frame.counter);
+
+                    clearPendingCommand(self, LDL_CMD_RX_PARAM_SETUP);
+                    clearPendingCommand(self, LDL_CMD_DL_CHANNEL);
+                    clearPendingCommand(self, LDL_CMD_RX_TIMING_SETUP);
+
+                    self->adrAckCounter = 0;
+                    self->adrAckReq = false;
+
+                    fopts = frame.opts;
+                    foptsLen = frame.optsLen;
+
+                    if(frame.data != NULL){
+
+                        if(frame.port == 0U){
+
+                            fopts = frame.data;
+                            foptsLen = frame.dataLen;
+                        }
+                        else{
+
+                            arg.rx.port = frame.port;
+                            arg.rx.data = frame.data;
+                            arg.rx.size = frame.dataLen;
+
+                            self->handler(self->app, LDL_MAC_RX, &arg);
+                        }
+                    }
+
+                    processCommands(self, fopts, foptsLen);
+
+                    switch(self->op){
+                    default:
+                    case LDL_OP_DATA_UNCONFIRMED:
+
+                        self->handler(self->app, LDL_MAC_DATA_COMPLETE, NULL);
+                        break;
+
+                    case LDL_OP_DATA_CONFIRMED:
+
+                        if(frame.ack){
+
+                            self->handler(self->app, LDL_MAC_DATA_COMPLETE, NULL);
+                        }
+                        else{
+
+                            LDL_DEBUG("NAK received in response to confirmed uplink")
+
+                            /* I don't see how this would ever happen
+                             * in practice since downlinks are sent
+                             * in response to having receied an uplink.
+                             *
+                             * For this reason simply handle it as a timeout
+                             * regardless of the number of attempts requested.
+                             *
+                             *  */
+                            self->handler(self->app, LDL_MAC_DATA_TIMEOUT, NULL);
+                        }
+                        break;
+
+                    case LDL_OP_REJOINING:
+                        break;
+                    }
+
+                    self->state = LDL_STATE_IDLE;
+                    self->op = LDL_OP_NONE;
+                    break;
+                }
+
+                pushSessionUpdate(self);
+            }
+            else{
+
+                downlinkMissingHandler(self);
+            }
         }
+        else if(status.timeout){
+
+            if(self->state == LDL_STATE_RX2){
+
+                self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
+
+                LDL_MAC_timerClear(self, LDL_TIMER_WAITB);
+
+                LDL_Region_convertRate(self->ctx.region, self->tx.rate, &sf, &bw, &mtu);
+
+                ms = LDL_Radio_getAirTime(bw, sf, mtu, false);
+
+                LDL_MAC_timerSet(self, LDL_TIMER_WAITA, msToTicks(self, ms));
+
+                self->state = LDL_STATE_RX2_LOCKOUT;
+            }
+            else{
+
+                self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_HOLD);
+
+                LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
+
+                self->state = LDL_STATE_WAIT_RX2;
+            }
+        }
+        /* hardware failure*/
         else{
 
-            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_STANDBY);
+            LDL_ERROR("timeout waiting for rx_complete or rx_timeout")
+            LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
 
-            LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
-
-            self->state = LDL_STATE_WAIT_RX2;
+            handleRadioError(self);
         }
-    }
-    /* hardware failure? */
-    else if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
+        break;
 
-        LDL_MAC_inputClear(self);
-        LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
-        LDL_MAC_timerClear(self, LDL_TIMER_WAITB);
-
-        self->state = LDL_STATE_RESET;
-        self->op = LDL_OP_RESET;
-
-        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_RESET);
-
-        /* >100us */
-        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (GET_TPS()/1024U));
+    case LDL_SME_TIMER_A:
 
         LDL_ERROR("timeout waiting for rx_complete or rx_timeout")
         LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
-    }
-    else{
 
-        /* nothing */
-    }
-}
+        handleRadioError(self);
+        break;
 
-static void processWaitTX(struct ldl_mac *self)
-{
-    uint32_t error;
-    uint32_t ms;
+    case LDL_SME_TIMER_B:
+        /* timer B might fire while you are receiving in RX1 */
+        break;
 
-    if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
+    case LDL_SME_BAND:
+        break;
 
-        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_STANDBY);
-        self->state = LDL_STATE_WAIT_RADIO;
-
-        ms = self->radio_interface->get_xtal_delay(self->radio);
-
-        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, msToTicks(self, ms));
-
-        LDL_DEBUG("xtal startup: ticks=%" PRIu32 " delay=%" PRIu32 "",
-            self->ticks(self->app),
-            msToTicks(self, ms)
-        )
+    default:
+        LDL_ERROR("unexpected")
+        break;
     }
 }
 
-static void processWaitRXEntropy(struct ldl_mac *self)
+static void processRX2Lockout(struct ldl_mac *self, enum ldl_mac_sme event)
 {
-    uint32_t error;
-    union ldl_mac_response_arg arg;
-
-    if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
-
-        arg.startup.entropy = self->radio_interface->read_entropy(self->radio);
-
-        self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
-
-        self->state = LDL_STATE_IDLE;
-        self->op = LDL_OP_NONE;
-
-        LDL_DEBUG("read entropy: ticks=%" PRIu32 " entropy=%" PRIu32 "",
-            self->ticks(self->app),
-            arg.startup.entropy
-        )
-
-        self->handler(self->app, LDL_MAC_STARTUP, &arg);
-    }
-}
-
-static void processRX2Lockout(struct ldl_mac *self)
-{
-    uint32_t error;
-
-    if(LDL_MAC_timerCheck(self, LDL_TIMER_WAITA, &error)){
+    switch(event){
+    case LDL_SME_TIMER_A:
 
         downlinkMissingHandler(self);
+        break;
+
+    case LDL_SME_BAND:
+        break;
+
+    default:
+        LDL_ERROR("unexpected")
+        break;
     }
 }
 
-static void processWaitRetry(struct ldl_mac *self)
+static void handleRadioError(struct ldl_mac *self)
 {
-    uint32_t delay = 0U;
+    inputDisarm(self);
+    LDL_MAC_timerClear(self, LDL_TIMER_WAITA);
+    LDL_MAC_timerClear(self, LDL_TIMER_WAITB);
 
-    if(self->band[LDL_BAND_RETRY] == 0U){
+    switch(self->op){
+    default:
+    case LDL_OP_NONE:
+    case LDL_OP_DATA_CONFIRMED:
+    case LDL_OP_DATA_UNCONFIRMED:
+    case LDL_OP_ENTROPY:
+        self->op = LDL_OP_NONE;
+        self->handler(self->app, LDL_MAC_OP_ERROR, NULL);
+        break;
 
-        if(self->band[LDL_BAND_GLOBAL] == 0U){
+    case LDL_OP_JOINING:
 
-#ifndef LDL_ENABLE_FAST_DEBUG
-            delay = self->rand(self->app) % (GET_TPS()*U32(30));
-#endif
-            LDL_DEBUG("add dither to retry: ticks=%" PRIu32 " delay=%" PRIu32 "",
-                self->ticks(self->app),
-                delay
-            )
-
-            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
-            self->state = LDL_STATE_WAIT_TX;
-        }
+        /* joining will continue after the radio is reset so we need
+         * to setup the next channel
+         *
+         * */
+        downlinkMissingHandler(self);
+        break;
     }
+
+
+    self->state = LDL_STATE_RADIO_RESET;
+
+    self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_RESET);
+
+    /* >100us */
+    LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (GET_TPS()/1024U));
+
+
+    LDL_DEBUG("radio fault detected, initiating radio reset")
 }
+
 
 static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confirmed, uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts)
 {
@@ -1512,25 +1776,30 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
     struct ldl_frame_data f;
     struct ldl_stream s;
     uint8_t macs[30U]; // large enough for all possible MAC commands
-    uint32_t delay = 0U;
 
-    if(self->state == LDL_STATE_IDLE){
+    if(self->ctx.joined){
 
-        if(self->ctx.joined){
+        if(self->op == LDL_OP_NONE){
 
             if((port > 0U) && (port <= 223U)){
 
                 if(self->band[LDL_BAND_GLOBAL] == 0U){
 
-                    if(selectChannel(self, self->ctx.rate, self->tx.chIndex, 0U, &self->tx.chIndex, &self->tx.freq)){
+                    /* set desired power and rate */
+                    self->tx.power = self->ctx.power;
+#ifdef LDL_DISABLE_TX_PARAM_SETUP
+                    self->tx.rate = self->ctx.rate;
+#else
+                    self->tx.rate = LDL_Region_applyUplinkDwell(self->ctx.region, uplinkDwell(self->ctx.tx_param_setup), self->ctx.rate);
+#endif
+
+                    if(selectChannel(self, self->ctx.rate, 0U, &self->tx)){
 
                         LDL_Region_convertRate(self->ctx.region, self->ctx.rate, &sf, &bw, &maxPayload);
 
-                        if(opts == NULL){
+                        (void)memset(&self->opts, 0, sizeof(self->opts));
 
-                            (void)memset(&self->opts, 0, sizeof(self->opts));
-                        }
-                        else{
+                        if(opts != NULL){
 
                             (void)memcpy(&self->opts, opts, sizeof(self->opts));
                         }
@@ -1539,9 +1808,6 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
 
                         {
                             self->trials = 0U;
-
-                            self->tx.rate = self->ctx.rate;
-                            self->tx.power = self->ctx.power;
 
                             (void)memset(&f, 0, sizeof(f));
 
@@ -1553,7 +1819,11 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                             f.adr = self->ctx.adr;
                             f.adrAckReq = self->adrAckReq;
                             f.port = port;
-                            f.ack = (self->ctx.pending_ACK > 0U);
+
+                            /* this might be wrong - have one try at
+                             * responding to a confirmed downlink */
+                            f.ack = self->pendingACK;
+
 
                             /* 1.1 has to awkwardly re-calculate the MIC when a frame is retried on a
                              * different channel and the counter is a parameter */
@@ -1568,7 +1838,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                 LDL_DEBUG("preparing data frame")
 
                                 /* sticky commands */
-#ifndef LDL_DISABLE_POINTONE
+#if defined(LDL_ENABLE_L2_1_1)
                                 if(commandIsPending(self, LDL_CMD_REKEY)){
 
                                     struct ldl_rekey_ind ind = {
@@ -1642,7 +1912,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                         self->ctx.new_channel_ans.channelFreqOK ? "true" : "false"
                                     )
                                 }
-#ifndef LDL_DISABLE_POINTONE
+#if defined(LDL_ENABLE_L2_1_1)
                                 if(commandIsPending(self, LDL_CMD_REJOIN_PARAM_SETUP)){
 
                                     LDL_MAC_putRejoinParamSetupAns(&s, &self->ctx.rejoin_param_setup_ans);
@@ -1661,7 +1931,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                     LDL_DEBUG("adding adr_param_setup_ans")
                                 }
 #endif
-
+#ifndef LDL_DISABLE_TX_PARAM_SETUP
                                 if(commandIsPending(self, LDL_CMD_TX_PARAM_SETUP)){
 
                                     LDL_MAC_putTXParamSetupAns(&s);
@@ -1669,7 +1939,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
 
                                     LDL_DEBUG("adding tx_param_setup_ans")
                                 }
-
+#endif
                                 if(commandIsPending(self, LDL_CMD_DUTY_CYCLE)){
 
                                     LDL_MAC_putDutyCycleAns(&s);
@@ -1677,7 +1947,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
 
                                     LDL_DEBUG("adding duty_cycle_ans")
                                 }
-#ifndef LDL_DISABLE_CHECK
+#ifndef LDL_DISABLE_LINK_CHECK
                                 if(self->opts.check){
 
                                     LDL_MAC_putLinkCheckReq(&s);
@@ -1740,20 +2010,14 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                             LDL_OPS_micDataFrame(self, self->buffer, self->bufferLen);
                         }
 
-                        self->state = LDL_STATE_WAIT_TX;
+                        if(self->state == LDL_STATE_IDLE){
 
-                        if(self->opts.dither > 0U){
-
-                            delay = (self->rand(self->app) % ((uint32_t)self->opts.dither * GET_TPS()));
+                            self->state = LDL_STATE_WAIT_TX;
+                            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0U);
                         }
 
-                        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, delay);
-
-                        self->band[LDL_BAND_DUTY] = 0U;
-
-                        LDL_DEBUG("initiate data: ticks=%" PRIu32 " delay=%" PRIu32 "",
-                            self->ticks(self->app),
-                            delay
+                        LDL_DEBUG("initiate data: ticks=%" PRIu32,
+                            self->ticks(self->app)
                         )
                     }
                     else{
@@ -1773,12 +2037,12 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
         }
         else{
 
-            retval = LDL_STATUS_NOTJOINED;
+            retval = LDL_STATUS_BUSY;
         }
     }
     else{
 
-        retval = LDL_STATUS_BUSY;
+        retval = LDL_STATUS_NOTJOINED;
     }
 
     return retval;
@@ -1806,7 +2070,7 @@ static bool adaptRate(struct ldl_mac *self)
 
                         if(self->ctx.power == 0U){
 
-                            if(self->ctx.rate > LDL_DEFAULT_RATE){
+                            if(self->ctx.rate > U8(MIN_RATE)){
 
                                 self->ctx.rate--;
                                 LDL_DEBUG("adr: rate reduced to %u", self->ctx.rate)
@@ -1840,7 +2104,7 @@ static bool adaptRate(struct ldl_mac *self)
 
 static uint32_t symbolPeriod(uint32_t tps, enum ldl_spreading_factor sf, enum ldl_signal_bandwidth bw)
 {
-    return ((((uint32_t)1UL) << sf) * tps) / LDL_Radio_bwToNumber(bw);
+    return (((U32(1)) << sf) * tps) / LDL_Radio_bwToNumber(bw);
 }
 
 static uint32_t extraSymbols(uint32_t xtal_error, uint32_t symbol_period)
@@ -1889,7 +2153,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             /* not handling */
             LDL_DEBUG("not handling type %u", cmd.type)
             break;
-#ifndef LDL_DISABLE_CHECK
+#ifndef LDL_DISABLE_LINK_CHECK
         case LDL_CMD_LINK_CHECK:
         {
             union ldl_mac_response_arg arg;
@@ -1998,9 +2262,9 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 
                         self->ctx.nbTrans = req->nbTrans & 0xfU;
 
-                        if(self->ctx.nbTrans > LDL_REDUNDANCY_MAX){
+                        if(self->ctx.nbTrans > U8(LDL_REDUNDANCY_MAX)){
 
-                            self->ctx.nbTrans = LDL_REDUNDANCY_MAX;
+                            self->ctx.nbTrans = U8(LDL_REDUNDANCY_MAX);
                         }
                     }
 
@@ -2132,6 +2396,8 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
                 self->ctx.new_channel_ans.dataRateRangeOK = LDL_Region_validateRate(self->ctx.region, cmd.fields.newChannel.chIndex, cmd.fields.newChannel.minDR, cmd.fields.newChannel.maxDR);
                 self->ctx.new_channel_ans.channelFreqOK = LDL_Region_validateFreq(self->ctx.region, cmd.fields.newChannel.freq);
 
+                // todo: check if modifying default channel
+
                 if(self->ctx.new_channel_ans.dataRateRangeOK && self->ctx.new_channel_ans.channelFreqOK){
 
                     (void)setChannel(self, cmd.fields.newChannel.chIndex, cmd.fields.newChannel.freq, cmd.fields.newChannel.minDR, cmd.fields.newChannel.maxDR);
@@ -2177,15 +2443,18 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
             setPendingCommand(self, LDL_CMD_RX_TIMING_SETUP);
             break;
 
+#ifndef LDL_DISABLE_TX_PARAM_SETUP
         case LDL_CMD_TX_PARAM_SETUP:
 
             LDL_DEBUG("tx_param_setup_req: downlinkDwellTime=%s uplinkDwellTime=%s maxEIRP=%u",
-                cmd.fields.txParamSetup.downlinkDwell ? "true" : "false",
-                cmd.fields.txParamSetup.uplinkDwell ? "true" : "false",
-                cmd.fields.txParamSetup.maxEIRP
+                ((cmd.fields.txParamSetup & 0x20U) > 0U) ? "true" : "false",
+                ((cmd.fields.txParamSetup & 0x10U) > 0U) ? "true" : "false",
+                cmd.fields.txParamSetup & 0xfU
             )
 
-            if(LDL_Region_isDynamic(self->ctx.region)){
+            if(LDL_Region_txParamSetupImplemented(self->ctx.region)){
+
+                self->ctx.tx_param_setup = cmd.fields.txParamSetup;
 
                 setPendingCommand(self, LDL_CMD_TX_PARAM_SETUP);
             }
@@ -2195,7 +2464,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
                 LDL_DEBUG("tx_param_setup_req not processed in this region")
             }
             break;
-
+#endif
 #ifndef LDL_DISABLE_DEVICE_TIME
         case LDL_CMD_DEVICE_TIME:
         {
@@ -2211,7 +2480,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 
                     uint32_t time = (arg.device_time.seconds << 8) | U32(arg.device_time.fractions);
 
-                    self->bands[LDL_BAND_BEACON] = GET_BEACON_INTERVAL() - (time % GET_BEACON_INTERVAL());
+                    //self->bands[LDL_BAND_BEACON] = GET_BEACON_INTERVAL() - (time % GET_BEACON_INTERVAL());
                 }
             }
 #endif
@@ -2224,7 +2493,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
         }
             break;
 #endif
-#ifndef LDL_DISABLE_POINTONE
+#if defined(LDL_ENABLE_L2_1_1)
         case LDL_CMD_ADR_PARAM_SETUP:
 
             LDL_DEBUG("adr_param_setup: limit_exp=%u delay_exp=%u",
@@ -2294,16 +2563,16 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
     }
 }
 
-static void registerTime(struct ldl_mac *self, uint32_t freq, uint32_t time)
+static void registerTime(struct ldl_mac *self, const struct ldl_mac_tx *tx)
 {
     uint8_t band;
     uint32_t offTime;
 
-    if(LDL_Region_getBand(self->ctx.region, freq, &band)){
+    if(LDL_Region_getBand(self->ctx.region, tx->freq, &band)){
 
         LDL_PEDANTIC( band < LDL_BAND_MAX )
 
-        offTime = time * LDL_Region_getOffTimeFactor(self->ctx.region, band);
+        offTime = tx->airTime * LDL_Region_getOffTimeFactor(self->ctx.region, band);
 
         if((self->band[band] + offTime) < self->band[band]){
 
@@ -2315,9 +2584,16 @@ static void registerTime(struct ldl_mac *self, uint32_t freq, uint32_t time)
         }
     }
 
-    if((self->op != LDL_OP_JOINING) && (self->ctx.maxDutyCycle > 0U)){
+    if((self->op == LDL_OP_JOINING) || (self->ctx.maxDutyCycle > 0U)){
 
-        offTime = time * ( U32(1) << (self->ctx.maxDutyCycle & 0xfU));
+        if(self->op == LDL_OP_JOINING){
+
+            offTime = tx->airTime * getOTAAOffTime(self);
+        }
+        else{
+
+            offTime = tx->airTime * (U32(1) << (self->ctx.maxDutyCycle & 0xfU));
+        }
 
         if((self->band[LDL_BAND_GLOBAL] + offTime) < self->band[LDL_BAND_GLOBAL]){
 
@@ -2330,13 +2606,75 @@ static void registerTime(struct ldl_mac *self, uint32_t freq, uint32_t time)
     }
 }
 
-static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prevChIndex, uint32_t limit, uint8_t *chIndex, uint32_t *freq)
+static uint8_t requiredRate(uint8_t desired, uint8_t min, uint8_t max)
+{
+    uint8_t retval;
+
+    if(desired < min){
+
+        retval = min;
+    }
+    else if(desired > max){
+
+        retval = max;
+    }
+    else{
+
+        retval = desired;
+    }
+
+    return retval;
+}
+
+#ifndef LDL_DISABLE_TX_PARAM_SETUP
+static bool uplinkDwell(uint8_t tx_param_setup)
+{
+    return ((tx_param_setup & 0x10U) > 0U);
+}
+#endif
+
+static void selectJoinChannelAndRate(struct ldl_mac *self, struct ldl_mac_tx *tx)
+{
+    uint8_t minRate;
+    uint8_t maxRate;
+    bool retval;
+    uint8_t desired_rate;
+
+    desired_rate = LDL_Region_getJoinRate(self->ctx.region, self->trials);
+#ifndef LDL_DISABLE_TX_PARAM_SETUP
+    desired_rate = LDL_Region_applyUplinkDwell(self->ctx.region, uplinkDwell(self->ctx.tx_param_setup), desired_rate);
+#endif
+
+    /* dynamic regions join on default channels so select as per usual */
+    if(LDL_Region_isDynamic(self->ctx.region)){
+
+        retval = selectChannel(self, desired_rate, timeUntilNextChannel(self), tx);
+    }
+    else{
+
+        minRate = 0;
+        maxRate = 0;
+
+        tx->chIndex = LDL_Region_getJoinIndex(self->ctx.region, self->trials, self->rand(self->app));
+
+        retval = LDL_Region_getChannel(self->ctx.region, tx->chIndex, &tx->freq, &minRate, &maxRate);
+
+        tx->rate = requiredRate(desired_rate, minRate, maxRate);
+    }
+
+    (void)retval;
+
+    /* join channels should always be available */
+    LDL_ASSERT(retval);
+}
+
+static bool selectChannel(const struct ldl_mac *self, uint8_t desired_rate, uint32_t limit, struct ldl_mac_tx *tx)
 {
     bool retval = false;
     uint8_t i;
     uint8_t selection;
-    uint32_t available = 0U;
-    uint8_t j = 0U;
+    uint32_t available = 0;
+    uint8_t j = 0;
     uint8_t minRate;
     uint8_t maxRate;
     uint8_t except = UINT8_MAX;
@@ -2346,11 +2684,11 @@ static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prev
     (void)memset(mask, 0, sizeof(mask));
 
     /* count number of available channels for this rate */
-    for(i=0U; i < LDL_Region_numChannels(self->ctx.region); i++){
+    for(i=0; i < LDL_Region_numChannels(self->ctx.region); i++){
 
-        if(isAvailable(self, i, rate, limit)){
+        if(isAvailable(self, i, limit)){
 
-            if(i == prevChIndex){
+            if(i == self->tx.chIndex){
 
                 except = i;
             }
@@ -2376,7 +2714,7 @@ static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prev
 
         selection = U8(self->rand(self->app) % available);
 
-        for(i=0U; i < LDL_Region_numChannels(self->ctx.region); i++){
+        for(i=0; i < LDL_Region_numChannels(self->ctx.region); i++){
 
             if(channelIsMasked(mask, sizeof(mask), self->ctx.region, i)){
 
@@ -2384,9 +2722,12 @@ static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prev
 
                     if(selection == j){
 
-                        if(getChannel(self, i, freq, &minRate, &maxRate)){
+                        if(getChannel(self, i, &tx->freq, &minRate, &maxRate)){
 
-                            *chIndex = i;
+                            tx->chIndex = i;
+
+                            tx->rate = requiredRate(desired_rate, minRate, maxRate);
+
                             retval = true;
                             break;
                         }
@@ -2401,7 +2742,7 @@ static bool selectChannel(const struct ldl_mac *self, uint8_t rate, uint8_t prev
     return retval;
 }
 
-static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rate, uint32_t limit)
+static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint32_t limit)
 {
     bool retval = false;
     uint32_t freq;
@@ -2413,7 +2754,7 @@ static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rat
 
         if(getChannel(self, chIndex, &freq, &minRate, &maxRate)){
 
-            if((rate >= minRate) && (rate <= maxRate)){
+            if(freq > 0U){
 
                 if(LDL_Region_getBand(self->ctx.region, freq, &band)){
 
@@ -2431,9 +2772,9 @@ static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rat
     return retval;
 }
 
-static bool timeUntilAvailable(const struct ldl_mac *self, uint8_t chIndex, uint8_t rate, uint32_t *time)
+static uint32_t timeUntilAvailable(const struct ldl_mac *self, uint8_t chIndex)
 {
-    bool retval = false;
+    uint32_t retval = UINT32_MAX;
     uint32_t freq;
     uint8_t minRate;
     uint8_t maxRate;
@@ -2443,15 +2784,13 @@ static bool timeUntilAvailable(const struct ldl_mac *self, uint8_t chIndex, uint
 
         if(getChannel(self, chIndex, &freq, &minRate, &maxRate)){
 
-            if((rate >= minRate) && (rate <= maxRate)){
+            if(freq > 0U){
 
                 if(LDL_Region_getBand(self->ctx.region, freq, &band)){
 
                     LDL_PEDANTIC( band < LDL_BAND_MAX )
 
-                    *time = (self->band[band] > self->band[LDL_BAND_GLOBAL]) ? self->band[band] : self->band[LDL_BAND_GLOBAL];
-
-                    retval = true;
+                    retval = (self->band[band] > self->band[LDL_BAND_GLOBAL]) ? self->band[band] : self->band[LDL_BAND_GLOBAL];
                 }
             }
         }
@@ -2465,7 +2804,7 @@ static void initSession(struct ldl_mac *self, enum ldl_region region)
     forgetNetwork(self);
 
     self->ctx.region = region;
-    self->ctx.rate = LDL_DEFAULT_RATE;
+    self->ctx.rate = MIN_RATE;
     self->ctx.power = 0U;
     self->ctx.adr = true;
 }
@@ -2494,6 +2833,9 @@ static void forgetNetwork(struct ldl_mac *self)
     self->ctx.rx2Freq = LDL_Region_getRX2Freq(region);
     self->ctx.adr_ack_limit = ADRAckLimit;
     self->ctx.adr_ack_delay = ADRAckDelay;
+#ifndef LDL_DISABLE_TX_PARAM_SETUP
+    self->ctx.tx_param_setup = 0xff;
+#endif
 
     /* locally set fields */
     self->ctx.maxDutyCycle = self->maxDutyCycle;
@@ -2650,25 +2992,17 @@ static bool rateSettingIsValid(enum ldl_region region, uint8_t rate)
     return retval;
 }
 
-static void refreshDayCounter(struct ldl_mac *self)
-{
-    if(self->band[LDL_BAND_DUTY] == 0U){
-
-        self->band[LDL_BAND_DUTY] = timeTPS * U32(24) * U32(60) * U32(60);
-    }
-}
-
-static uint32_t getRetryDuty(const struct ldl_mac *self)
+static uint32_t getOTAAOffTime(const struct ldl_mac *self)
 {
     uint32_t retval;
 
     /* first hour: 36/3600 (0.01) */
-    if(self->band[LDL_BAND_DUTY] > (timeTPS * U32(23) * U32(60) * U32(60))){
+    if(self->day > (timeTPS * U32(23) * U32(60) * U32(60))){
 
         retval = 100;
     }
     /* first 11 hours: 36/36000 (0.001) */
-    else if(self->band[LDL_BAND_DUTY] > (timeTPS * U32(13) * U32(60) * U32(60))){
+    else if(self->day > (timeTPS * U32(13) * U32(60) * U32(60))){
 
         retval = 1000;
     }
@@ -2678,12 +3012,7 @@ static uint32_t getRetryDuty(const struct ldl_mac *self)
         retval = 10000;
     }
 
-    LDL_DEBUG("offtime=%" PRIu32 " countdown=%02" PRIu32 ":%02" PRIu32 ":%02" PRIu32 "",
-        retval,
-        self->band[LDL_BAND_DUTY] / timeTPS / U32(60) / U32(60),
-        self->band[LDL_BAND_DUTY] / timeTPS / U32(60) % U32(60),
-        self->band[LDL_BAND_DUTY] / timeTPS % U32(60)
-    )
+    LDL_DEBUG("offtime=%" PRIu32 "", retval)
 
     return retval;
 }
@@ -2693,88 +3022,130 @@ static uint32_t timerDelta(uint32_t timeout, uint32_t time)
     return (timeout <= time) ? (time - timeout) : (UINT32_MAX - timeout + time);
 }
 
-static void processBands(struct ldl_mac *self)
+static bool updateDownCounter(uint32_t *counter, uint32_t time)
 {
-    size_t i;
-    uint32_t time = 0;
+    bool expired = false;
 
-    /* time tracking via ticks */
-    {
-        uint32_t ticks = self->ticks(self->app);
+    if(*counter > 0U){
 
-        uint32_t since = timerDelta(self->time.ticks, ticks);
+        if(*counter <= time){
 
-        self->time.ticks = ticks;
+            *counter = 0U;
+            expired = true;
+        }
+        else{
 
-        uint32_t fraction = ((since % GET_TPS()) * timeTPS) + self->time.remainder;
-
-        time = ((since / GET_TPS()) * timeTPS) + (fraction / GET_TPS());
-
-        self->time.remainder = fraction % GET_TPS();
-    }
-
-    /* decrement down counters with time */
-    for(i=0; i < sizeof(self->band)/sizeof(*self->band); i++){
-
-        if(self->band[i] > 0U){
-
-            if(self->band[i] < time){
-
-              self->band[i] = 0;
-            }
-            else{
-
-               self->band[i] -= time;
-            }
+            *counter -= time;
         }
     }
+
+    return expired;
 }
 
-static uint32_t timeUntilNextBandEvent(const struct ldl_mac *self)
+static bool processBands(struct ldl_mac *self)
 {
-    uint32_t retval = UINT32_MAX;
+    bool retval = false;
     size_t i;
+    uint32_t time = 0U;
 
-    /* note that this will return UINT32_MAX if all band timers are zero */
-    for(i=0U; i < (sizeof(self->band)/sizeof(*self->band)); i++){
+    if(!self->time.parked){
 
-        if(self->band[i] > 0U){
+        /* time tracking via ticks */
+        {
+            uint32_t ticks = self->ticks(self->app);
 
-            if(self->band[i] < retval){
+            uint32_t since = timerDelta(self->time.ticks, ticks);
 
-                retval = self->band[i];
+            self->time.ticks = ticks;
+
+            uint32_t fraction = ((since % GET_TPS()) * timeTPS) + self->time.remainder;
+
+            time = ((since / GET_TPS()) * timeTPS) + (fraction / GET_TPS());
+
+            self->time.remainder = fraction % GET_TPS();
+        }
+
+        bool ready = false;
+
+        /* handle the day counter if set */
+        (void)updateDownCounter(&self->day, time);
+
+        /* decrement down counters with time */
+        for(i=0U; i < sizeof(self->band)/sizeof(*self->band); i++){
+
+            if(updateDownCounter(&self->band[i], time)){
+
+                ready = true;
             }
+        }
+
+        if(ready && (self->band[LDL_BAND_GLOBAL] == 0U)){
+
+            LDL_DEBUG("channel is ready")
+            self->handler(self->app, LDL_MAC_CHANNEL_READY, NULL);
+            retval = true;
         }
     }
 
     return retval;
 }
 
-static void finaliseUnconfirmedUp(struct ldl_mac *self)
+static void setNextBandEvent(struct ldl_mac *self)
 {
-    if(adaptRate(self)){
+    uint32_t time = UINT32_MAX;
+    uint32_t ticks;
+    size_t i;
 
-        pushSessionUpdate(self);
+    for(i=0; i < sizeof(self->band)/sizeof(*self->band); i++){
+
+        if(self->band[i] > 0U){
+
+            if(self->band[i] < time){
+
+                time = self->band[i];
+            }
+        }
     }
 
-    self->tx.rate = self->ctx.rate;
-    self->tx.power = self->ctx.power;
+    if(time <= self->band[LDL_BAND_GLOBAL]){
 
-    self->handler(self->app, LDL_MAC_DATA_COMPLETE, NULL);
+        time = self->band[LDL_BAND_GLOBAL];
+    }
 
-    self->state = LDL_STATE_IDLE;
-    self->op = LDL_OP_NONE;
+    /* consider day counter if there are no
+     * band counters */
+    if((time == UINT32_MAX) && (self->day > 0U)){
+
+        time = self->day;
+    }
+
+    /* convert to ticks */
+    if(time < UINT32_MAX){
+
+        self->time.parked = false;
+
+        if(time < (U32(INT32_MAX)/GET_TPS()*timeTPS)){
+
+            ticks = ((time / timeTPS) + (((time % timeTPS) > 0U) ? U32(1) : U32(0))) * GET_TPS();
+        }
+        else{
+
+            ticks = U32(INT32_MAX)/GET_TPS()*U32(INT32_MAX);
+        }
+
+        LDL_MAC_timerSet(self, LDL_TIMER_BAND, ticks);
+    }
+    else{
+
+        //LDL_DEBUG("time tracking is disabled")
+        self->time.parked = true;
+        LDL_MAC_timerClear(self, LDL_TIMER_BAND);
+    }
 }
 
 static void downlinkMissingHandler(struct ldl_mac *self)
 {
-    union ldl_mac_response_arg arg;
     uint8_t nbTrans;
-    enum ldl_spreading_factor sf;
-    enum ldl_signal_bandwidth bw;
-    uint32_t ms;
-    uint8_t mtu;
-    uint32_t time_until_next;
 
     if(self->opts.nbTrans > 0U){
 
@@ -2787,39 +3158,35 @@ static void downlinkMissingHandler(struct ldl_mac *self)
 
     self->trials++;
 
-    LDL_Region_convertRate(self->ctx.region, self->tx.rate, &sf, &bw, &mtu);
-
-    ms = LDL_Radio_getAirTime(bw, sf, self->bufferLen, true);
-
     switch(self->op){
     default:
     case LDL_OP_NONE:
         /* do nothing */
         break;
+
+    case LDL_OP_DATA_UNCONFIRMED:
     case LDL_OP_DATA_CONFIRMED:
+    {
+        struct ldl_mac_tx tx;
 
-        if(self->trials < nbTrans){
+        bool global_band_ok = (self->band[LDL_BAND_GLOBAL] < LDL_Region_getMaxDCycleOffLimit(self->ctx.region));
+        bool channel_ok = selectChannel(self, self->tx.rate, LDL_Region_getMaxDCycleOffLimit(self->ctx.region), &tx);
 
-            refreshDayCounter(self);
+        if((self->trials < nbTrans) && global_band_ok && channel_ok){
 
-            self->band[LDL_BAND_RETRY] = msToTime(ms) * getRetryDuty(self);
+            LDL_OPS_micDataFrame(self, self->buffer, self->bufferLen);
 
-            time_until_next = timeUntilNextChannel(self, self->tx.rate);
-            time_until_next = (time_until_next > self->band[LDL_BAND_RETRY]) ? time_until_next : self->band[LDL_BAND_RETRY];
+            if(self->op == LDL_OP_DATA_CONFIRMED){
 
-            if(selectChannel(self, self->tx.rate, self->tx.chIndex, time_until_next, &self->tx.chIndex, &self->tx.freq)){
+                /* double back-off with each trial */
+                LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (GET_TPS() << self->trials));
+            }
+            else{
 
-#ifndef LDL_DISABLE_POINTONE
-                /* MIC must be refreshed when channel changes */
-                if(SESS_VERSION(self->ctx) > 0U){
-
-                    LDL_OPS_micDataFrame(self, self->buffer, self->bufferLen);
-                }
-#endif
+                LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0U);
             }
 
-            LDL_DEBUG("channel available for confirmed data retry in ~%" PRIu32 "s", time_until_next >> 8)
-            self->state = LDL_STATE_WAIT_RETRY;
+            self->state = LDL_STATE_WAIT_TX;
         }
         else{
 
@@ -2828,72 +3195,21 @@ static void downlinkMissingHandler(struct ldl_mac *self)
                 pushSessionUpdate(self);
             }
 
-            self->tx.rate = self->ctx.rate;
-            self->tx.power = self->ctx.power;
-
-            self->handler(self->app, LDL_MAC_DATA_TIMEOUT, NULL);
+            self->handler(self->app, (self->op == LDL_OP_DATA_CONFIRMED) ? LDL_MAC_DATA_TIMEOUT : LDL_MAC_DATA_COMPLETE, NULL);
 
             self->state = LDL_STATE_IDLE;
             self->op = LDL_OP_NONE;
         }
-        break;
-
-    case LDL_OP_DATA_UNCONFIRMED:
-
-        if(self->trials < nbTrans){
-
-            bool global_band_ok = (self->band[LDL_BAND_GLOBAL] < LDL_Region_getMaxDCycleOffLimit(self->ctx.region));
-            bool channel_ok = selectChannel(self, self->tx.rate, self->tx.chIndex, LDL_Region_getMaxDCycleOffLimit(self->ctx.region), &self->tx.chIndex, &self->tx.freq);
-
-            if(global_band_ok && channel_ok){
-
-#ifndef LDL_DISABLE_POINTONE
-                /* must recalculate the MIC for V1.1 since channel changes */
-                if(SESS_VERSION(self->ctx) > 0U){
-
-                    LDL_OPS_micDataFrame(self, self->buffer, self->bufferLen);
-                }
-#endif
-
-                LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0U);
-                self->state = LDL_STATE_WAIT_TX;
-            }
-            else{
-
-                finaliseUnconfirmedUp(self);
-            }
-        }
-        else{
-
-            finaliseUnconfirmedUp(self);
-        }
+    }
         break;
 
     case LDL_OP_JOINING:
 
-        refreshDayCounter(self);
+        selectJoinChannelAndRate(self, &self->tx);
 
-        self->band[LDL_BAND_RETRY] = msToTime(ms) * getRetryDuty(self);
-
-        self->tx.rate = LDL_Region_getJoinRate(self->ctx.region, self->trials);
-
-        time_until_next = timeUntilNextChannel(self, self->tx.rate);
-        time_until_next = (time_until_next > self->band[LDL_BAND_RETRY]) ? time_until_next : self->band[LDL_BAND_RETRY];
-
-        if(selectChannel(self, self->tx.rate, self->tx.chIndex, time_until_next, &self->tx.chIndex, &self->tx.freq)){
-
-            LDL_DEBUG("channel available for otaa retry in ~%" PRIu32 "s", time_until_next >> 8)
-            self->state = LDL_STATE_WAIT_RETRY;
-        }
-        else{
-
-            LDL_ERROR("no channel available for otaa retry")
-
-            self->state = LDL_STATE_IDLE;
-            self->op = LDL_OP_NONE;
-        }
-
-        self->handler(self->app, LDL_MAC_JOIN_TIMEOUT, &arg);
+        LDL_DEBUG("waiting to retry OTAA")
+        self->state = LDL_STATE_WAIT_OTAA;
+        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
         break;
     }
 }
@@ -2914,20 +3230,17 @@ static uint32_t msToTicks(const struct ldl_mac *self, uint32_t ms)
     return (t / U32(1000)) + (((t % U32(1000)) > 0U) ? U32(1) : U32(0));
 }
 
-static uint32_t timeUntilNextChannel(const struct ldl_mac *self, uint8_t rate)
+
+static uint32_t timeUntilNextChannel(const struct ldl_mac *self)
 {
     uint8_t i;
     uint32_t min = UINT32_MAX;
-    uint32_t time;
 
-    for(i=0U; i < LDL_Region_numChannels(self->ctx.region); i++){
+    for(i=0; i < LDL_Region_numChannels(self->ctx.region); i++){
 
-        if(timeUntilAvailable(self, i, rate, &time)){
+        if(min > timeUntilAvailable(self, i)){
 
-            if(time < min){
-
-                min = time;
-            }
+            min = timeUntilAvailable(self, i);
         }
     }
 
@@ -3034,4 +3347,61 @@ static uint8_t defaultBatteryLevel(void *app)
     (void)app;
 
     return 255U;
+}
+
+static void inputSignal(struct ldl_mac *self, uint32_t ticks)
+{
+    LDL_SYSTEM_ENTER_CRITICAL(self->app)
+
+    if(!self->inputs.state && self->inputs.armed){
+
+        self->inputs.time = ticks;
+        self->inputs.state = true;
+    }
+
+    LDL_SYSTEM_LEAVE_CRITICAL(self->app)
+}
+
+static void inputArm(struct ldl_mac *self)
+{
+    LDL_SYSTEM_ENTER_CRITICAL(self->app)
+
+    self->inputs.state = false;
+    self->inputs.armed = true;
+
+    LDL_SYSTEM_LEAVE_CRITICAL(self->app)
+}
+
+static void inputDisarm(struct ldl_mac *self)
+{
+    LDL_SYSTEM_ENTER_CRITICAL(self->app)
+
+    self->inputs.armed = false;
+
+    LDL_SYSTEM_LEAVE_CRITICAL(self->app)
+}
+
+static bool inputCheck(struct ldl_mac *self, uint32_t *lag)
+{
+    bool retval = false;
+
+    LDL_SYSTEM_ENTER_CRITICAL(self->app)
+
+    if(self->inputs.state){
+
+        self->inputs.armed = false;
+        self->inputs.state = false;
+        *lag = timerDelta(self->inputs.time, self->ticks(self->app));
+
+        retval = true;
+    }
+
+    LDL_SYSTEM_LEAVE_CRITICAL(self->app)
+
+    return retval;
+}
+
+static bool inputPending(const struct ldl_mac *self)
+{
+    return self->inputs.state;
 }

@@ -6,31 +6,39 @@ module LDL
     include RadioModel
 
     attr_accessor :active
-    attr_reader :buffer, :gain, :location, :name, :event_cb
+    attr_reader :buffer, :name, :event_cb
 
-    def broker
-      @scenario.broker
-    end
+    attr_reader :broker, :clock, :rx_log, :tx_log
 
     def on_event(&block)
       @event_cb = block
     end
 
-    def initialize(scenario, **opts)
+    def initialize(broker, clock, **opts)
+
+      self.enable_log
+
+      @logger = opts[:logger]||LoggerMethods::NULL_LOGGER
+      @broker = broker
+      @clock = clock
+
+      @rx_log = FrameLogger.new
+      @tx_log = FrameLogger.new
+
+      self.path_loss = opts[:path_loss] if opts[:path_loss]
 
       @event_cb = nil
-      @scenario = scenario
       @buffer = {}
 
-      @name = opts[:name]||EUI.new(opts[:dev_eui]).to_s("")
-
-      @gain = opts[:gain]||0
-
-      @location = opts[:location]||Location.new(0,0)
+      @name = EUI.new(opts[:dev_eui]).to_s("")
 
       @active = []
 
       @logger_header = "DEVICE(#{name})::Radio"
+
+      @tx = false
+      @rx = false
+      @to = false
 
       this = self
 
@@ -44,9 +52,6 @@ module LDL
 
     end
 
-    def reset(state)
-    end
-
     def transmit(data, **opts)
 
       bw = opts[:bw]
@@ -55,23 +60,29 @@ module LDL
 
       msg = {
         station: self,
-        time: @scenario.ticks,
-        airTime: self.class.transmit_time_up(bw, sf, data.size),
+        time: clock.time,
+        ticks: clock.ticks,
+        air_time: self.class.transmit_time_up(bw, sf, data.size),
         data: data.dup,
         sf: sf,
         bw: bw,
         cr: 1,
         freq: freq,
         power: opts[:dbm],
-        gain: gain,
-        location: location
+        reliability: self.reliability
       }
+
+      tx_log.log(msg)
 
       broker.publish msg, "tx_begin"
 
       this = self
 
-      @scenario.clock.call_in(msg[:airTime]) do
+      clock.call_in(msg[:air_time]) do
+
+        @timeout = false
+        @tx = true
+        @rx = false
 
         event_cb.call(:tx_complete) if event_cb
 
@@ -81,6 +92,13 @@ module LDL
 
       true
 
+    end
+
+    def do_timeout
+      @timeout = true
+      @tx = false
+      @rx = false
+      event_cb.call(:rx_timeout) if event_cb
     end
 
     def receive(**opts)
@@ -94,44 +112,61 @@ module LDL
       log_debug{"listening on sf: #{sf} bw: #{bw} freq: #{freq} timeout: #{opts[:timeout]} symbols"}
 
       # work out if there were any overlapping transmissions at window timeout
-      @scenario.clock.call_in( opts[:timeout] * t_sym ) do
+      clock.call_in( opts[:timeout] * t_sym ) do
 
-        endtime = @scenario.ticks
+        endtime = clock.time
 
-        active.detect do |m1|
+        m1 = active.detect do |m|
 
           # same channel, datarate, and with at least 5 preamble symbols
-          m1[:sf] == sf and m1[:bw] == bw and m1[:freq] == freq and (m1[:time] < endtime) and ((endtime - m1[:time]) >= (5*t_sym))
+          m[:sf] == sf and m[:bw] == bw and m[:freq] == freq and (m[:time] < endtime) and ((endtime - m[:time]) >= (5*t_sym))
 
-        end.tap do |m1|
+        end
 
-          if m1
+        if m1.nil?
 
-            tx_end = broker.subscribe "tx_end" do |m2|
+          do_timeout
 
-              if m2[:station] == m1[:station]
+        elsif not(rf_detected?(m1[:power], m1[:bw], m1[:sf]))
 
-                log_info{"message received"}
+          log_debug{"rf signal dropped the packet"}
+          do_timeout
 
-                broker.unsubscribe tx_end
-                @buffer = {
-                  data: m1[:data].dup,
-                  sf: m1[:sf],
-                  bw: m1[:bw],
-                  freq: m1[:freq],
-                  rssi: -80,
-                  lsnr: 9,
-                }
+        elsif rand > m1[:reliability]
 
-                event_cb.call(:rx_ready) if event_cb
+          log_debug{"reliability dropped the packet"}
+          do_timeout
 
-              end
+        else
+
+          tx_end = broker.subscribe "tx_end" do |m2|
+
+            if m2[:station] == m1[:station]
+
+              msg = m1.dup
+              msg[:rssi] = rssi(m1[:power])
+              msg[:snr] = snr(m1[:power])
+              rx_log.log(msg)
+
+              log_info{"message received: rssi=#{rssi(m1[:power])} snr=#{snr(m1[:power])}"}
+
+              broker.unsubscribe tx_end
+              @buffer = {
+                data: m1[:data].dup,
+                sf: m1[:sf],
+                bw: m1[:bw],
+                freq: m1[:freq],
+                rssi: rssi(m1[:power]),
+                lsnr: snr(m1[:power])
+              }
+
+              @timeout = false
+              @tx = false
+              @rx = true
+
+              event_cb.call(:rx_ready) if event_cb
 
             end
-
-          else
-
-            event_cb.call(:rx_timeout) if event_cb
 
           end
 
@@ -147,7 +182,22 @@ module LDL
       @buffer
     end
 
-    def set_mode
+    def set_mode(mode)
+      @tx = false
+      @rx = false
+      @timeout = false
+    end
+
+    def get_status
+
+      log_debug{"get_status: tx=#{@tx} rx=#{@rx} timeout=#{@timeout}"}
+
+      {
+        tx: @tx,
+        rx: @rx,
+        timeout: @timeout
+      }
+
     end
 
   end

@@ -19,7 +19,7 @@
  *
  * */
 
-#include "sx1272.h"
+#include "sx126x.h"
 #include "ldl_system.h"
 #include "ldl_radio.h"
 
@@ -27,49 +27,58 @@ using namespace LDL;
 
 /* constructors *******************************************************/
 
-SX1272::SX1272(
+SX126X::SX126X(
+    enum ldl_radio_type type,
     SPI& spi,
     PinName nss,
     PinName reset,
-    PinName dio0,
+    PinName busy,
     PinName dio1,
     PinName dio2,
     PinName dio3,
-    PinName dio4,
-    PinName dio5,
-    enum ldl_radio_pa pa,
     int16_t tx_gain,
+    enum ldl_sx126x_regulator regulator,
+    enum ldl_sx126x_txen txen,
+    enum ldl_sx126x_voltage voltage,
     enum ldl_radio_xtal xtal,
-    uint8_t xtal_delay,
     Callback<void(enum ldl_chip_mode)> chip_mode_cb
 )
     :
     SPIRadio(
         spi,
-        nss
+        nss,
+        busy
     ),
-    reset(reset, PIN_INPUT, PullNone, 1),
-    dio0(dio0),
+    reset(reset, PIN_INPUT, PullNone, 0),
     dio1(dio1),
     chip_mode_cb(chip_mode_cb)
 {
-    struct ldl_radio_init_arg arg = {};
+    internal_if = LDL_SX1262_getInterface();
 
-    arg.type = LDL_RADIO_SX1272;
-    arg.pa = pa;
+    struct ldl_sx126x_init_arg arg = {};
+
     arg.xtal = xtal;
-    arg.xtal_delay = xtal_delay;
     arg.tx_gain = tx_gain;
+
+    arg.regulator = regulator;
+    arg.txen = txen;
+    arg.voltage = voltage;
 
     arg.chip = this;
     arg.chip_write = &SPIRadio::_chip_write;
     arg.chip_read = &SPIRadio::_chip_read;
-    arg.chip_set_mode = &SX1272::_chip_set_mode;
+    arg.chip_set_mode = &SX126X::_chip_set_mode;
 
-    LDL_Radio_init(&radio, &arg);
+    if(type == LDL_RADIO_SX1262){
 
-    this->dio0.rise(callback(this, &SX1272::dio0_handler));
-    this->dio1.rise(callback(this, &SX1272::dio1_handler));
+        LDL_SX1262_init(&radio, &arg);
+    }
+    else{
+
+        LDL_SX1261_init(&radio, &arg);
+    }
+
+    this->dio1.rise(callback(this, &SX126X::dio1_handler));
 
     LDL_Radio_setEventCallback(&radio, (struct ldl_mac *)this, &Radio::_interrupt_handler);
 }
@@ -77,13 +86,13 @@ SX1272::SX1272(
 /* static protected ***************************************************/
 
 void
-SX1272::_chip_set_mode(void *self, enum ldl_chip_mode mode)
+SX126X::_chip_set_mode(void *self, enum ldl_chip_mode mode)
 {
-    static_cast<SX1272 *>(self)->chip_set_mode(mode);
+    static_cast<SX126X *>(self)->chip_set_mode(mode);
 }
 
 void
-SX1272::chip_set_mode(enum ldl_chip_mode mode)
+SX126X::chip_set_mode(enum ldl_chip_mode mode)
 {
     switch(mode){
     case LDL_CHIP_MODE_RESET:
@@ -105,13 +114,8 @@ SX1272::chip_set_mode(enum ldl_chip_mode mode)
 /* protected **********************************************************/
 
 void
-SX1272::dio0_handler()
+SX126X::dio1_handler()
 {
     LDL_Radio_handleInterrupt(&radio, 0);
 }
 
-void
-SX1272::dio1_handler()
-{
-    LDL_Radio_handleInterrupt(&radio, 1);
-}

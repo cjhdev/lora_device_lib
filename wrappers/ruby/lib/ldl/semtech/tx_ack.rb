@@ -2,7 +2,7 @@ module LDL::Semtech
 
     class TXAck < Message
 
-        @type = 5
+        @type = TX_ACK
 
         def self.decode(msg)
 

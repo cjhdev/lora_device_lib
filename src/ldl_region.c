@@ -37,6 +37,12 @@
 
 #endif
 
+#ifdef LDL_DISABLE_SF12
+    #define MIN_RATE 1
+#else
+    #define MIN_RATE 0
+#endif
+
 #include <stddef.h>
 
 /* static function prototypes *****************************************/
@@ -508,7 +514,6 @@ void LDL_Region_processCFList(enum ldl_region region, struct ldl_mac *mac, const
 
 #   ifdef LDL_ENABLE_US_902_928
         case LDL_US_902_928:
-            break;
 #   endif
 #   ifdef LDL_ENABLE_AU_915_928
         case LDL_AU_915_928:
@@ -530,6 +535,10 @@ void LDL_Region_processCFList(enum ldl_region region, struct ldl_mac *mac, const
                         if((mask & (U16(1) << b)) > 0U){
 
                             (void)LDL_MAC_unmaskChannel(mac, (i * 16U) + b);
+                        }
+                        else{
+
+                            (void)LDL_MAC_maskChannel(mac, (i * 16U) + b);
                         }
                     }
                 }
@@ -807,22 +816,22 @@ uint8_t LDL_Region_getRX2Rate(enum ldl_region region)
     default:
 #ifdef LDL_ENABLE_EU_863_870
     case LDL_EU_863_870:
-        retval = 0U;
+        retval = 0;
         break;
 #endif
 #ifdef LDL_ENABLE_EU_433
     case LDL_EU_433:
-        retval = 0U;
+        retval = 0;
         break;
 #endif
 #ifdef LDL_ENABLE_US_902_928
     case LDL_US_902_928:
-        retval = 8U;
+        retval = 8;
         break;
 #endif
 #ifdef LDL_ENABLE_AU_915_928
     case LDL_AU_915_928:
-        retval = 8U;
+        retval = 8;
         break;
 #endif
     }
@@ -934,50 +943,75 @@ int16_t LDL_Region_getTXPower(enum ldl_region region, uint8_t power)
 
 uint8_t LDL_Region_getJoinRate(enum ldl_region region, uint32_t trial)
 {
-    uint8_t retval = 0U;
+    uint8_t retval = 0;
+
+    (void)trial;
 
     switch(region){
-#if defined(LDL_ENABLE_EU_863_870) || defined(LDL_ENABLE_EU_433)
-#   ifdef LDL_ENABLE_EU_863_870
+#ifdef LDL_ENABLE_EU_863_870
     case LDL_EU_863_870:
-#   endif
-#   ifdef LDL_ENABLE_EU_433
+        retval = U8(5) - U8(trial % U32(6U - U8(MIN_RATE)));
+        break;
+#endif
+#ifdef LDL_ENABLE_EU_433
     case LDL_EU_433:
-#   endif
-        retval = 5U - U8(trial % U32(6U - LDL_DEFAULT_RATE));
+        retval = U8(5) - U8(trial % U32(6U - U8(MIN_RATE)));
         break;
 #endif
-#if defined(LDL_ENABLE_US_902_928)
-#   ifdef LDL_ENABLE_US_902_928
+#ifdef LDL_ENABLE_US_902_928
     case LDL_US_902_928:
-#   endif
-        if((trial & 1U) > 0U){
-
-            retval = 4U;
-        }
-        else{
-
-            retval = 3U - U8((trial >> 1) % U32(4U - LDL_DEFAULT_RATE));
-        }
+        retval = MIN_RATE;
         break;
 #endif
-#if defined(LDL_ENABLE_AU_915_928)
-#   ifdef LDL_ENABLE_AU_915_928
+#ifdef LDL_ENABLE_AU_915_928
     case LDL_AU_915_928:
-#   endif
-        if((trial & 1U) > 0U){
-
-            retval = 0U;
-        }
-        else{
-
-            retval = 4U - U8((trial >> 1) % U32(5U - LDL_DEFAULT_RATE));
-        }
+        retval = 2;
         break;
 #endif
     default:
         /* impossible */
         break;
+    }
+
+    return retval;
+}
+
+uint8_t LDL_Region_getJoinIndex(enum ldl_region region, uint32_t trial, uint32_t random)
+{
+    uint8_t retval = 0;
+
+    (void)trial;
+    (void)random;
+
+    switch(region){
+    default:
+        break;
+#ifdef LDL_ENABLE_US_902_928
+    case LDL_US_902_928:
+
+        if((trial & 1U) > 0U){
+
+            retval = U8(U32(64) + ((trial >> 1) % U32(8)));
+        }
+        else{
+
+            retval = U8((((trial >> 1) % U32(8)) * U32(8)) + (random % U32(8)));
+        }
+        break;
+#endif
+#ifdef LDL_ENABLE_AU_915_928
+    case LDL_AU_915_928:
+
+        if((trial & 1U) > 0U){
+
+            retval = U8(U32(64) + ((trial >> 1) % U32(8)));
+        }
+        else{
+
+            retval = U8((((trial >> 1) % U32(8)) * U32(8)) + (random % U32(8)));
+        }
+        break;
+#endif
     }
 
     return retval;
@@ -993,10 +1027,13 @@ uint32_t LDL_Region_getMaxDCycleOffLimit(enum ldl_region region)
      * limit ourselves by never accumulating more than one hour of
      * off-time.
      *
+     * For a little more safety I've cut this back to half an hour.
+     *
      * */
-    return U32(60)*U32(60)*U32(256);
+    return U32(30)*U32(60)*U32(256);
 }
 
+#ifndef LDL_TRACE_DISABLED
 const char *LDL_Region_enumToString(enum ldl_region region)
 {
     const char *retval;
@@ -1025,6 +1062,49 @@ const char *LDL_Region_enumToString(enum ldl_region region)
         retval = "LDL_AU_915_928";
         break;
 #endif
+    }
+
+    return retval;
+}
+#endif
+
+bool LDL_Region_txParamSetupImplemented(enum ldl_region region)
+{
+    bool retval = false;
+
+    switch(region){
+#ifdef LDL_ENABLE_AU_915_928
+    case LDL_AU_915_928:
+        retval = true;
+        break;
+#endif
+    default:
+        break;
+    }
+
+    return retval;
+}
+
+uint8_t LDL_Region_applyUplinkDwell(enum ldl_region region, bool dwell, uint8_t rate)
+{
+    uint8_t retval = rate;
+
+    (void)dwell;
+
+    switch(region){
+#ifdef LDL_ENABLE_AU_915_928
+    case LDL_AU_915_928:
+        if(dwell){
+
+            if(retval < 2U){
+
+                retval = 2U;
+            }
+        }
+        break;
+#endif
+    default:
+        break;
     }
 
     return retval;
@@ -1101,8 +1181,6 @@ static bool upRateRange(enum ldl_region region, uint8_t chIndex, uint8_t *minRat
 
     return retval;
 }
-
-
 
 #ifndef LDL_ENABLE_AVR
     #undef memcpy_P

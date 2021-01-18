@@ -1,10 +1,10 @@
 Todo
 ====
 
-- Implement LoRaWAN conformance test application
-    - get access to test specification
-    - this application should be "built-in" so that production nodes have
-      the option of being put into test mode
+- Implement the LoRaWAN conformance test application
+    - The test app should be "built-in" and run from LDL_MAC_process()
+    - The test app should be included in the build if LDL_ENABLE_TEST_MODE is defined
+    - The test app should be started and stopped from a LDL_MAC_* interface
 
 - LoRaWAN conformance test
     - need to put LDL through the test
@@ -19,10 +19,6 @@ Todo
     - implement mode
     - implement tooling to prove the feature works
 
-- Add support for new radios
-    - SX1261
-    - SX1262
-
 - Add support for additional regions
     - CN_779
     - CN_470_510
@@ -31,4 +27,8 @@ Todo
     - IN_865_867
     - RU_864_870
 
-- Adjust current trim in radio driver
+- Radio driver improvements
+    - add adjustment for current trim
+    - add adjustment for PA ramp time
+    - add FSK mode
+    - add continuous wave mode

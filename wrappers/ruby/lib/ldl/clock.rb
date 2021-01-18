@@ -1,3 +1,5 @@
+require 'securerandom'
+require 'pry'
 
 module LDL
 
@@ -5,81 +7,47 @@ module LDL
 
     include LoggerMethods
 
+    TPS = 1000000
+    MAX = 0xffffffff
+
     # @return [Integer] 32 bit system time integer
     #
     def ticks
-      (@time * ExtMAC::TICKS_PER_SECOND).to_i & 0xffffffff
+      (@time & MAX)
+    end
+
+    attr_reader :time
+
+    def tps
+      TPS
+    end
+
+    def self.ticks_to_f(ticks)
+      ticks.to_f / TPS.to_f
+    end
+
+    def self.ticks_to_s(ticks)
+      (ticks.to_f / TPS.to_f).to_s
     end
 
     def ticks_to_s(ticks)
-      ticks.to_f / ExtMAC::TICKS_PER_SECOND.to_f
+      self.class.send __method__, ticks
     end
 
-    def initialize(scenario)
+    def initialize(**opts)
 
-      @disable_log = true
+      @logger = opts[:logger]||LoggerMethods::NULL_LOGGER
 
-      @scenario = scenario
+      #self.enable_log
+
       @queue = []
       @running = false
       @mutex = Mutex.new
       @update = ConditionVariable.new
       @event = Struct.new(:timeout, :block, :id)
       @time = self.get_time()
-
-      Thread.new do
-
-        loop do
-
-          expired = nil
-
-          with_mutex do
-
-            floating_time = self.get_time()
-
-            if not(@queue.empty?) and @queue.first.timeout <= floating_time
-
-              expired = @queue.shift
-
-            else
-
-              loop do
-
-                # fixed time will now track floating
-                @time = floating_time
-
-                if @queue.empty?
-
-                  @update.wait(@mutex)
-
-                else
-
-                  @update.wait(@mutex, @queue.first.timeout - floating_time)
-
-                end
-
-                # wakeup!
-
-                # floating time must be updated
-                floating_time = self.get_time()
-
-                break unless @queue.empty?
-
-              end
-
-            end
-
-          end
-
-          if expired
-            log_debug{"calling #{expired.id}"}
-            @time = expired.timeout
-            expired.block.call
-          end
-
-        end
-
-      end.run
+      @worker = nil
+      @stack = []
 
     end
 
@@ -93,9 +61,18 @@ module LDL
 
       with_mutex do
 
-        future_time = (@time + (interval.to_f / ExtMAC::TICKS_PER_SECOND.to_f)).round(6)
+        raise unless running?
+        raise if @queue.any?(nil)
 
-        event = @event.new(future_time, block, rand(0..2**32))
+        if @worker == Thread.current
+          _time = @time
+        else
+          _time = get_time
+        end
+
+        future_time = _time + interval
+
+        event = @event.new(future_time, block, SecureRandom.uuid)
 
         if @queue.empty?
           @queue.push(event)
@@ -111,9 +88,9 @@ module LDL
 
         @update.signal
 
-      end
+        log_debug{"created #{event.id}: #{_time} + #{interval} = #{_time + interval}"}
 
-      log_debug{"#{event.id} created"}
+      end
 
       event
 
@@ -128,6 +105,7 @@ module LDL
     def cancel(event)
       if event
         with_mutex do
+          raise unless running?
           if @queue.delete(event)
             log_debug{"#{event.id} deleted"}
           end
@@ -138,6 +116,7 @@ module LDL
 
     def clear
       with_mutex do
+        raise unless running?
         @queue.clear
       end
       self
@@ -159,7 +138,96 @@ module LDL
     end
 
     def get_time
-      Time.now.to_f.round(6)
+      t = Time.now
+      ((t.to_i * TPS) + t.usec)
+    end
+
+    def running?
+      @running
+    end
+
+    def start
+
+      with_mutex do
+
+        return if running?
+
+        sync = Queue.new
+
+        @worker = Thread.new do
+
+          sync.push nil
+
+          log_debug{"starting timer thread"}
+
+          run = true
+
+          while run do
+
+            expired = nil
+
+            with_mutex do
+
+              floating_time = self.get_time()
+
+              log_debug{"floating_time=#{floating_time}"}
+
+              if @queue.empty?
+
+                @update.wait(@mutex)
+
+              elsif @queue.first.nil?
+
+                log_debug{"stopping timer thread"}
+                @queue.clear
+                run = false
+
+              elsif @queue.first.timeout <= floating_time
+
+                expired = @queue.shift
+
+              else
+
+                @update.wait(@mutex, (@queue.first.timeout - floating_time).to_f / TPS.to_f)
+
+              end
+
+            # with_mutex
+            end
+
+            if expired
+              log_debug{"calling #{expired.id}"}
+              @time = expired.timeout
+              expired.block.call
+            end
+
+          # while
+          end
+
+        # end @worker = Thread.new
+        end
+
+        sync.pop
+
+        @running = true
+
+      end
+
+    end
+
+    def stop
+
+      return unless running?
+
+      with_mutex do
+        @queue.unshift(nil)
+        @update.signal
+      end
+
+      @worker.join
+
+      @running = false
+
     end
 
     private :with_mutex, :get_time

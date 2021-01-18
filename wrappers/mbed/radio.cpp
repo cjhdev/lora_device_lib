@@ -36,11 +36,11 @@ Radio::to_radio(void *self)
 }
 
 void
-Radio::_interrupt_handler(struct ldl_mac *self, enum ldl_radio_event event)
+Radio::_interrupt_handler(struct ldl_mac *self)
 {
     if(to_radio(self)->event_cb){
 
-        to_radio(self)->event_cb(event);
+        to_radio(self)->event_cb();
     }
 }
 
@@ -50,7 +50,7 @@ Radio::_interrupt_handler(struct ldl_mac *self, enum ldl_radio_event event)
 /* public *************************************************************/
 
 void
-Radio::set_event_handler(Callback<void(enum ldl_radio_event)> handler)
+Radio::set_event_handler(Callback<void()> handler)
 {
     event_cb = handler;
 }

@@ -31,15 +31,16 @@
  * It's pedantic but PCLINT in MISRA 2012 mode complains a lot about widths
  *
  *  */
+#define U64(X) ((uint64_t)(X))
 #define U32(X) ((uint32_t)(X))
 #define U16(X) ((uint16_t)(X))
 #define S16(X) ((int16_t)(X))
 #define U8(X) ((uint8_t)(X))
 
-#ifdef LDL_DISABLE_POINTONE
-    #define SESS_VERSION(sess) (0U)
-#else
+#if defined(LDL_ENABLE_L2_1_1)
     #define SESS_VERSION(sess) sess.version
+#else
+    #define SESS_VERSION(sess) (0U)
 #endif
 
 #endif

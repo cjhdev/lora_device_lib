@@ -58,11 +58,11 @@ void LDL_OPS_syncDownCounter(struct ldl_mac *self, uint8_t port, uint16_t counte
 
     if((SESS_VERSION(self->ctx) > 0U) && (port == 0U)){
 
-        self->ctx.nwkDown = (uint16_t)(derived >> 16);
+        self->ctx.nwkDown = U16(derived >> 16);
     }
     else{
 
-        self->ctx.appDown = (uint16_t)(derived >> 16);
+        self->ctx.appDown = U16(derived >> 16);
     }
 }
 
@@ -83,15 +83,15 @@ void LDL_OPS_deriveKeys(struct ldl_mac *self)
         if(SESS_VERSION(self->ctx) == 0U){
 
             /* ptr[0] below */
-            pos = 1U;
+            pos = 1;
             pos += putU24(&ptr[pos], self->ctx.joinNonce);
             pos += putU24(&ptr[pos], self->ctx.netID);
             (void)putU16(&ptr[pos], self->ctx.devNonce);
 
-            ptr[0] = 2U;
+            ptr[0] = 2;
             self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_NWK, &iv);
 
-            ptr[0] = 1U;
+            ptr[0] = 1;
             self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_FNWKSINT, LDL_SM_KEY_NWK, &iv);
             self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_SNWKSINT, LDL_SM_KEY_NWK, &iv);
             self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_NWKSENC, LDL_SM_KEY_NWK, &iv);
@@ -99,28 +99,28 @@ void LDL_OPS_deriveKeys(struct ldl_mac *self)
         else{
 
             /* ptr[0] below */
-            pos = 1U;
+            pos = 1;
             pos += putU24(&ptr[pos], self->ctx.joinNonce);
             pos += putEUI(&ptr[pos], self->joinEUI);
             (void)putU16(&ptr[pos], self->ctx.devNonce);
 
-            ptr[0] = 1U;
+            ptr[0] = 1;
             self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_FNWKSINT, LDL_SM_KEY_NWK, &iv);
 
-            ptr[0] = 2U;
+            ptr[0] = 2;
             self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_APP, &iv);
 
-            ptr[0] = 3U;
+            ptr[0] = 3;
             self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_SNWKSINT, LDL_SM_KEY_NWK, &iv);
 
-            ptr[0] = 4U;
+            ptr[0] = 4;
             self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_NWKSENC, LDL_SM_KEY_NWK, &iv);
         }
     }
     self->sm_interface->end_update_session_key(self->sm);
 }
 
-#ifndef LDL_DISABLE_POINTONE
+#if defined(LDL_ENABLE_L2_1_1)
 void LDL_OPS_deriveJoinKeys(struct ldl_mac *self)
 {
     LDL_PEDANTIC(self != NULL)
@@ -152,29 +152,30 @@ uint8_t LDL_OPS_prepareData(struct ldl_mac *self, const struct ldl_frame_data *f
     LDL_PEDANTIC(self != NULL)
 
     struct ldl_frame_data_offset off;
-    uint8_t retval = 0U;
+    uint8_t retval = 0;
 
     retval = LDL_Frame_putData(f, out, max, &off);
 
     if(retval > 0U){
 
-
         struct ldl_block A;
 
+#if defined(LDL_ENABLE_L2_1_1)
         /* encrypt fopt (LoRaWAN 1.1) */
         if(SESS_VERSION(self->ctx) == 1U){
 
-#ifdef LDL_ENABLE_POINTONE_ERRATA_A1
+#ifdef LDL_ENABLE_ERRATA_A1
             /* as per errata 26 Jan 2018 */
-            initA(&A, 1U, f->devAddr, true, f->counter, 1U);
+            initA(&A, 1, f->devAddr, true, f->counter, 1);
 #else
             /* as per 1.1 spec */
-            initA(&A, 0U, f->devAddr, true, f->counter, 0U);
+            initA(&A, 0, f->devAddr, true, f->counter, 0);
 #endif
             self->sm_interface->ctr(self->sm, LDL_SM_KEY_NWKSENC, &A, &out[off.opts], f->optsLen);
         }
+#endif
 
-        initA(&A, 0U, f->devAddr, true, f->counter, 1U);
+        initA(&A, 0, f->devAddr, true, f->counter, 1);
 
         /* encrypt data */
         self->sm_interface->ctr(self->sm, (f->port == 0U) ? LDL_SM_KEY_NWKSENC : LDL_SM_KEY_APPS, &A, &out[off.data], f->dataLen);
@@ -253,7 +254,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
 
                 if(LDL_Frame_decode(f, in, len)){
 
-#ifndef LDL_DISABLE_POINTONE
+#if defined(LDL_ENABLE_L2_1_1)
                     if(f->optNeg){
 
                         if(f->joinNonce >= self->joinNonce){
@@ -322,7 +323,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
         case FRAME_TYPE_DATA_CONFIRMED_DOWN:
 
             if(
-                ((SESS_VERSION(self->ctx) > 0U) && (self->op == LDL_OP_REJOINING))
+                (self->op == LDL_OP_REJOINING)
                 ||
                 (self->op  == LDL_OP_DATA_UNCONFIRMED)
                 ||
@@ -351,21 +352,19 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
 
                     if(mic == f->mic){
 
+#if defined(LDL_ENABLE_L2_1_1)
                         /* V1.1 encrypts the opts */
                         if(SESS_VERSION(self->ctx) == 1U){
-
-#ifdef LDL_ENABLE_POINTONE_ERRATA_A1
+#ifdef LDL_ENABLE_ERRATA_A1
                             /* as per errata 26 Jan 2018 */
                             initA(&A, f->dataPresent ? 2U : 1U, f->devAddr, false, f->counter, 0U);
-
 #else
                             /* as per 1.1 spec */
                             initA(&A, 0U, f->devAddr, false, f->counter, 0U);
 #endif
-
                             self->sm_interface->ctr(self->sm, LDL_SM_KEY_NWKSENC, &A, f->opts, f->optsLen);
                         }
-
+#endif
                         initA(&A, 0U, f->devAddr, false, f->counter, 1U);
 
                         self->sm_interface->ctr(self->sm, (f->port == 0U) ? LDL_SM_KEY_NWKSENC : LDL_SM_KEY_APPS, &A, f->data, f->dataLen);

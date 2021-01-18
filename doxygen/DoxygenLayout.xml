@@ -3,15 +3,15 @@
   <!-- Navigation index tabs for HTML output -->
   <navindex>
     <tab type="mainpage" visible="no" title=""/>
-    <tab type="pages" visible="yes" title="" intro=""/>
+    <tab type="pages" visible="no" title="" intro=""/>
     <tab type="modules" visible="no" title="" intro=""/>
-    <tab type="namespaces" visible="yes" title="">
-      <tab type="namespacelist" visible="yes" title="" intro=""/>
-      <tab type="namespacemembers" visible="yes" title="" intro=""/>
+    <tab type="namespaces" visible="no" title="">
+      <tab type="namespacelist" visible="no" title="" intro=""/>
+      <tab type="namespacemembers" visible="no" title="" intro=""/>
     </tab>
     <tab type="classes" visible="no" title="">
       <tab type="classlist" visible="yes" title="" intro=""/>
-      <tab type="classindex" visible="$ALPHABETICAL_INDEX" title=""/> 
+      <tab type="classindex" visible="$ALPHABETICAL_INDEX" title=""/>
       <tab type="hierarchy" visible="yes" title="" intro=""/>
       <tab type="classmembers" visible="yes" title="" intro=""/>
     </tab>
@@ -19,7 +19,7 @@
       <tab type="filelist" visible="yes" title="" intro=""/>
       <tab type="globals" visible="yes" title="" intro=""/>
     </tab>
-    <tab type="examples" visible="yes" title="" intro=""/>  
+    <tab type="examples" visible="yes" title="" intro=""/>
   </navindex>
 
   <!-- Layout definition for a class page -->
@@ -138,18 +138,18 @@
   <!-- Layout definition for a group page -->
   <group>
     <briefdescription visible="no"/>
-    <groupgraph visible="$GROUP_GRAPHS"/>
+    <groupgraph visible="no"/>
     <detaileddescription title="Description"/>
     <memberdecl>
       <functions title="Function List"/>
-      <nestedgroups visible="yes" title="Modules"/>
+      <nestedgroups visible="no" title="Modules"/>
       <dirs visible="yes" title=""/>
       <files visible="yes" title=""/>
       <namespaces visible="yes" title=""/>
       <classes visible="no" title="Structures"/>
       <defines title=""/>
-      <typedefs title=""/>      
-      <enumvalues title=""/>      
+      <typedefs title=""/>
+      <enumvalues title=""/>
       <variables title=""/>
       <signals title=""/>
       <publicslots title=""/>
@@ -160,7 +160,7 @@
       <friends title=""/>
       <membergroups visible="yes"/>
     </memberdecl>
-    
+
     <memberdef>
       <pagedocs/>
       <functions title="Functions"/>
@@ -168,7 +168,7 @@
       <defines title=""/>
       <typedefs title=""/>
       <enums title=""/>
-      <enumvalues title=""/>      
+      <enumvalues title=""/>
       <variables title=""/>
       <signals title=""/>
       <publicslots title=""/>

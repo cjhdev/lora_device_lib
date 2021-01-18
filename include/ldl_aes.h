@@ -25,10 +25,7 @@
 /** @file */
 
 /**
- * @defgroup ldl_crypto Default Crypto
- * @ingroup ldl
- *
- * # Default Crypto Interface
+ * @defgroup ldl_crypto Default Cryptography
  *
  * The implementations for these interfaces are used by the default
  * @ref ldl_tsm. They are documented here to assist integrators that

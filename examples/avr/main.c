@@ -6,10 +6,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <avr/io.h>
+
 void app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg);
 void chip_set_mode(void *self, enum ldl_chip_mode mode);
-void chip_write(void *self, uint8_t addr, const void *data, uint8_t size);
-void chip_read(void *self, uint8_t addr, void *data, uint8_t size);
+bool chip_write(void *self, const void *opcode, size_t opcode_size, const void *data, size_t size);
+bool chip_read(void *self, const void *opcode, size_t opcode_size, void *data, size_t size);
+
+void spi_init(void);
+uint8_t spi_write(uint8_t data);
 
 uint32_t system_ticks(void *app);
 uint32_t system_rand(void *app);
@@ -22,6 +27,9 @@ void main() __attribute__ ((noreturn));
 
 void main(void)
 {
+    spi_init();
+
+
     {
         const uint8_t nwk_key[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
@@ -29,19 +37,18 @@ void main(void)
     }
 
     {
-        struct ldl_radio_init_arg arg = {0};
+        /* this will work with the RFM modules */
+        struct ldl_sx127x_init_arg arg = {0};
 
-        arg.type = LDL_RADIO_SX1276;
         arg.xtal = LDL_RADIO_XTAL_CRYSTAL;
-        arg.xtal_delay = 0U;
         arg.tx_gain = 0;
-        arg.pa = LDL_RADIO_PA_BOOST;
+        arg.pa = LDL_SX127X_PA_BOOST;
 
         arg.chip_read = chip_read,
         arg.chip_write = chip_write,
         arg.chip_set_mode = chip_set_mode,
 
-        LDL_Radio_init(&radio, &arg);
+        LDL_SX1276_init(&radio, &arg);
     }
 
     {
@@ -55,7 +62,10 @@ void main(void)
         arg.rand = system_rand;
 
         arg.radio = &radio;
+        arg.radio_interface = LDL_Radio_getInterface(&radio);
+
         arg.sm = &sm;
+        arg.sm_interface = LDL_SM_getInterface();
 
         arg.devEUI = dev_eui;
         arg.joinEUI = join_eui;
@@ -63,6 +73,21 @@ void main(void)
         arg.handler = app_handler;
 
         LDL_MAC_init(&mac, LDL_EU_863_870, &arg);
+    }
+
+    /* entropy is no longer gathered automatically
+     *
+     * If you seed srand from an different source this step can be
+     * removed.
+     *
+     * */
+    for(;;){
+
+        if(LDL_MAC_ready(&mac)){
+
+            LDL_MAC_entropy(&mac);
+            break;
+        }
     }
 
     for(;;){
@@ -92,22 +117,67 @@ void app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
     switch(type){
     default:
         break;
-    case LDL_MAC_STARTUP:
-        srand(arg->startup.entropy);
+    case LDL_MAC_ENTROPY:
+        srand(arg->entropy.value);
         break;
     }
 }
 
 void chip_set_mode(void *self, enum ldl_chip_mode mode)
 {
+    (void)self;
+
+    switch(mode){
+    case LDL_CHIP_MODE_RESET:
+        // drive reset high
+        break;
+    case LDL_CHIP_MODE_SLEEP:
+        //  hiz reset
+        break;
+    case LDL_CHIP_MODE_STANDBY:
+        break;
+    case LDL_CHIP_MODE_RX:
+        break;
+    case LDL_CHIP_MODE_TX_BOOST:
+        break;
+    case LDL_CHIP_MODE_TX_RFO:
+        break;
+    }
 }
 
-void chip_write(void *self, uint8_t addr, const void *data, uint8_t size)
+bool chip_write(void *self, const void *opcode, size_t opcode_size, const void *data, size_t size)
 {
+    (void)self;
+
+    for(size_t i=0U; i < opcode_size; i++){
+
+        (void)spi_write(((const uint8_t *)opcode)[i]);
+    }
+
+    for(size_t i=0U; i < size; i++){
+
+        (void)spi_write(((const uint8_t *)data)[i]);
+    }
+
+    return true;
 }
 
-void chip_read(void *self, uint8_t addr, void *data, uint8_t size)
+bool chip_read(void *self, const void *opcode, size_t opcode_size, void *data, size_t size)
 {
+    (void)self;
+
+    for(size_t i=0U; i < opcode_size; i++){
+
+        (void)spi_write(((const uint8_t *)opcode)[i]);
+    }
+
+    for(size_t i=0U; i < size; i++){
+
+        ((uint8_t *)data)[i] = spi_write(0);
+    }
+
+
+    return true;
 }
 
 uint32_t system_ticks(void *app)
@@ -122,4 +192,16 @@ uint32_t system_rand(void *app)
     (void)app;
 
     return rand();
+}
+
+void spi_init(void)
+{
+    // todo
+}
+
+uint8_t spi_write(uint8_t data)
+{
+    SPDR = data;
+    while(!(SPSR & _BV(SPIF)));
+    return SPDR;
 }

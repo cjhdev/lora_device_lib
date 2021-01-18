@@ -27,7 +27,7 @@
         },
         "DISCO_L072CZ_LRWAN1" : {
 
-            "ldl.default-rate" : 0
+            "ldl.disable-sf12" : null
         }
     }
 }

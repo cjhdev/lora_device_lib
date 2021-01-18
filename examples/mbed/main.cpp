@@ -2,51 +2,58 @@
 
 #include "mbed_trace.h"
 
-/* Change these values either here or in mbed_app.json
- *
- * - keys must be 16 bytes
- * - EUIs must be 8 bytes
- *
- * */
 const uint8_t app_key[] = MBED_CONF_APP_APP_KEY;
 const uint8_t nwk_key[] = MBED_CONF_APP_NWK_KEY;
 const uint8_t dev_eui[] = MBED_CONF_APP_DEV_EUI;
 const uint8_t join_eui[] = MBED_CONF_APP_JOIN_EUI;
 
-SPI spi(D11, D12, D13);
 LDL::DefaultSM sm(app_key, nwk_key);
 LDL::DefaultStore store(dev_eui, join_eui);
 
+void handle_rx(uint8_t port, const void *data, uint8_t size)
+{
+}
+
+void handle_link_status(uint8_t margin, uint8_t gwcount)
+{
+}
+
+void handle_device_time(uint32_t seconds, uint8_t fractions)
+{
+}
+
 int main()
 {
+    uint32_t entropy;
+
     mbed_trace_init();
 
-    static LDL::SX1272 radio(
-        spi,
-        D10,    // nss
-        A0,     // reset
-        D2, D3  // DIO0, DIO1
-    );
+    //static LDL::HW::SX1272MB2XAS radio;
+    static LDL::HW::SX126XMB2XAS radio;
 
     static LDL::Device device(store, sm, radio);
 
+    device.set_rx_cb(callback(handle_rx));
+    device.set_link_status_cb(callback(handle_link_status));
+    device.set_device_time_cb(callback(handle_device_time));
+
     device.start(LDL_EU_863_870);
+
+    if(device.entropy(entropy) == LDL_STATUS_OK){
+
+        srand(entropy);
+    }
+
+    device.otaa();
 
     for(;;){
 
-        if(device.ready()){
+        const char msg[] = "hello world";
 
-            if(device.joined()){
+        // will block until channel available
+        device.unconfirmed(1, msg, strlen(msg));
 
-                const char msg[] = "hello world";
-
-                (void)device.unconfirmed(1, msg, strlen(msg));
-            }
-            else{
-
-                (void)device.otaa();
-            }
-        }
+        ThisThread::sleep_for(10s);
     }
 
     return 0;

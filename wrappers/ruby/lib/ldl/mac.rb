@@ -6,39 +6,102 @@ module LDL
 
     include LoggerMethods
 
-    attr_reader :scenario, :ext
+    attr_reader :ext, :net_id, :join_nonce, :dev_addr
 
-    def initialize(scenario, sm, radio, **opts)
+    def running?
+      @running
+    end
 
-      @scenario = scenario
+    def initialize(broker, clock, sm, radio, **opts)
 
-      @job_events = []
+      self.enable_log
+
+      @logger = opts[:logger]||LoggerMethods::NULL_LOGGER
+      @broker = broker
+      @clock = clock
+
+      @ready = ConditionVariable.new
+      @ready_mutex = Mutex.new
+      @need_to_stop = false
+
+      @mutex = Mutex.new
+
+      @running = false
+
       @job_handler = nil
 
       @tick_ev = nil
 
-      @ext = ExtMAC.new(scenario, sm, radio, **opts) do |ev, **params|
+      evstruct = Struct.new(:event, :param)
 
-        log_debug{"event: #{ev} #{(params.empty? ? "" : params.to_json)}"}
+      @rx = nil
+      @device_time = nil
+      @link_status = nil
 
-        if @job_handler and @job_events.include? ev
-          @job_handler.call(ev)
+      @ext = ExtMAC.new(clock, sm, radio, **opts) do |ev, **params|
+
+        case ev
+        # the following go back to the request
+        when :join_complete, :data_complete, :data_timeout, :op_error, :op_cancelled, :entropy
+
+          if @job_handler
+            handler = @job_handler
+            @job_handler = nil
+            handler.call(evstruct.new(ev, params))
+          end
+
+        when :rx
+
+          if @rx
+            @rx.call(params)
+          end
+
+        when :link_status
+
+          if @link_status
+            @link_status.call(params)
+          end
+
+        when :session_updated
+        when :device_time
+
+          if @device_time
+            @device_time.call(params)
+          end
+
+        when :channel_ready
+
+          @ready_mutex.synchronize { @ready.signal }
+
+        else
+          log_debug{"not handling event: #{ev}"}
         end
 
       end
 
-      @log_header = "DEVICE(#{name})::MAC"
-
       # configure radio to callback to mac
       radio.on_event do |ev|
-        radio_event(ev)
+        ext.radio_event
+        do_process()
       end
 
-      # ensure the stack starts ticking
-      scenario.clock.call do
+    end
+
+    def start
+      @clock.call do
+        @need_to_stop = false
         do_process
+        @running = true
       end
+    end
 
+    def stop
+      @clock.call do
+        @need_to_stop = true
+        @ready_mutex.synchronize { @ready.signal }
+        @clock.cancel(@tick_ev)
+        @running = false
+      end
     end
 
     def do_process
@@ -47,13 +110,13 @@ module LDL
 
       ticks = ext.ticks_until_next_event
 
-      if ticks
+      unless ticks.nil?
 
-        #log_debug{"call again in #{ticks}"}
+        #log_debug{"call again in #{ticks} @ #{@clock.ticks}"}
 
-        scenario.clock.cancel(@tick_ev)
+        @clock.cancel(@tick_ev)
 
-        @tick_ev = scenario.clock.call_in(ticks) do
+        @tick_ev = @clock.call_in(ticks) do
           do_process
         end
 
@@ -63,165 +126,254 @@ module LDL
 
     end
 
-    def radio_event(ev)
-      ext.send(__method__, ev)
-      scenario.clock.call do
-        do_process()
-      end
-      self
-    end
-
     def do_set(method, *args)
-      q = Queue.new
-      scenario.clock.call do
-        begin
-          q << ext.send(method, *args)
-        rescue => e
-          q << e
+      with_mutex do
+        q = Queue.new
+        @clock.call do
+          begin
+            q << ext.send(method, *args)
+          rescue => e
+            q << e
+          end
         end
-      end
-      case retval = q.pop
-      when Exception
-        raise retval
-      else
-        retval
+        case retval = q.pop
+        when Exception
+          raise retval
+        else
+          retval
+        end
       end
     end
 
     def do_get(method)
-      q = Queue.new
-      scenario.clock.call do
-        q << ext.send(method)
+      with_mutex do
+        q = Queue.new
+        @clock.call do
+          q << ext.send(method)
+        end
+        q.pop
       end
-      q.pop
     end
 
-    def otaa(**opts)
+    def do_command(method, *args, **opts, &block)
 
       q = Queue.new
 
-      scenario.clock.call do
+      @clock.call do
 
         begin
 
-          ext.otaa
+          q << ext.send(method, *args, **opts)
 
-          @job_handler = nil
-          @job_events = [:join_complete]
-          @job_handler = proc do |ev|
-            q << ev
-          end
+          @job_handler = block
 
           do_process()
-          q << nil
+
         rescue => e
+
           q << e
+
         end
 
       end
 
+      # get initial result
       case retval = q.pop
       when Exception
         raise retval
       end
 
-      q.pop
+    end
 
-      @job_handler = nil
+    def entropy(**opts)
+
+      q = Queue.new
+
+      do_command(__method__) { |ev| q << ev }
+
+      retval = q.pop
+
+      case retval.event
+      when :entropy
+        retval.param[:entropy]
+      when :op_error
+        raise OpError
+      when :op_cancelled
+        raise OpCancelled
+      else
+        raise "unexpected ev"
+      end
+
+    end
+
+    def otaa(**opts)
+      with_mutex do
+
+        q = TimeoutQueue.new
+
+        do_command(__method__) { |ev| q << ev }
+
+        # wait for call to complete (could take forever)
+        begin
+
+          retval = q.pop(timeout: opts[:timeout])
+
+          case retval.event
+          when :join_complete
+
+            @dev_addr = retval.param[:dev_addr]
+            @net_id = retval.param[:net_id]
+            @join_nonce = retval.param[:join_nonce]
+
+            nil
+
+          when :op_error
+            raise OpError
+          when :op_cancelled
+            raise OpCancelled
+          else
+            raise "unexpected ev"
+          end
+
+        rescue ThreadError
+
+          sync = Queue.new
+
+          @clock.call do
+
+            if q.empty?
+              ext.cancel
+            else
+              ext.forget
+            end
+
+            sync.push nil
+
+          end
+
+          sync.pop
+          raise ThreadError.new "otaa timeout"
+
+        end
+
+      end
 
     end
 
     def confirmed(port=1, data, **opts)
+      with_mutex do
 
-      q = Queue.new
+        ready_before = opts[:timeout] ? (Time.now + opts[:timeout]) : nil
 
-      scenario.clock.call do
+        q = Queue.new
 
-        begin
+        loop do
 
-          ext.confirmed(port, data, **opts)
+          begin
 
-          @job_handler = nil
-          @job_events = [:join_complete]
-          @job_handler = proc do |ev|
-            q << ev
+            do_command(__method__, port, data, **opts) { |ev| q << ev }
+
+            retval = q.pop
+
+            case retval.event
+            when :data_complete
+              break
+            when :data_timeout
+              raise DataTimeout
+            when :op_error
+              raise OpError
+            when :op_cancelled
+              raise OpCancelled
+            else
+              raise "unexpected event"
+            end
+
+          rescue ErrNoChannel
+
+            if ready_before
+
+              remaining = ready_before - Time.now
+
+              raise ErrNoChannel.new "timeout waiting for channel" if remaining <= 0
+
+              @ready_mutex.synchronize { @ready.wait(@ready_mutex, remaining) }
+
+            else
+
+              @ready_mutex.synchronize { @ready.wait(@ready_mutex) }
+
+            end
+
           end
 
-          do_process()
-          q << nil
-        rescue => e
-          q << e
         end
 
-      end
-
-      case retval = q.pop
-      when Exception
-        raise retval
-      end
-
-      retval = q.pop
-
-      @job_handler = nil
-
-      case retval
-      when :data_complete
-        self
-      when :data_timeout
-        raise DataTimeout
-      when :data_nack
-        raise DataNack
-      when Exception
-        raise retval
-      else
-        raise
       end
 
     end
 
     def unconfirmed(port=1, data, **opts)
+      with_mutex do
 
-      q = Queue.new
+        ready_before = opts[:timeout] ? (Time.now + opts[:timeout]) : nil
 
-      scenario.clock.call do
+        q = Queue.new
 
-        begin
+        loop do
 
-          ext.unconfirmed(port, data, **opts)
+          begin
 
-          @job_handler = nil
-          @job_events = [:data_complete]
-          @job_handler = proc do |ev|
-            q << ev
+            do_command(__method__, port, data, **opts) { |ev| q << ev }
+
+            retval = q.pop
+
+            case retval.event
+            when :data_complete
+              break
+            when :op_error
+              raise OpError
+            when :op_cancelled
+              raise OpCancelled
+            else
+              raise "unexpected event"
+            end
+
+          rescue ErrNoChannel
+
+            if ready_before
+
+              remaining = ready_before - Time.now
+
+              raise ErrNoChannel.new "timeout waiting for channel" if remaining <= 0
+
+              @ready_mutex.synchronize { @ready.wait(@ready_mutex, remaining) }
+
+            else
+
+              @ready_mutex.synchronize { @ready.wait(@ready_mutex) }
+
+            end
+
           end
 
-          do_process()
-          q << nil
-
-        rescue => e
-          q << e
         end
 
       end
-
-      case retval = q.pop
-      when Exception
-        raise retval
-      end
-
-      q.pop
-
-      @job_handler = nil
-
-      raise
-
     end
 
     def on_rx(&block)
-
       @rx = block
       self
+    end
 
+    def on_device_time(&block)
+      @device_time = block
+      self
+    end
+
+    def on_link_status(&block)
+      @link_status = block
+      self
     end
 
     def rate=(value)
@@ -260,6 +412,13 @@ module LDL
       do_get(__method__)
     end
 
+    def forget
+      do_get(__method__)
+      @dev_addr = nil
+      @net_id = nil
+      @join_nonce = nil
+    end
+
     def adr=(value)
       do_set(__method__, value)
     end
@@ -276,8 +435,8 @@ module LDL
       do_get(__method__)
     end
 
-    def seconds_since_valid_downlink
-      do_get(__method__)
+    def unlimited_duty_cycle=(value)
+      do_set(__method__, value)
     end
 
     def dev_eui
@@ -291,6 +450,18 @@ module LDL
     def name
       ext.name
     end
+
+    def region
+      ext.region
+    end
+
+    def with_mutex
+      @mutex.synchronize do
+        yield
+      end
+    end
+
+    private :with_mutex, :do_process, :do_get, :do_set
 
   end
 

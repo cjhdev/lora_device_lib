@@ -40,13 +40,13 @@ namespace LDL {
 
             static Radio *to_radio(void *self);
 
-            Callback<void(enum ldl_radio_event)> event_cb;
+            Callback<void()> event_cb;
 
-            static void _interrupt_handler(struct ldl_mac *self, enum ldl_radio_event event);
+            static void _interrupt_handler(struct ldl_mac *self);
 
         public:
 
-            void set_event_handler(Callback<void(enum ldl_radio_event)> handler);
+            void set_event_handler(Callback<void()> handler);
 
             virtual Radio *get_state();
             virtual const struct ldl_radio_interface *get_interface() = 0;

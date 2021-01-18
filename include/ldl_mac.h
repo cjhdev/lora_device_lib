@@ -1,4 +1,4 @@
-/* Copyright (c) 2019-2020 Cameron Harper
+/* Copyright (c) 2019-2021 Cameron Harper
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -25,91 +25,29 @@
 /** @file */
 
 /**
- * @defgroup ldl LDL
- *
- * # LDL Interface Documentation
- *
- * - @ref ldl_mac MAC
- * - @ref ldl_radio radio driver
- * - @ref ldl_system system interface(s)
- * - @ref ldl_chip_interface connects @ref ldl_radio to the transceiver
- * - @ref ldl_build_options build options
- * - @ref ldl_tsm security module
- * - @ref ldl_crypto default cipher and cipher modes
- *
- * ## Usage
- *
- * Below is an example of how to use LDL to join and then send data.
- *
- * What isn't shown:
- *
- * - implementation of functions marked as "extern"
- * - sensible values for @ref ldl_radio_connector and @ref ldl_system implementation
- *
- * This example would need the following @ref ldl_build_options to be defined:
- *
- * - #LDL_ENABLE_SX1272
- * - #LDL_ENABLE_EU_863_870
- *
- * @include examples/doxygen/example.c
- *
- * */
-
-/**
  * @defgroup ldl_mac MAC
- * @ingroup ldl
  *
- * # MAC Interface
- *
- * Before accessing any of the interfaces #ldl_mac must be initialised
+ * Before accessing any of the interfaces @ref ldl_mac must be initialised
  * by calling LDL_MAC_init().
  *
- * Immediately after initialisation, LDL_Radio_setEventCallback() should
- * be used to configure @ref ldl_radio to callback to LDL_MAC_radioEvent().
- * It is also possible to configure @ref ldl_radio to call an intermediate
- * function that in turn calls LDL_MAC_radioEventWithTicks() if that better
- * suits the application.
- *
- * Initialisation may take order of milliseconds but LDL_MAC_init() does
- * not block, instead it schedules actions to run in the future.
- * It is then the responsibility of the application to poll LDL_MAC_process()
- * from a loop in order to ensure the schedule is processed. LDL_MAC_ready() will return true
- * when initialisation is complete.
- *
- * On systems that sleep, LDL_MAC_ticksUntilNextEvent() can be used in combination
- * with a wakeup timer to ensure that LDL_MAC_process() is called only when
- * necessary. Note that the counter behind LDL_System_ticks() must continue
- * to increment during sleep.
+ * Any operation that cannot be completed immediately runs from a state
+ * machine in LDL_MAC_process(). Applications that sleep can use LDL_MAC_ticksUntilNextEvent()
+ * to work out when LDL_MAC_process() needs to be called.
  *
  * Events (#ldl_mac_response_type) that occur within LDL_MAC_process() are pushed back to the
  * application using the #ldl_mac_response_fn function pointer.
  * This includes everything from state change notifications
  * to data received from the network.
  *
- * The application is free to apply settings while waiting for LDL_MAC_ready() to become
- * true. Setting interfaces are:
- *
- * - LDL_MAC_setRate()
- * - LDL_MAC_setPower()
- * - LDL_MAC_setADR()
- * - LDL_MAC_setMaxDCycle()
- *
  * Data services are not available until #ldl_mac is joined to a network.
- * The join procedure is initiated by calling LDL_MAC_otaa(). Calls to
- * LDL_MAC_otaa() may not always be successful, check the return value
- * to discover the reason for failure.
+ * The join procedure is initiated by calling LDL_MAC_otaa(). Join will
+ * run indefintely until either join succeeds, or the application
+ * calls LDL_MAC_cancel() or LDL_MAC_forget(). The application can check
+ * on the join status by calling LDL_MAC_joined().
  *
- * The join procedure will run indefinitely until either the join succeeds, or the application
- * calls LDL_MAC_cancel() or LDL_MAC_forget(). The application can check on the join status
- * by calling LDL_MAC_joined().
+ * The application can un-join by call LDL_MAC_forget().
  *
- * Once joined the application can use the data services:
- *
- * - LDL_MAC_unconfirmedData()
- * - LDL_MAC_confirmedData()
- *
- * If the application wishes to un-join it can call LDL_MAC_forget().
- *
+ * The application can cancel an operation by calling LDL_MAC_cancel().
  *
  * @{
  * */
@@ -122,6 +60,7 @@ extern "C" {
 #include "ldl_region.h"
 #include "ldl_radio.h"
 #include "ldl_mac_commands.h"
+#include "ldl_mac_internal.h"
 #include "ldl_system.h"
 
 #include <stdint.h>
@@ -137,10 +76,31 @@ struct ldl_sm;
  *  */
 enum ldl_mac_response_type {
 
-    /** Entropy has been collected by the radio driver
+    /** Entropy has received from the radio driver
      *
      * */
-    LDL_MAC_STARTUP,
+    LDL_MAC_ENTROPY,
+
+    /** A channel has become ready.
+     *
+     * This event can be spurious in some situations and so make sure
+     * to check that LDL can actually send on next attempt.
+     *
+     * */
+    LDL_MAC_CHANNEL_READY,
+
+    /** The last requested OP failed due to a radio error
+     *
+     *
+     *
+     * */
+    LDL_MAC_OP_ERROR,
+
+    /** The last requested OP was cancelled using LDL_MAC_cancel()
+     *
+     *
+     * */
+    LDL_MAC_OP_CANCELLED,
 
     /** Join request was answered and MAC is now joined
      *
@@ -153,22 +113,16 @@ enum ldl_mac_response_type {
      * */
     LDL_MAC_JOIN_COMPLETE,
 
-    /** join request was not answered (MAC will try again) */
-    LDL_MAC_JOIN_TIMEOUT,
-
     /** data request (confirmed or unconfirmed) completed successfully */
     LDL_MAC_DATA_COMPLETE,
 
     /** confirmed data request was not answered */
     LDL_MAC_DATA_TIMEOUT,
 
-    /** confirmed data request was answered but the ACK bit wasn't set */
-    LDL_MAC_DATA_NAK,
-
-    /** data receieved */
+    /** data received */
     LDL_MAC_RX,
 
-    /** LinkCheckAns */
+    /** LinkCheckAns received */
     LDL_MAC_LINK_STATUS,
 
     /** #ldl_mac_session has changed
@@ -178,10 +132,82 @@ enum ldl_mac_response_type {
      * */
     LDL_MAC_SESSION_UPDATED,
 
-    /** deviceTimeAns receieved
+    /** deviceTimeAns received
      *
      * */
     LDL_MAC_DEVICE_TIME
+};
+
+enum ldl_mac_sme {
+
+    LDL_SME_NONE,
+    LDL_SME_TIMER_A,
+    LDL_SME_TIMER_B,
+    LDL_SME_INTERRUPT,
+    LDL_SME_BAND
+};
+
+/** MAC state */
+enum ldl_mac_state {
+
+    LDL_STATE_INIT,         /**< stack has been memset to zero */
+
+    LDL_STATE_RADIO_RESET,     /**< holding reset */
+    LDL_STATE_RADIO_BOOT,      /**< waiting for radio to start after reset */
+
+    LDL_STATE_IDLE,         /**< ready for operations */
+
+    LDL_STATE_WAIT_ENTROPY,
+    LDL_STATE_START_RADIO_FOR_ENTROPY,  /**< waiting for radio to start before entropy */
+    LDL_STATE_ENTROPY,                  /**< waiting to receive entropy */
+
+    LDL_STATE_WAIT_OTAA,
+    LDL_STATE_WAIT_TX,               /**< waiting for channel to become available */
+    LDL_STATE_START_RADIO_FOR_TX,    /**< waiting for radio to start before TX */
+    LDL_STATE_TX,           /**< radio is TX */
+    LDL_STATE_WAIT_RX1,     /**< waiting for first RX window */
+    LDL_STATE_START_RADIO_FOR_RX1,
+    LDL_STATE_RX1,          /**< first RX window */
+    LDL_STATE_WAIT_RX2,     /**< waiting for second RX window */
+    LDL_STATE_START_RADIO_FOR_RX2,     /**< waiting for second RX window */
+    LDL_STATE_RX2,          /**< second RX window */
+
+    LDL_STATE_RX2_LOCKOUT  /**< used to ensure an out of range RX2 window is not clobbered */
+
+};
+
+/** MAC operations */
+enum ldl_mac_operation {
+
+    LDL_OP_NONE,                /**< no active operation */
+    LDL_OP_ENTROPY,             /**< MAC is gathering entropy */
+    LDL_OP_JOINING,             /**< MAC is performing a join */
+    LDL_OP_REJOINING,           /**< MAC is performing a rejoin */
+    LDL_OP_DATA_UNCONFIRMED,    /**< MAC is sending unconfirmed data */
+    LDL_OP_DATA_CONFIRMED,      /**< MAC is sending confirmed data */
+};
+
+/** MAC operation return status codes */
+enum ldl_mac_status {
+
+    LDL_STATUS_OK,          /**< success/pending */
+    LDL_STATUS_NOCHANNEL,   /**< upstream channel not available */
+    LDL_STATUS_SIZE,        /**< message too large to send */
+    LDL_STATUS_RATE,        /**< invalid rate setting for region */
+    LDL_STATUS_PORT,        /**< invalid port number */
+    LDL_STATUS_BUSY,        /**< cannot perform operation because busy */
+    LDL_STATUS_NOTJOINED,   /**< cannot perform operation because not joined */
+    LDL_STATUS_POWER,       /**< invalid power setting for region */
+    LDL_STATUS_MACPRIORITY, /**< data request failed due to MAC command(s) being prioritised */
+    LDL_STATUS_JOINED,      /**< cannot join because already joined */
+
+    /* the following status codes are available for
+     * use by wrappers with blocking interfaces */
+
+    LDL_STATUS_NOACK,       /**< confirmed service did not receive acknowledgement */
+    LDL_STATUS_CANCELLED,   /**< service was cancelled */
+    LDL_STATUS_TIMEOUT,     /**< user timeout waiting for service */
+    LDL_STATUS_ERROR,       /**< hardware error */
 };
 
 /** Event arguments sent to application
@@ -195,7 +221,6 @@ union ldl_mac_response_arg {
     struct {
 
         const uint8_t *data;    /**< message data */
-        uint16_t counter;       /**< frame counter */
         uint8_t port;           /**< lorawan application port */
         uint8_t size;           /**< size of message */
 
@@ -209,12 +234,12 @@ union ldl_mac_response_arg {
 
     } link_status;
 
-    /** #LDL_MAC_STARTUP argument */
+    /** #LDL_MAC_ENTROPY argument */
     struct {
 
-        uint32_t entropy;               /**< srand seed from radio driver */
+        uint32_t value;     /**< srand seed from radio driver */
 
-    } startup;
+    } entropy;
 
     /** #LDL_MAC_SESSION_UPDATED argument
      *
@@ -257,81 +282,24 @@ union ldl_mac_response_arg {
  * */
 typedef void (*ldl_mac_response_fn)(void *app, enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg);
 
-/** MAC state */
-enum ldl_mac_state {
+/** Data service invocation options */
+struct ldl_mac_data_opts {
 
-    LDL_STATE_INIT,         /**< stack has been memset to zero */
-
-    LDL_STATE_RESET,        /**< holding reset */
-    LDL_STATE_STARTUP,      /**< waiting for radio to start after reset */
-
-    LDL_STATE_IDLE,         /**< ready for operations */
-
-    LDL_STATE_WAIT_TX,      /**< waiting for channel to become available */
-    LDL_STATE_WAIT_RADIO,   /**< waiting for radio to start */
-    LDL_STATE_WAIT_RX_ENTROPY,  /**< waiting to receive entropy */
-    LDL_STATE_TX,           /**< radio is TX */
-    LDL_STATE_WAIT_RX1,     /**< waiting for first RX window */
-    LDL_STATE_RX1,          /**< first RX window */
-    LDL_STATE_WAIT_RX2,     /**< waiting for second RX window */
-    LDL_STATE_RX2,          /**< second RX window */
-
-    LDL_STATE_RX2_LOCKOUT, /**< used to ensure an out of range RX2 window is not clobbered */
-
-    LDL_STATE_WAIT_RETRY   /**< wait to retry */
-
+    uint8_t nbTrans;        /**< redundancy (0..LDL_REDUNDANCY_MAX) */
+    bool check;             /**< piggy-back a LinkCheckReq */
+    bool getTime;           /**< piggy-back a DeviceTimeReq */
 };
 
-/** MAC operations */
-enum ldl_mac_operation {
 
-    LDL_OP_NONE,                /**< no active operation */
-    LDL_OP_JOINING,             /**< MAC is performing a join */
-    LDL_OP_REJOINING,           /**< MAC is performing a rejoin */
-    LDL_OP_DATA_UNCONFIRMED,    /**< MAC is sending unconfirmed data */
-    LDL_OP_DATA_CONFIRMED,      /**< MAC is sending confirmed data */
-    LDL_OP_RESET,               /**< MAC is performing radio reset */
-    LDL_OP_ENTROPY              /**< MAC is gathering entropy */
-};
-
-/** MAC operation return status codes */
-enum ldl_mac_status {
-
-    LDL_STATUS_OK,          /**< success */
-    LDL_STATUS_NOCHANNEL,   /**< upstream channel not available */
-    LDL_STATUS_SIZE,        /**< message too large to send */
-    LDL_STATUS_RATE,        /**< data rate setting not valid for region */
-    LDL_STATUS_PORT,        /**< port not valid for upstream message */
-    LDL_STATUS_BUSY,        /**< stack is busy; cannot process request */
-    LDL_STATUS_NOTJOINED,   /**< stack is not joined; cannot process request */
-    LDL_STATUS_POWER,       /**< power setting not valid for region */
-    LDL_STATUS_INTERNAL,    /**< implementation fault */
-    LDL_STATUS_MACPRIORITY  /**< data request failed due to MAC command(s) being prioritised */
-};
-
-/* band array indices */
 enum ldl_band_index {
 
-    LDL_BAND_1,
+    LDL_BAND_1,         /* off-time per sub-band (depends on the region) */
     LDL_BAND_2,
     LDL_BAND_3,
     LDL_BAND_4,
     LDL_BAND_5,
-    LDL_BAND_GLOBAL,
-    LDL_BAND_RETRY,
-    LDL_BAND_DUTY,
-#ifdef LDL_ENABLE_CLASS_B
-    LDL_BAND_BEACON,
-#endif
+    LDL_BAND_GLOBAL,    /* global off-time counter */
     LDL_BAND_MAX
-};
-
-enum ldl_timer_inst {
-
-    LDL_TIMER_WAITA,
-    LDL_TIMER_WAITB,
-    LDL_TIMER_BAND,
-    LDL_TIMER_MAX
 };
 
 struct ldl_timer {
@@ -340,17 +308,10 @@ struct ldl_timer {
     bool armed;
 };
 
-enum ldl_input_type {
-
-    LDL_INPUT_TX_COMPLETE,
-    LDL_INPUT_RX_READY,
-    LDL_INPUT_RX_TIMEOUT
-};
-
 struct ldl_input {
 
-    uint8_t armed;
-    uint8_t state;
+    bool armed;
+    bool state;
     uint32_t time;
 };
 
@@ -360,8 +321,14 @@ struct ldl_mac_channel {
     uint32_t dlFreq;
 };
 
+struct ldl_mac_time {
 
-/** session cache */
+    uint32_t ticks;
+    uint32_t remainder;
+    bool parked;
+};
+
+/** Session cache */
 struct ldl_mac_session {
 
     /* sanity check against accepting uninitialised memory as session */
@@ -370,7 +337,7 @@ struct ldl_mac_session {
     bool adr;
 
     /* 0: 1.0 backend, 1: 1.1 backend */
-#ifndef LDL_DISABLE_POINTONE
+#if defined(LDL_ENABLE_L2_1_1)
     uint8_t version;
 #endif
 
@@ -410,30 +377,30 @@ struct ldl_mac_session {
     uint32_t joinNonce;
     uint16_t devNonce;
     uint16_t pending_cmds;
-    uint8_t  pending_ACK;   /** a CONFIRMED DATA message received, answer with ACK */
+
+#ifndef LDL_DISABLE_TX_PARAM_SETUP
+    uint8_t tx_param_setup;
+#endif
 };
 
-/** data service invocation options */
-struct ldl_mac_data_opts {
+struct ldl_mac_tx {
 
-    uint8_t nbTrans;        /**< redundancy (0..LDL_REDUNDANCY_MAX) */
-    bool check;             /**< piggy-back a LinkCheckReq */
-    bool getTime;           /**< piggy-back a DeviceTimeReq */
-    uint8_t dither;         /**< seconds of dither to add to the transmit schedule (0..60) */
+    uint32_t freq;
+    uint32_t counter;
+    uint32_t airTime;
+    uint8_t chIndex;
+    uint8_t rate;
+    uint8_t power;
+
 };
-
-struct ldl_mac_time {
-
-    uint32_t ticks;
-    uint32_t remainder;
-};
-
 
 /** MAC layer data */
 struct ldl_mac {
 
     enum ldl_mac_state state;
     enum ldl_mac_operation op;
+
+    bool pendingACK;
 
     uint8_t joinEUI[8U];
     uint8_t devEUI[8U];
@@ -449,6 +416,12 @@ struct ldl_mac {
      * used for duty cycle timing per band among other things */
     uint32_t band[LDL_BAND_MAX];
 
+    /* day down-counter used by OTAA to apply duty-cycle reduction
+     *
+     * 'time' timebase like the band down-counters
+     * */
+    uint32_t day;
+
     uint16_t devNonce;
     uint32_t joinNonce;
 
@@ -456,14 +429,7 @@ struct ldl_mac {
     int16_t margin;     /* margin calculated for last DevStatusReq */
 
     /* the settings currently being used to TX */
-    struct {
-
-        uint32_t freq;
-        uint32_t counter;
-        uint8_t chIndex;
-        uint8_t rate;
-        uint8_t power;
-    } tx;
+    struct ldl_mac_tx tx;
 
     uint16_t rx1_symbols;
     uint16_t rx2_symbols;
@@ -520,9 +486,17 @@ struct ldl_mac {
 #endif
 
 #endif
+
+#ifdef LDL_ENABLE_OTAA_DITHER
+    uint32_t otaaDither;
+#endif
+
+#ifdef LDL_ENABLE_TEST_MODE
+    bool unlimitedDutyCycle;
+#endif
 };
 
-/** passed as an argument to LDL_MAC_init()
+/** Passed as an argument to LDL_MAC_init()
  *
  * */
 struct ldl_mac_init_arg {
@@ -587,6 +561,7 @@ struct ldl_mac_init_arg {
      * */
     ldl_system_get_battery_level_fn get_battery_level;
 
+#ifndef LDL_PARAM_TPS
     /** The rate at which #ldl_mac_init_arg.ticks() increments i.e. "ticks per second"
      *
      * This is not required if LDL_PARAM_TPS has been defined.
@@ -595,7 +570,9 @@ struct ldl_mac_init_arg {
      *
      * */
     uint32_t tps;
+#endif
 
+#ifndef LDL_PARAM_A
     /** #ldl_mac_init_arg.ticks() compensation parameter A
      *
      * This is not required if LDL_PARAM_A has been defined.
@@ -604,7 +581,9 @@ struct ldl_mac_init_arg {
      *
      * */
     uint32_t a;
+#endif
 
+#ifndef LDL_PARAM_B
     /** #ldl_mac_init_arg.ticks() compensation parameter B
      *
      * This is not required if LDL_PARAM_B has been defined.
@@ -613,7 +592,9 @@ struct ldl_mac_init_arg {
      *
      * */
     uint32_t b;
+#endif
 
+#ifndef LDL_PARAM_ADVANCE
     /** Advance window open events by this many ticks
      *
      * This is not required if LDL_PARAM_ADVANCE has been defined.
@@ -624,91 +605,147 @@ struct ldl_mac_init_arg {
      *
      * */
     uint32_t advance;
+#endif
 
-    /** Beacon interval in seconds (Class B only)
+#if defined(LDL_ENABLE_CLASS_B) && !defined(LDL_PARAM_BEACON_INTERVAL)
+    /** Beacon interval in ticks (Class B only)
      *
      * This is not required if LDL_PARAM_BEACON_INTERVAL has been defined.
      *
      * */
     uint32_t beaconInterval;
+#endif
+
+#ifdef LDL_ENABLE_OTAA_DITHER
+    /** (0..otaaDither) ticks to add to JoinReq
+     *
+     * */
+    uint32_t otaaDither;
+#endif
 };
 
 
 /** Initialise #ldl_mac
  *
+ * Parameters are injected into #ldl_mac via arg.
+ *
+ * The following paramters are **MANDATORY**:
+ *
+ * - ldl_mac_init_arg.radio
+ * - ldl_mac_init_arg.ticks
+ * - ldl_mac_init_arg.joinEUI
+ * - ldl_mac_init_arg.devEUI
+ * - ldl_mac_init_arg.tps (if #LDL_PARAM_TPS is not defined)
+ * - ldl_mac_init_arg.a (if #LDL_PARAM_A is not defined)
+ * - ldl_mac_init_arg.b (if #LDL_PARAM_B is not defined)
+ * - ldl_mac_init_arg.advance (if #LDL_PARAM_ADVANCE is not defined)
+ * - ldl_mac_init_arg.sm
+ * - ldl_mac_init_arg.sm_interface
+ * - ldl_mac_init_arg.radio
+ * - ldl_mac_init_arg.radio_interface
+ *
+ * The following parameters are **OPTIONAL** (leave NULL or 0):
+ *
+ * - ldl_mac_init_arg.app
+ * - ldl_mac_init_arg.handler
+ * - ldl_mac_init_arg.session
+ * - ldl_mac_init_arg.devNonce
+ * - ldl_mac_init_arg.joinNonce
+ * - ldl_mac_init_arg.rand
+ * - ldl_mac_init_arg.get_battery_level
+ *
  * @param[in] self      #ldl_mac
  * @param[in] region    #ldl_region
  * @param[in] arg       #ldl_mac_init_arg
  *
- * Many important parameters and references are injected
- * into #ldl_mac via arg. These are immutable
- * for the lifetime of #ldl_mac.
  *
- * The following arguments are **MANDATORY**:
- *
- * - ldl_mac_init_arg.radio
- * - ldl_mac_init_arg.sm
- * - ldl_mac_init_arg.ticks
- * - ldl_mac_init_arg.joinEUI
- * - ldl_mac_init_arg.devEUI
- * - ldl_mac_init_arg.tps (if LDL_PARAM_TPS is not defined)
- *
- * The following arguments are **OPTIONAL** (leave NULL or 0):
- *
- * - ldl_mac_init_arg.handler
- * - ldl_mac_init_arg.app
- * - ldl_mac_init_arg.session
- * - ldl_mac_init_arg.a (if LDL_PARAM_A is not defined)
- * - ldl_mac_init_arg.b (if LDL_PARAM_B is not defined)
- * - ldl_mac_init_arg.advance (if LDL_PARAM_ADVANCE is not defined)
- * - ldl_mac_init_arg.devNonce
- * - ldl_mac_init_arg.joinNonce
- * - ldl_mac_init_arg.sm_interface
- * - ldl_mac_init_arg.radio_interface
- * - ldl_mac_init_arg.rand
- * - ldl_mac_init_arg.get_battery_level
- *
- * More members may be added in future releases and so it is
- * recommended to clear #ldl_mac_init_arg before using.
- *
- * For example:
- *
- * @code{.c}
+ * @code
+ * struct ldl_mac mac;
  * struct ldl_mac_init_arg arg = {0};
  *
- * arg.radio = &radio;
  * // ...
  *
- * LDL_MAC_init(&mac, LDL_EU_863_870, &arg);
+ * LDL_MAC_init(&mac, &arg);
  * @endcode
  *
  * */
 void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl_mac_init_arg *arg);
 
-/** Send data without confirmation
+/** Read entropy from the radio
  *
- * Once initiated MAC will send at most nbTrans times until a valid downlink is received. NbTrans may be set:
+ * The application shall be notified of completion via #ldl_mac_response_fn.
+ * One of the following events can be expected:
+ *
+ * - #LDL_MAC_ENTROPY
+ * - #LDL_MAC_OP_ERROR
+ * - #LDL_MAC_OP_CANCELLED
+ *
+ * @param[in] self #ldl_mac
+ *
+ * @return #ldl_mac_status
+ *
+ * @retval #LDL_STATUS_OK
+ * @retval #LDL_STATUS_BUSY
+ *
+ * */
+enum ldl_mac_status LDL_MAC_entropy(struct ldl_mac *self);
+
+/** Initiate Over The Air Activation
+ *
+ * Once initiated MAC will keep trying to join forever.
+ *
+ * The application can cancel the service while it is in progress by
+ * calling LDL_MAC_cancel().
+ *
+ * The application shall be notified of completion via #ldl_mac_response_fn.
+ * One of the following events can be expected:
+ *
+ * - #LDL_MAC_JOIN_COMPLETE
+ * - #LDL_MAC_OP_CANCELLED
+ *
+ * Unlike data services, OTAA will continue even if radio errors
+ * are detected.
+ *
+ * @param[in] self  #ldl_mac
+ *
+ * @return #ldl_mac_status
+ *
+ * @retval #LDL_STATUS_OK
+ * @retval #LDL_STATUS_BUSY
+ * @retval #LDL_STATUS_JOINED
+ *
+ * */
+enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self);
+
+/** Send data without network confirmation
+ *
+ * Once initiated MAC will send at most nbTrans times or until a valid downlink is received. NbTrans may be set:
  *
  * - globally by the network (via LinkADRReq)
- * - globally by the application (via LDL_MAC_setNbTrans())
  * - per invocation by #ldl_mac_data_opts
  *
  * The application can cancel the service while it is in progress by calling LDL_MAC_cancel().
  *
- * #ldl_mac_response_fn will push #LDL_MAC_DATA_COMPLETE on completion.
+ * The application shall be notified of completion via #ldl_mac_response_fn.
+ * One of the following events can be expected:
  *
- * Be aware that pending MAC commands (i.e. MAC commands LDL is waiting to send to the server)
- * are piggy-backed onto upstream data frames. If the pending MAC commands will
- * not fit into the same frame as the application data, the MAC commands will be prioritised.
- * This means that:
+ * - #LDL_MAC_DATA_COMPLETE
+ * - #LDL_MAC_OP_ERROR
+ * - #LDL_MAC_OP_CANCELLED
  *
- * 1. LDL_MAC_unconfirmedData() function will return LDL_STATUS_MACPRIORITY to indicate non-success for sending
+ * Be aware that pending MAC commands are piggy-backed onto upstream data frames.
+ * If the pending MAC commands will not fit into the same frame as the
+ * application data, the MAC commands will be prioritised.
+ *
+ * In the event this happens, please be aware that:
+ *
+ * 1. LDL_MAC_unconfirmedData() function will return #LDL_STATUS_MACPRIORITY to indicate non-success for sending
  *    user data
- * 2. LDL will become busy and send the pending MAC commands as an unconfirmed data frame (note
- *    that this will result in all the usual event notifications coming back to the application)
+ * 2. LDL will send the pending MAC commands as an unconfirmed data frame with
+ *    the usual event notifications coming back to the application.
  *
- * The application can recover from send request failure by trying again when LDL
- * becomes ready again.
+ * An application encountering #LDL_STATUS_MACPRIORITY should try again
+ * after the MAC commands have been sent.
  *
  * @param[in] self  #ldl_mac
  * @param[in] port  lorawan port (must be >0)
@@ -718,29 +755,31 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
  *
  * @return #ldl_mac_status
  *
- * @retval LDL_STATUS_OK            success
- * @retval LDL_STATUS_NOCHANNEL
- * @retval LDL_STATUS_SIZE
- * @retval LDL_STATUS_PORT
- * @retval LDL_STATUS_BUSY
- * @retval LDL_STATUS_NOTJOINED
- * @retval LDL_STATUS_INTERNAL
- * @retval LDL_STATUS_MACPRIORITY
+ * @retval #LDL_STATUS_OK
+ * @retval #LDL_STATUS_NOTJOINED
+ * @retval #LDL_STATUS_BUSY
+ * @retval #LDL_STATUS_PORT
+ * @retval #LDL_STATUS_NOCHANNEL
+ * @retval #LDL_STATUS_SIZE
+ * @retval #LDL_STATUS_MACPRIORITY
  *
  * */
 enum ldl_mac_status LDL_MAC_unconfirmedData(struct ldl_mac *self, uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts);
 
-/** Send data with confirmation
+/** Send data with network confirmation
  *
- * Once initiated MAC will send at most nbTrans times until a confirmation is received. NbTrans may be set:
+ * Once initiated MAC will send at most nbTrans times until a confirmation is received.
+ * NbTrans may be set per invocation by #ldl_mac_data_opts.nbTrans
  *
- * - globally by the network (via LinkADRReq)
- * - per invocation by #ldl_mac_data_opts
+ * The application can cancel the operation while it is in progress by calling LDL_MAC_cancel().
  *
- * The application can cancel the service while it is in progress by calling LDL_MAC_cancel().
+ * The application shall be notified of completion via #ldl_mac_response_fn. One of the following events
+ * can be expected:
  *
- * #ldl_mac_response_fn will push #LDL_MAC_DATA_TIMEOUT on every timeout
- * #ldl_mac_response_fn will push #LDL_MAC_DATA_COMPLETE on completion
+ * - #LDL_MAC_DATA_COMPLETE
+ * - #LDL_MAC_DATA_TIMEOUT
+ * - #LDL_MAC_OP_ERROR
+ * - #LDL_MAC_OP_CANCELLED
  *
  * MAC commands are piggy-backed and prioritised the same as they are for
  * LDL_MAC_unconfirmedData().
@@ -753,53 +792,29 @@ enum ldl_mac_status LDL_MAC_unconfirmedData(struct ldl_mac *self, uint8_t port, 
  *
  * @return #ldl_mac_status
  *
- * @retval LDL_STATUS_OK        operation is pending
- * @retval LDL_STATUS_NOCHANNEL
- * @retval LDL_STATUS_SIZE
- * @retval LDL_STATUS_PORT
- * @retval LDL_STATUS_BUSY
- * @retval LDL_STATUS_NOTJOINED
- * @retval LDL_STATUS_INTERNAL
- * @retval LDL_STATUS_MACPRIORITY
+ * @retval #LDL_STATUS_OK
+ * @retval #LDL_STATUS_NOTJOINED
+ * @retval #LDL_STATUS_BUSY
+ * @retval #LDL_STATUS_PORT
+ * @retval #LDL_STATUS_NOCHANNEL
+ * @retval #LDL_STATUS_SIZE
+ * @retval #LDL_STATUS_MACPRIORITY
  *
  * */
 enum ldl_mac_status LDL_MAC_confirmedData(struct ldl_mac *self, uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts);
 
-/** Initiate Over The Air Activation
- *
- * Once initiated MAC will keep trying to join forever.
- *
- * - Application can cancel by calling LDL_MAC_cancel()
- * - #ldl_mac_response_fn will push #LDL_MAC_JOIN_TIMEOUT on every timeout
- * - #ldl_mac_response_fn will push #LDL_MAC_JOIN_COMPLETE on completion
- *
- * @param[in] self  #ldl_mac
- *
- * @return #ldl_mac_status
- *
- * @retval LDL_STATUS_OK        operation is pending
- * @retval LDL_STATUS_NOCHANNEL
- * @retval LDL_STATUS_SIZE
- * @retval LDL_STATUS_PORT
- * @retval LDL_STATUS_BUSY
- * @retval LDL_STATUS_NOTJOINED
- * @retval LDL_STATUS_INTERNAL
- * @retval LDL_STATUS_MACPRIORITY
- *
- * */
-enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self);
-
-/** Forget network
+/** Forget network and cancel any operation
  *
  * @param[in] self  #ldl_mac
  *
  * */
 void LDL_MAC_forget(struct ldl_mac *self);
 
-/** Return state to #LDL_STATE_IDLE
+/** Cancel any operation
  *
- * @note has no immediate effect if MAC is already in the process of resetting
- * the radio
+ * Calling this function will always cause the radio hardware to be
+ * reset. This may be useful for long running applications that wish
+ * to periodically cycle the radio.
  *
  * @param[in] self  #ldl_mac
  *
@@ -815,15 +830,6 @@ void LDL_MAC_process(struct ldl_mac *self);
 
 /** Get number of ticks until the next event
  *
- * Aside from the passage of time, calls to the following functions may
- * cause the return value of this function to be change:
- *
- * - LDL_MAC_process()
- * - LDL_MAC_otaa()
- * - LDL_MAC_unconfirmedData()
- * - LDL_MAC_confirmedData()
- * - LDL_Radio_interrupt()
- *
  * @param[in] self  #ldl_mac
  *
  * @return system ticks
@@ -835,20 +841,20 @@ void LDL_MAC_process(struct ldl_mac *self);
  * */
 uint32_t LDL_MAC_ticksUntilNextEvent(const struct ldl_mac *self);
 
-/** Set the transmit data rate
+/** Set the desired transmit data rate
  *
  * @param[in] self  #ldl_mac
  * @param[in] rate
  *
  * @return #ldl_mac_status
  *
- * @retval LDL_STATUS_OK
- * @retval LDL_STATUS_RATE
+ * @retval #LDL_STATUS_OK
+ * @retval #LDL_STATUS_RATE
  *
  * */
 enum ldl_mac_status LDL_MAC_setRate(struct ldl_mac *self, uint8_t rate);
 
-/** Get the current transmit data rate
+/** Get the current desired transmit data rate
  *
  * @param[in] self  #ldl_mac
  *
@@ -864,8 +870,8 @@ uint8_t LDL_MAC_getRate(const struct ldl_mac *self);
  *
  * @return #ldl_mac_status
  *
- * @retval LDL_STATUS_OK
- * @retval LDL_STATUS_POWER
+ * @retval #LDL_STATUS_OK
+ * @retval #LDL_STATUS_POWER
  *
  * */
 enum ldl_mac_status LDL_MAC_setPower(struct ldl_mac *self, uint8_t power);
@@ -880,6 +886,8 @@ enum ldl_mac_status LDL_MAC_setPower(struct ldl_mac *self, uint8_t power);
 uint8_t LDL_MAC_getPower(const struct ldl_mac *self);
 
 /** Enable or Disable ADR
+ *
+ * Note that ADR is enabled by default after OTAA is successful.
  *
  * @param[in] self  #ldl_mac
  * @param[in] value
@@ -937,10 +945,10 @@ bool LDL_MAC_ready(const struct ldl_mac *self);
 
 /** Get the maximum transfer unit in bytes
  *
- * This number changes depending on:
+ * The MTU depends on:
  *
  * - region
- * - rate
+ * - channel mask settings
  * - pending mac commands
  *
  * @param[in] self  #ldl_mac
@@ -949,26 +957,22 @@ bool LDL_MAC_ready(const struct ldl_mac *self);
  * */
 uint8_t LDL_MAC_mtu(const struct ldl_mac *self);
 
-/** Seconds since valid downlink message received
- *
- * A valid downlink is one that is:
- *
- * - expected type for current operation
- * - well formed
- * - able to be decrypted
- *
- * @param[in] self  #ldl_mac
- *
- * @return seconds since last valid downlink
- *
- * @retval UINT32_MAX   no valid downlinks / not joined
- *
- * */
-uint32_t LDL_MAC_secondsSinceValidDownlink(struct ldl_mac *self);
-
 /** Set the aggregated duty cycle limit
  *
  * duty cycle limit = 1 / (2 ^ limit)
+ *
+ * This is useful for slowing the rate at which a device is able
+ * to send messages, especially if the device is operating in a
+ * region that doesn't limit duty cycle.
+ *
+ * e.g.
+ *
+ * @code
+ * maxDCycle=0 (off-time=1)
+ * maxDCycle=6 (off-time=0.015)
+ * maxDCycle=12 (off-time=0.00024)
+ * etc.
+ * @endcode
  *
  * @note the network may reset this via a MAC command
  *
@@ -1013,12 +1017,11 @@ bool LDL_MAC_priority(const struct ldl_mac *self, uint8_t interval);
  * argument in LDL_Radio_setHandler().
  *
  * @param[in] self      #ldl_mac
- * @param[in] event     #ldl_radio_event
  *
  * @note interrupt safe if LDL_SYSTEM_ENTER_CRITICAL() and LDL_SYSTEM_ENTER_CRITICAL() have been defined
  *
  * */
-void LDL_MAC_radioEvent(struct ldl_mac *self, enum ldl_radio_event event);
+void LDL_MAC_radioEvent(struct ldl_mac *self);
 
 /** LDL_MAC_radioEvent() but with ticks passed as argument
  *
@@ -1026,13 +1029,12 @@ void LDL_MAC_radioEvent(struct ldl_mac *self, enum ldl_radio_event event);
  * argument in LDL_Radio_setHandler().
  *
  * @param[in] self      #ldl_mac
- * @param[in] event     #ldl_radio_event
  * @param[in] ticks             timestamp from LDL_MAC_getTicks()
  *
  * @note interrupt safe if LDL_SYSTEM_ENTER_CRITICAL() and LDL_SYSTEM_ENTER_CRITICAL() have been defined
  *
  * */
-void LDL_MAC_radioEventWithTicks(struct ldl_mac *self, enum ldl_radio_event event, uint32_t ticks);
+void LDL_MAC_radioEventWithTicks(struct ldl_mac *self, uint32_t ticks);
 
 /** Get current tick value
  *
@@ -1042,26 +1044,34 @@ void LDL_MAC_radioEventWithTicks(struct ldl_mac *self, enum ldl_radio_event even
  * */
 uint32_t LDL_MAC_getTicks(struct ldl_mac *self);
 
+/** Set beacon mode
+ *
+ * @param[in] self #ldl_mac
+ * @param[in] value
+ *
+ * */
 void LDL_MAC_setBeaconMode(struct ldl_mac *self, bool value);
+
+/** Get beacon mode
+ *
+ * @param[in] self #ldl_mac
+ *
+ * @retval true enabled
+ * @retval false disable
+ *
+ * */
 bool LDL_MAC_getBeaconMode(struct ldl_mac *self);
 
-/* for internal use only */
-bool LDL_MAC_addChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate);
-void LDL_MAC_removeChannel(struct ldl_mac *self, uint8_t chIndex);
-bool LDL_MAC_maskChannel(struct ldl_mac *self, uint8_t chIndex);
-bool LDL_MAC_unmaskChannel(struct ldl_mac *self, uint8_t chIndex);
-
-void LDL_MAC_timerSet(struct ldl_mac *self, enum ldl_timer_inst timer, uint32_t timeout);
-bool LDL_MAC_timerCheck(struct ldl_mac *self, enum ldl_timer_inst timer, uint32_t *error);
-void LDL_MAC_timerClear(struct ldl_mac *self, enum ldl_timer_inst timer);
-uint32_t LDL_MAC_timerTicksUntilNext(const struct ldl_mac *self);
-uint32_t LDL_MAC_timerTicksUntil(const struct ldl_mac *self, enum ldl_timer_inst timer, uint32_t *error);
-
-void LDL_MAC_inputArm(struct ldl_mac *self, enum ldl_input_type type);
-bool LDL_MAC_inputCheck(const struct ldl_mac *self, enum ldl_input_type type, uint32_t *error);
-void LDL_MAC_inputClear(struct ldl_mac *self);
-void LDL_MAC_inputSignal(struct ldl_mac *self, enum ldl_input_type type, uint32_t ticks);
-bool LDL_MAC_inputPending(const struct ldl_mac *self);
+/** Use this setting to remove duty cycle limits to speed up testing
+ *
+ * This feature is only available when LDL_ENABLE_TEST_MODE is enabled.
+ * It must not be used in production.
+ *
+ * @param[in] self #ldl_mac
+ * @param[in] value true for enabled, false for disabled
+ *
+ * */
+void LDL_MAC_setUnlimitedDutyCycle(struct ldl_mac *self, bool value);
 
 #ifdef __cplusplus
 }

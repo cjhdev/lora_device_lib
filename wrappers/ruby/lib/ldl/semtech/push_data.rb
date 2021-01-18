@@ -4,7 +4,7 @@ module LDL::Semtech
 
     class PushData < Message
 
-        @type = 0
+        @type = PUSH_DATA
 
         def self.decode(msg)
 

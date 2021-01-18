@@ -1,26 +1,41 @@
 #include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 
 extern void spi_chip_select(void);
 extern void spi_chip_release(void);
 extern void spi_write(uint8_t byte);
+extern bool read_busy_pin(void);
 
-void LDL_Chip_write(void *self, uint8_t addr, const void *data, uint8_t size)
+bool LDL_Chip_write(void *self, const void *opcode, size_t opcode_size, const void *data, size_t size)
 {
     /* unused in this example */
     (void)self;
-    
-    const uint8_t *ptr = (uint8_t *)data;
-    uint8_t i;
+
+    size_t i;
 
     spi_chip_select();
     {
-        /* SX1272/6 set the MSb of address indicate write */
-        spi_write(addr | 0x80U);
+        /* required for the SX126X series but not the SX127X series
+         *
+         * This must occur after selecting the chip since NSS is
+         * used to wake from sleep, during which busy pin will be set.
+         *
+         * consider adding a timeout to recover from a faulty chip */
+        while(read_busy_pin());
 
-        for(i=0; i < size; i++){
+        for(i=0U; i < opcode_size; i++){
 
-            spi_write(ptr[i]);
+            spi_write(((const uint8_t *)opcode)[i]);
         }
-    }   
-    spi_chip_release();    
+
+        for(i=0U; i < size; i++){
+
+            spi_write(((const uint8_t *)data)[i]);
+        }
+    }
+    spi_chip_release();
+
+    /* this would return false if there was a busy timeout */
+    return true;
 }

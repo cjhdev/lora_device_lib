@@ -26,68 +26,47 @@
 
 /**
  * @defgroup ldl_chip_interface Chip Interface
- * @ingroup ldl
  *
- * # Chip Interface
+ * The @ref ldl_radio uses chip interface function pointers to control
+ * the hardware:
  *
- * The Radio driver uses chip interface function pointers to control
- * the transceiver.
+ * - #ldl_chip_set_mode_fn
+ * - #ldl_chip_write_fn
+ * - #ldl_chip_read_fn
  *
- * ## SX1272 and SX1276
+ * Implementations of these functions must be assigned to the radio
+ * driver during initialisation. Use the examples in the function pointer
+ * documentation as a guide. These functions will need to interact with
+ * IO connected to the radio chip.
  *
- * The following connections are required:
+ * The Radio driver can receive an interrupt from the radio via the
+ * LDL_Radio_handleInterrupt() function.
  *
- * | signal | direction    | type                    | polarity    |
+ * The following connections are required for SX1272 and SX1276:
+ *
+ * | signal | direction on host    | type                    | polarity    |
  * |--------|--------------|-------------------------|-------------|
- * | MOSI   | input        | hiz                     |             |
- * | MISO   | output       | push-pull/hiz           |             |
- * | SCK    | input        | hiz                     |             |
- * | NSS    | input        | hiz                     | active-low  |
- * | Reset  | input/output | hiz/pull-down           | active-high |
- * | DIO0   | output       | push-pull               | active-high |
- * | DIO1   | output       | push-pull               | active-high |
+ * | MOSI   | output       | push-pull               |             |
+ * | MISO   | input        | hiz with opt. pull-up   |             |
+ * | SCK    | output       | push-pull               |             |
+ * | NSS    | output       | push-pull               | active-low  |
+ * | Reset  | input/output | hiz/push-pull           | active-high |
+ * | DIO0   | input        | hiz with opt. pull-down | active-high |
+ * | DIO1   | input        | hiz with opt. pull-down | active-high |
  *
- * - Direction is from perspective of transceiver
- * - SPI mode is CPOL=0 and CPHA=0
- * - consider adding pullup to MISO to prevent floating when not selected
+ * The following connections are required for SX1261 and SX1262:
+*
+ * | signal | direction on host    | type                    | polarity    |
+ * |--------|---------------|-------------------------|-------------|
+ * | MOSI   | output        | push-pull               |             |
+ * | MISO   | input         | hiz with opt. pull-up   |             |
+ * | SCK    | output        | push-pull               |             |
+ * | NSS    | output        | push-pull               | active-low  |
+ * | Reset  | input/output  | hiz/push-pull           | active-low  |
+ * | Busy   | input         | hiz                     | active-high |
+ * | DIO1   | input         | hiz with opt. pull-down | active-high |
  *
- * ### ldl_chip_set_mode_fn
- *
- * Should manipulate Reset and accessory IO lines like so:
- *
- * @include examples/chip_interface/set_mode_example.c
- *
- * ### ldl_chip_set_read_fn
- *
- * Should manipulate the chip select line and SPI like this:
- *
- * @include examples/chip_interface/read_example.c
- *
- * ### ldl_chip_set_write_fn
- *
- * Should manipulate the chip select line and SPI like this:
- *
- * @include examples/chip_interface/write_example.c
- *
- * ### LDL_Radio_interrupt()
- *
- * The chip interface code needs to be able to detect the rising edge and call
- * LDL_Radio_handleInterrupt().
- *
- * The code might look like this:
- *
- * @code{.c}
- * extern ldl_radio radio;
- *
- * void dio0_rising_edge_isr(void)
- * {
- *   LDL_Radio_handleInterrupt(&radio, 0);
- * }
- * void dio1_rising_edge_isr(void)
- * {
- *   LDL_Radio_handleInterrupt(&radio, 1);
- * }
- * @endcode
+ * **Note that SX126X reset is active-low, while SX127X reset is active-high.**
  *
  * @{
  * */
@@ -96,7 +75,7 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 
 /** chip mode tells the chip interface code what to do
@@ -116,7 +95,7 @@ enum ldl_chip_mode {
 /** Use this function to configure the transceiver and associated
  * hardware.
  *
- * @param[in] self  #ldl_radio_init_arg.chip
+ * @param[in] self
  * @param[in] mode  #ldl_chip_mode
  *
  * @include examples/chip_interface/set_mode_example.c
@@ -124,35 +103,52 @@ enum ldl_chip_mode {
  * */
 typedef void (*ldl_chip_set_mode_fn)(void *self, enum ldl_chip_mode mode);
 
-/** Write bytes to address
+/**Write opcode and write payload
  *
- * @param[in] self      chip from LDL_Radio_init()
- * @param[in] addr      register address
+ * @param[in] self
+ * @param[in] opcode        opcode data that must be written
+ * @param[in] opcode_size   size of opcode data
  * @param[in] data      buffer to write
  * @param[in] size      size of buffer in bytes
  *
- * This function must handle chip selection, addressing, and transferring zero
- * or more bytes. For example:
+ * @retval true     operation complete
+ * @retval false    chip is still busy after timeout
+ *
+ * This function must handle:
+ *
+ * - busy polling & timeout (SX126X series)
+ * - chip selection
+ * - data transfer
  *
  * @include examples/chip_interface/write_example.c
  *
  * */
-typedef void (*ldl_chip_write_fn)(void *self, uint8_t addr, const void *data, uint8_t size);
+typedef bool (*ldl_chip_write_fn)(void *self, const void *opcode, size_t opcode_size, const void *data, size_t size);
 
-/** Read bytes from address
+/** Write opcode and read payload
  *
- * @param[in] self      board from LDL_Radio_init()
- * @param[in] addr      register address
+ * @param[in] self
+ * @param[in] opcode    opcode data that must be written
+ * @param[in] opcode_size size of opcode data
  * @param[out] data     read into this buffer
  * @param[in] size      number of bytes to read (and size of buffer in bytes)
  *
- * This function must handle chip selection, addressing, and transferring zero
- * or more bytes. For example:
+ * @retval true     operation complete
+ * @retval false    chip is still busy after timeout
+ *
+ * This function must handle:
+ *
+ * - busy polling & timeout (SX126X series)
+ * - chip selection
+ * - data transfer
+ *
+ * For example:
  *
  * @include examples/chip_interface/read_example.c
  *
+ *
  * */
-typedef void (*ldl_chip_read_fn)(void *self, uint8_t addr, void *data, uint8_t size);
+typedef bool (*ldl_chip_read_fn)(void *self, const void *opcode, size_t opcode_size, void *data, size_t size);
 
 #ifdef __cplusplus
 }

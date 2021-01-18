@@ -26,9 +26,6 @@
 
 /**
  * @defgroup ldl_system System
- * @ingroup ldl
- *
- * # System Interface
  *
  * @ref ldl_mac accesses various things through system interfaces which
  * must be passed as function pointers to @ref ldl_mac during LDL_MAC_init().
@@ -40,7 +37,7 @@
  * - #ldl_mac_init_arg.get_battery_level
  *
  * In addition to function pointers, the following macros *MUST* be
- * defined if LDL_MAC_radioEvent(), LDL_MAC_RadioEventWithTicks(), or LDL_MAC_ticksUntilNextEvent()
+ * defined if LDL_MAC_radioEvent(), LDL_MAC_radioEventWithTicks(), or LDL_MAC_ticksUntilNextEvent()
  * are called from an interrupt:
  *
  * - LDL_SYSTEM_ENTER_CRITICAL()
@@ -79,7 +76,7 @@ typedef uint32_t (*ldl_system_ticks_fn)(void *app);
 /** LDL uses this function to select channels and to add random dither
  * to scheduled events.
  *
- * @param[]     app     from #ldl_mac_init_arg.app
+ * @param[in]     app     from #ldl_mac_init_arg.app
  * @retval (0..UINT32_MAX)
  *
  * */

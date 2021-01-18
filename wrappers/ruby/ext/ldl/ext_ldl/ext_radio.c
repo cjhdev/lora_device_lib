@@ -10,13 +10,13 @@ static VALUE cRadio;
 
 /* static prototypes **************************************************/
 
-static uint8_t get_xtal_delay(struct ldl_radio *self);
 static void receive_entropy(struct ldl_radio *self);
 static unsigned int read_entropy(struct ldl_radio *self);
 static void transmit(struct ldl_radio *self, const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);
 static void receive(struct ldl_radio *self, const struct ldl_radio_rx_setting *settings);
 static uint8_t read_buffer(struct ldl_radio *self, struct ldl_radio_packet_metadata *meta, void *data, uint8_t max);
 static void set_mode(struct ldl_radio *self, enum ldl_radio_mode mode);
+static void get_status(struct ldl_radio *self, struct ldl_radio_status *status);
 
 static VALUE bw_to_number(enum ldl_signal_bandwidth bw);
 static VALUE sf_to_number(enum ldl_spreading_factor sf);
@@ -32,8 +32,8 @@ const struct ldl_radio_interface ext_radio_interface = {
     .read_buffer = read_buffer,
     .transmit = transmit,
     .receive = receive,
-    .get_xtal_delay = get_xtal_delay,
-    .receive_entropy = receive_entropy
+    .receive_entropy = receive_entropy,
+    .get_status = get_status
 };
 
 /* functions **********************************************************/
@@ -49,11 +49,6 @@ void ext_radio_init(void)
 
 
 /* static functions **********************************************************/
-
-static uint8_t get_xtal_delay(struct ldl_radio *self)
-{
-    return 0U;
-}
 
 static unsigned int read_entropy(struct ldl_radio *self)
 {
@@ -108,13 +103,47 @@ static uint8_t read_buffer(struct ldl_radio *self, struct ldl_radio_packet_metad
 
 static void set_mode(struct ldl_radio *self, enum ldl_radio_mode mode)
 {
-    (void)self;
-    (void)mode;
+    VALUE _mode;
+
+    switch(mode){
+    default:
+    case LDL_RADIO_MODE_RESET:
+        _mode = ID2SYM(rb_intern("reset"));
+        break;
+    case LDL_RADIO_MODE_BOOT:
+        _mode = ID2SYM(rb_intern("boot"));
+        break;
+    case LDL_RADIO_MODE_SLEEP:
+        _mode = ID2SYM(rb_intern("sleep"));
+        break;
+    case LDL_RADIO_MODE_RX:
+        _mode = ID2SYM(rb_intern("rx"));
+        break;
+    case LDL_RADIO_MODE_TX:
+        _mode = ID2SYM(rb_intern("tx"));
+        break;
+    case LDL_RADIO_MODE_HOLD:
+        _mode = ID2SYM(rb_intern("hold"));
+        break;
+    }
+
+    rb_funcall((VALUE)self, rb_intern("set_mode"), 1, _mode);
 }
 
 static void receive_entropy(struct ldl_radio *self)
 {
     (void)self;
+}
+
+static void get_status(struct ldl_radio *self, struct ldl_radio_status *status)
+{
+    VALUE result;
+
+    result = rb_funcall((VALUE)self, rb_intern("get_status"), 0);
+
+    status->rx = (rb_hash_aref(result, ID2SYM(rb_intern("rx"))) == Qtrue);
+    status->tx = (rb_hash_aref(result, ID2SYM(rb_intern("tx"))) == Qtrue);
+    status->timeout = (rb_hash_aref(result, ID2SYM(rb_intern("timeout"))) == Qtrue);
 }
 
 static VALUE bw_to_number(enum ldl_signal_bandwidth bw)

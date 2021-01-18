@@ -83,10 +83,13 @@ uint8_t LDL_Region_getRX1Offset(enum ldl_region region);
 uint32_t LDL_Region_getRX2Freq(enum ldl_region region);
 uint8_t LDL_Region_getRX2Rate(enum ldl_region region);
 uint8_t LDL_Region_getJoinRate(enum ldl_region region, uint32_t trial);
+uint8_t LDL_Region_getJoinIndex(enum ldl_region region, uint32_t trial, uint32_t random);
 void LDL_Region_getDefaultChannels(enum ldl_region region, struct ldl_mac *mac);
 void LDL_Region_processCFList(enum ldl_region region, struct ldl_mac *mac, const uint8_t *cfList, uint8_t cfListLen);
 uint32_t LDL_Region_getMaxDCycleOffLimit(enum ldl_region region);
 const char *LDL_Region_enumToString(enum ldl_region region);
+bool LDL_Region_txParamSetupImplemented(enum ldl_region region);
+uint8_t LDL_Region_applyUplinkDwell(enum ldl_region region, bool dwell, uint8_t rate);
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,7 @@
 module LDL
 
   LOG_FORMATTER = Proc.new do |severity, datetime, progname, msg|
-    "#{severity.ljust(5)} [#{datetime.strftime("%Y-%m-%d %H:%M:%S")}] #{progname}: #{msg}\n"
+    "#{severity.ljust(5)} [#{datetime.strftime("%Y-%m-%d %H:%M:%S")}] #{progname}#{progname ? ": " : ""}#{msg}\n"
   end
 
   module LoggerMethods
@@ -18,21 +18,15 @@ module LDL
     end
 
     def log_info(hdr=nil, &block)
-      unless disable_log
-        @scenario.logger.info(_do_hdr(hdr), &block)
-      end
+      @logger.info(_do_hdr(hdr), &block) if log_is_enabled
     end
 
     def log_error(hdr=nil, &block)
-      unless disable_log
-        @scenario.logger.debug(_do_hdr(hdr), &block)
-      end
+      @logger.debug(_do_hdr(hdr), &block) if log_is_enabled
     end
 
     def log_debug(hdr=nil, &block)
-      unless disable_log
-        @scenario.logger.debug(_do_hdr(hdr), &block)
-      end
+      @logger.debug(_do_hdr(hdr), &block) if log_is_enabled
     end
 
     def log_header
@@ -43,12 +37,16 @@ module LDL
       @log_header = hdr
     end
 
-    def disable_log
-      @disable_log||=false
+    def enable_log
+      @log_is_enabled = true
     end
 
-    def disable_log=(value)
-      @disable_log = value
+    def disable_log
+      @log_is_enabled = false
+    end
+
+    def log_is_enabled
+      @log_is_enabled ||= false
     end
 
   end

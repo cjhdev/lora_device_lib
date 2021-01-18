@@ -22,27 +22,11 @@
 #ifndef MBED_LDL_SX1272_H
 #define MBED_LDL_SX1272_H
 
-#include "spi_radio.h"
+#include "sx127x.h"
 
 namespace LDL {
 
-    class SX1272 : public SPIRadio {
-
-        protected:
-
-            DigitalInOut reset;
-            InterruptIn dio0;
-            InterruptIn dio1;
-
-            Callback<void(enum ldl_chip_mode)> chip_mode_cb;
-
-            static void _chip_set_mode(void *self, enum ldl_chip_mode mode);
-
-            static void _chip_set_mode(enum ldl_chip_mode mode);
-            void chip_set_mode(enum ldl_chip_mode mode);
-
-            void dio0_handler();
-            void dio1_handler();
+    class SX1272 : public SX127X {
 
         public:
 
@@ -56,12 +40,29 @@ namespace LDL {
                 PinName dio3 = NC,
                 PinName dio4 = NC,
                 PinName dio5 = NC,
-                enum ldl_radio_pa pa = LDL_RADIO_PA_RFO,
+                enum ldl_sx127x_pa pa = LDL_SX127X_PA_RFO,
                 int16_t tx_gain = 0,
                 enum ldl_radio_xtal xtal = LDL_RADIO_XTAL_CRYSTAL,
-                uint8_t xtal_delay = 1UL,
-                Callback<void(enum ldl_chip_mode)> = nullptr
-            );
+                Callback<void(enum ldl_chip_mode)> chip_mode_cb = nullptr
+            )
+                :
+                SX127X(
+                    LDL_RADIO_SX1272,
+                    spi,
+                    nss,
+                    reset,
+                    dio0,
+                    dio1,
+                    dio2,
+                    dio3,
+                    dio4,
+                    dio5,
+                    pa,
+                    tx_gain,
+                    xtal,
+                    chip_mode_cb
+                )
+            {}
     };
 
 };

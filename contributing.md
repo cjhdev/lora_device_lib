@@ -17,7 +17,7 @@ Raise an issue.
 
 ### Questions
 
-Raise an issue. This policy may change later if the project grows.
+Start a discussion.
 
 ### Feature Contributions
 

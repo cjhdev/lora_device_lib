@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include "mbed_trace.h"
+#include "mbed.h"
 
 #include "mbed_ldl_port.h"
 
@@ -9,12 +10,25 @@ static char buffer[1024];
 static size_t pos;
 #endif
 
+static Mutex mutex;
+
 void my_trace_begin(void)
 {
 #ifdef MBED_CONF_LDL_ENABLE_VERBOSE_DEBUG
+    my_trace_lock();
     buffer[0] = 0;
     pos = 0U;
 #endif
+}
+
+void my_trace_lock(void)
+{
+    mutex.lock();
+}
+
+void my_trace_unlock(void)
+{
+    mutex.unlock();
 }
 
 void my_trace_part(const char *fmt, ...)
@@ -82,5 +96,6 @@ void my_trace_end(void)
 
         tr_debug(buffer);
     }
+    my_trace_unlock();
 #endif
 }

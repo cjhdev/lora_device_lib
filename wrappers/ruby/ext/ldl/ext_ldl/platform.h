@@ -3,17 +3,16 @@
 
 #include "ext_ldl.h"
 
+#define LDL_L2_VERSION  LDL_L2_VERSION_1_1
+
 #define LDL_ENABLE_AU_915_928
 #define LDL_ENABLE_US_902_928
 #define LDL_ENABLE_EU_433
 #define LDL_ENABLE_EU_863_870
 
-#define LDL_ENABLE_SX1272
-#define LDL_ENABLE_SX1276
+#define LDL_ENABLE_OTAA_DITHER
 
-#define LDL_ENABLE_FAST_DEBUG
-
-#define LDL_DEFAULT_RATE 0U
+#define LDL_ENABLE_TEST_MODE
 
 void LDL_System_enterCriticalSection(void *app);
 void LDL_System_leaveCriticalSection(void *app);
@@ -30,19 +29,19 @@ void LDL_System_leaveCriticalSection(void *app);
 
 #define LDL_ERROR(FMT, ...) \
     do{\
-        VALUE msg = rb_sprintf("%s: " FMT, __FUNCTION__, ##__VA_ARGS__);\
+        VALUE msg = rb_sprintf("LDL::ExtMac: %s: " FMT, __FUNCTION__, ##__VA_ARGS__);\
         rb_funcall(rb_const_get(cLDL, rb_intern("Scenario")), rb_intern("log_error"), 1, msg);\
     }while(0);
 
 #define LDL_DEBUG(FMT, ...) \
     do{\
-        VALUE msg = rb_sprintf("%s: " FMT, __FUNCTION__, ##__VA_ARGS__);\
+        VALUE msg = rb_sprintf("LDL::ExtMac: %s: " FMT, __FUNCTION__, ##__VA_ARGS__);\
         rb_funcall(rb_const_get(cLDL, rb_intern("Scenario")), rb_intern("log_debug"), 1, msg);\
     }while(0);
 
 #define LDL_INFO(FMT, ...) \
     do{\
-        VALUE msg = rb_sprintf("%s: " FMT, __FUNCTION__, ##__VA_ARGS__);\
+        VALUE msg = rb_sprintf("LDL::ExtMac: %s: " FMT, __FUNCTION__, ##__VA_ARGS__);\
         rb_funcall(rb_const_get(cLDL, rb_intern("Scenario")), rb_intern("log_info"), 1, msg);\
     }while(0);
 

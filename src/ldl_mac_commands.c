@@ -44,13 +44,13 @@ static const struct type_to_tag tags[] = {
     {9U, LDL_CMD_TX_PARAM_SETUP},
     {10U, LDL_CMD_DL_CHANNEL},
     {13U, LDL_CMD_DEVICE_TIME},
-#ifndef LDL_DISABLE_POINTONE
+#if defined(LDL_ENABLE_L2_1_1)
     {11U, LDL_CMD_REKEY},
     {12U, LDL_CMD_ADR_PARAM_SETUP},
     {14U, LDL_CMD_FORCE_REJOIN},
     {15U, LDL_CMD_REJOIN_PARAM_SETUP},
 #endif
-#ifdef LDL_ENABLE_CLASS_B
+#if defined(LDL_ENABLE_CLASS_B)
     {16U, LDL_CMD_PING_SLOT_INFO},
     {17U, LDL_CMD_PING_SLOT_CHANNEL},
     {18U, LDL_CMD_BEACON_TIMING},
@@ -332,9 +332,7 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
 
                 (void)LDL_Stream_getU8(s, &buf);
 
-                cmd->fields.txParamSetup.downlinkDwell = ((buf & 0x20U) == 0x20U);
-                cmd->fields.txParamSetup.uplinkDwell = ((buf & 0x10U) == 0x10U);
-                cmd->fields.txParamSetup.maxEIRP = buf & 0xfU;
+                cmd->fields.txParamSetup = buf & 0x3fU;
             }
                 break;
 
@@ -344,7 +342,7 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
                 (void)LDL_Stream_getU8(s, &cmd->fields.deviceTime.fractions);
                 break;
 
-#ifndef LDL_DISABLE_POINTONE
+#if defined(LDL_ENABLE_L2_1_1)
             case LDL_CMD_REKEY:
 
                 (void)LDL_Stream_getU8(s, &cmd->fields.rekey.version);

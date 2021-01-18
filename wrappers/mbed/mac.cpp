@@ -69,26 +69,12 @@ MAC::app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
     MAC *self = to_obj(app);
 
     switch(type){
-    case LDL_MAC_STARTUP:
-        if(self->entropy_cb){
-
-            self->entropy_cb(arg->startup.entropy);
-        }
-        else{
-
-            srand(arg->startup.entropy);
-        }
-        break;
     case LDL_MAC_JOIN_COMPLETE:
         self->store.save_join_accept(arg->join_complete.joinNonce, arg->join_complete.nextDevNonce);
         break;
     case LDL_MAC_SESSION_UPDATED:
         self->store.save_session(arg->session_updated.session, sizeof(*arg->session_updated.session));
         break;
-    case LDL_MAC_RX:
-        self->data_cb(arg->rx.port, arg->rx.data, arg->rx.size);
-        break;
-
     default:
         break;
     }
@@ -102,9 +88,9 @@ MAC::app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
 /* public methods *****************************************************/
 
 void
-MAC::handle_radio_event(enum ldl_radio_event event)
+MAC::handle_radio_event()
 {
-    LDL_MAC_radioEvent(&mac, event);
+    LDL_MAC_radioEvent(&mac);
 }
 
 bool
@@ -147,18 +133,6 @@ MAC::start(enum ldl_region region)
     arg.session = (session_size == sizeof(session)) ? &session : NULL;
 
     LDL_MAC_init(&mac, region, &arg);
-
-    /* apply TTN fair access policy
-     *
-     * ~30s per day
-     *
-     * 30 / (60*60*24)  = 0.000347222
-     *
-     * 1 / (2 ^ 11)     = 0.000488281
-     * 1 / (2 ^ 12)     = 0.000244141
-     *
-     * */
-    LDL_MAC_setMaxDCycle(&mac, 12U);
 
     radio.set_event_handler(callback(this, &MAC::handle_radio_event));
 
@@ -262,3 +236,17 @@ MAC::process()
 {
     LDL_MAC_process(&mac);
 }
+
+enum ldl_mac_status
+MAC::entropy()
+{
+    return LDL_MAC_entropy(&mac);
+}
+
+void
+MAC::cancel()
+{
+    LDL_MAC_cancel(&mac);
+}
+
+

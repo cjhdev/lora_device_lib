@@ -26,9 +26,6 @@
 
 /**
  * @defgroup ldl_build_options Build Options
- * @ingroup ldl
- *
- * # Build Options
  *
  * These can be defined in two ways:
  *
@@ -37,8 +34,6 @@
  *
  * @{
  * */
-
-
 
 #ifdef DOXYGEN
 
@@ -77,11 +72,52 @@
     //#undef LDL_ENABLE_SX1276
 
     /**
-     * Define to remove the link-check feature.
+     * Define to add support for SX1261
      *
      * */
+    #define LDL_ENABLE_SX1261
+    //#undef LDL_ENABLE_SX126X
+
+    /**
+     * Define to add support for SX1262
+     *
+     * */
+    #define LDL_ENABLE_SX1262
+    //#undef LDL_ENABLE_SX126X
+
+
     #define LDL_DISABLE_CHECK
     #undef LDL_DISABLE_CHECK
+
+    /**
+     * Define to remove the link-check feature.
+     *
+     * This will save a small amount of Flash.
+     *
+     * */
+    #define LDL_DISABLE_LINK_CHECK
+    #undef LDL_DISABLE_LINK_CHECK
+
+     /**
+      * Define to remove deviceTime MAC command handling
+      *
+      * This will save a small amount of Flash.
+      *
+      * */
+    #define LDL_DISABLE_DEVICE_TIME
+    #undef LDL_DISABLE_DEVICE_TIME
+
+    /**
+     * Define to remove code associated with this MAC command.
+     *
+     * This will save a small amount of Flash.
+     *
+     * This code cannot be removed if you have enabled a region
+     * that requires it.
+     *
+     * */
+    #define LDL_DISABLE_TX_PARAM_SETUP
+    #undef LDL_DISABLE_TX_PARAM_SETUP
 
     /**
      * Define to enable support for AU_915_928
@@ -130,40 +166,12 @@
     #undef  LDL_ENABLE_AVR
 
     /**
-     * Define to remove all LoRaWAN 1.1 features
-     *
-     * This must not be used with 1.1 servers
-     *
-     * */
-    #define LDL_DISABLE_POINTONE
-    #undef LDL_DISABLE_POINTONE
-
-    /** Define to apply the proposed change to LoRaWAN 1.1 spec regarding
+     * Define to apply the proposed change to LoRaWAN 1.1 spec regarding
      * the construction of the A1 block when encrypting Fopts.
      *
      * */
-    #define LDL_ENABLE_POINTONE_ERRATA_A1
-    #undef LDL_ENABLE_POINTONE_ERRATA_A1
-
-    /** To be true to the 1.0.x specification, if LDL_DISABLE_POINTONE
-     * is defined, the devNonce will be initialised from random.
-     *
-     * Define this build option (with LDL_DISABLE_POINTONE) to have
-     * devNonce initialised from a counter.
-     *
-     * This will avoid the problem of OTAA failing because a random
-     * devNonce has already been used.
-     *
-     * */
-    #define LDL_DISABLE_RANDOM_DEV_NONCE
-    #undef LDL_DISABLE_RANDOM_DEV_NONCE
-
-     /**
-      * Define to remove deviceTime MAC command handling
-      *
-      * */
-     #define LDL_DISABLE_DEVICE_TIME
-     #undef LDL_DISABLE_DEVICE_TIME
+    #define LDL_ENABLE_ERRATA_A1
+    #undef LDL_ENABLE_ERRATA_A1
 
      /**
       * Define to optimise for little-endian targets
@@ -184,19 +192,6 @@
      * */
     #define LDL_ENABLE_RADIO_DEBUG
     #undef LDL_ENABLE_RADIO_DEBUG
-
-    /**
-     * Define to remove delays that are normally inserted in front of
-     * operations and retries. These delays are essential for ensuring
-     * groups of devices don't continually talk over themselves in the field,
-     * but slow down development sometimes.
-     *
-     * Recommend only using this for nodes that are on your desk and under
-     * development.
-     *
-     * */
-    #define LDL_ENABLE_FAST_DEBUG
-    #undef LDL_ENABLE_FAST_DEBUG
 
     /**
      * Define to set #ldl_mac_init_arg.tps at compile time
@@ -227,7 +222,7 @@
     #undef LDL_PARAM_ADVANCE
 
     /**
-     * Define to set #ldl_mac_init_arg.beaconInterval at compile time
+     * Define to set at compile time
      *
      * */
     #define LDL_PARAM_BEACON_INTERVAL
@@ -241,6 +236,38 @@
      * */
     #define LDL_ENABLE_CLASS_B
     #undef LDL_ENABLE_CLASS_B
+
+    /**
+     * Define to add run-time control of OTAA dither interval
+     *
+     * This is useful for test platforms to speed up the joining
+     * process.
+     *
+     * */
+    #define LDL_ENABLE_OTAA_DITHER
+    #undef  LDL_ENABLE_OTAA_DITHER
+
+    /**
+     * Define to enable test mode features
+     *
+     * DO NOT ENABLE FOR PRODUCTION
+     *
+     * */
+    #define LDL_ENABLE_TEST_MODE
+    #undef LDL_ENABLE_TEST_MODE
+
+    /**
+     * Define to prevent SF12 data rates being used.
+     *
+     * This is useful if you are using an SX127X radio with a standard
+     * XTAL.
+     *
+     * Note that disabling SF12 may mean it is not possible to use
+     * mode B.
+     *
+     * */
+     #define LDL_DISABLE_SF12
+     #undef LDL_DISABLE_SF12
 
 #endif
 
@@ -257,49 +284,124 @@
     #define LDL_MAX_PACKET UINT8_MAX
 #endif
 
-#ifndef LDL_DEFAULT_RATE
-    /** Redefine to limit maximum rate to this setting
-     *
-     * Useful if you want to avoid a large spreading factor if your
-     * hardware doesn't support it.
-     *
-     * */
-    #define LDL_DEFAULT_RATE 1U
-
+#ifdef LDL_DEFAULT_RATE
+    /* it's not a 1:1 replacement but LDL_DISABLE_SF12 is a more
+     * reliable way to ensure the device will not use SF12 */
+    #error "LDL_DEFAULT_RATE has been replaced by LDL_DISABLE_SF12"
 #endif
 
 #ifndef LDL_REDUNDANCY_MAX
-    /** Redefine to limit the maximum redundancy setting
+    /** Redefine to limit the maximum redundancy setting used to send
+     * unconfirmed data frames.
      *
      * (i.e. LinkADRReq.redundancy.NbTrans)
      *
-     * The implementation and that standard limit this value to 15. Since
-     * the network can set this value, if you feel it is way too high to
-     * ever consider using, you can use this macro to further limit it.
+     * The standard limits this value to 15 which is very high.
+     * This implementation by default will not send more than three
+     * redundant frames. You can raise this limit by
+     * redefining LDL_REDUNDANCY_MAX.
      *
      * e.g.
      *
      * @code{.c}
-     * #define LDL_REDUNDANCY_MAX 3
+     * #define LDL_REDUNDANCY_MAX 5
      * @endcode
      *
-     * would ensure there will never be more than 3 redundant frames.
-     *
      * */
-    #define LDL_REDUNDANCY_MAX 0xfU
+    #define LDL_REDUNDANCY_MAX 3
 #endif
 
 #ifndef LDL_STARTUP_DELAY
     /**
-     * Define to add a startup delay (in milliseconds) to when bands become
-     * available.
+     * Define to add a delay (in milliseconds) to when a device can
+     * send its first message after LDL_MAC_init().
      *
      * This is an optional safety feature to ensure a device stuck
      * in a reset loop doesn't transmit too often.
      *
      * */
-    #define LDL_STARTUP_DELAY 0UL
+    #define LDL_STARTUP_DELAY 0
+#endif
+
+#ifndef LDL_PARAM_XTAL_DELAY
+    /**
+     * Define to change the fixed millisecond delay that is inserted
+     * before RX and TX operations.
+     *
+     * This delay is to give time for the xtal to start and stabilise.
+     *
+     * It can't be too large, it can't be too small.
+     *
+     *
+     * */
+    #define LDL_PARAM_XTAL_DELAY 25
+#endif
+
+#ifdef LDL_DISABLE_POINTONE
+    #error "LDL_DISABLE_POINTONE is depreciated, use LDL_L2_VERSION=LDL_L2_VERSION_1_0_4"
+#endif
+
+#ifdef LDL_DISABLE_RANDOM_DEV_NONCE
+    #error "LDL_DISABLE_RANDOM_DEV_NONCE is depreciated, use LDL_L2_VERSION=LDL_L2_VERSION_1_0_3"
+#endif
+
+#define LDL_L2_VERSION_1_0_3    0
+#define LDL_L2_VERSION_1_0_4    1
+#define LDL_L2_VERSION_1_1      2
+
+#ifndef LDL_L2_VERSION
+    /** Define to change the LoRaWAN L2 version from the default setting.
+     *
+     * Must be one of:
+     *
+     * - **LDL_L2_VERSION_1_0_3**
+     * - **LDL_L2_VERSION_1_0_4**
+     * - **LDL_L2_VERSION_1_1**
+     *
+     * e.g.
+     *
+     * @code
+     * #define LDL_L2_VERSION   LDL_L2_VERSION_1_0_4
+     * @endcode
+     *
+     * */
+    #define LDL_L2_VERSION LDL_L2_VERSION_1_0_4
+#endif
+
+#if (LDL_L2_VERSION == LDL_L2_VERSION_1_0_3)
+    #define LDL_ENABLE_L2_1_0_3
+    #ifdef LDL_ENABLE_CLASS_B
+        #error "class b is not supported for LDL_L2_VERSION_1_0_3"
+    #endif
+#elif (LDL_L2_VERSION == LDL_L2_VERSION_1_0_4)
+    #define LDL_ENABLE_L2_1_0_4
+#elif (LDL_L2_VERSION == LDL_L2_VERSION_1_1)
+    #define LDL_ENABLE_L2_1_1
+#else
+    #error "unrecognised LDL_L2_VERSION"
+#endif
+
+#ifdef LDL_DISABLE_TX_PARAM_SETUP
+    #if defined(LDL_ENABLE_AU_915_928)
+        /* AU_915_928 region requires the tx param setup mac command */
+        #errror "LDL_DISABLE_TX_PARAM_SETUP cannot be defined if LDL_ENABLE_AU_915_928 is defined"
+    #endif
+#else
+    #if !defined(LDL_ENABLE_AU_915_928)
+        /* enable the optimisation if there are no regions that require
+         * this MAC command */
+        #define LDL_DISABLE_TX_PARAM_SETUP
+    #endif
+#endif
+
+#if defined(LDL_DISABLE_CHECK) && !defined(LDL_DISABLE_LINK_CHECK)
+    #warning "LDL_DISABLE_CHECK is depreciated, use LDL_DISABLE_LINK_CHECK"
+    #define LDL_DISABLE_LINK_CHECK
 #endif
 
 /** @} */
+
+
+
+
 #endif

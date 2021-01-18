@@ -4,11 +4,10 @@
 DIR_PROJECT_ROOT := $(shell cd ../..;pwd)
 
 # change this to point to your container
-DOCKER := docker run --mount type=bind,source=$(DIR_PROJECT_ROOT),destination=/mbed/lora_device_lib -ti --rm --user 1000:1000 -v $(shell pwd):/mbed:cached my-mbed-cli
+DOCKER := docker run -ti --rm --user 1000:1000 --mount type=bind,source=$(DIR_PROJECT_ROOT),destination=/mbed/lora_device_lib -v $(shell pwd):/mbed:cached my-mbed-cli
 
 # special MBED name for target
 DEVICE ?= NUCLEO_F429ZI
-#DEVICE ?= DISCO_L072CZ_LRWAN1
 
 # special JLINK name for the target
 JLINK_DEVICE ?= STM32F429ZI
@@ -38,6 +37,9 @@ DIR_BUILD := BUILD/$(DEVICE)/GCC_ARM-DEBUG
 
 compile: $(DIR_BUILD)/mbed.elf
 
+init:
+	git clone https://github.com/ARMmbed/mbed-os
+
 $(DIR_BUILD)/mbed.elf:
 	$(MBED) compile -m $(DEVICE) -t GCC_ARM --profile debug
 
@@ -56,9 +58,6 @@ gdb_server:
 size: $(DIR_BUILD)/mbed.elf
 	$(SIZE) $<
 
-sterm:
-	$(MBED) sterm --port /dev/ttyACM0
-
 upload_flash.jlink:
 	@ rm -f $@
 	@ touch $@
@@ -76,8 +75,6 @@ upload_flash.jlink:
 	@ echo dir $(DIR_PROJECT_ROOT)/src  >> $@
 	@ echo dir $(DIR_PROJECT_ROOT)/include  >> $@
 	@ echo dir $(DIR_PROJECT_ROOT)/wrappers/mbed  >> $@
-	#@ echo monitor flash download = 1    >> $@
-	#@ echo load                 >> $@
 	@ echo monitor reset                 >> $@
 	@ echo focus cmd                     >> $@
 
@@ -85,7 +82,7 @@ clean:
 	rm -f .gdbinit upload_flash.jlink
 	rm -rf $(DIR_BUILD)
 
-.PHONY: clean gdb_server $(DIR_BUILD)/mbed.elf upload_flash.jlink .gdbinit config sterm
+.PHONY: clean gdb_server $(DIR_BUILD)/mbed.elf upload_flash.jlink .gdbinit config init
 
 config:
 	$(MBED) compile --config -v

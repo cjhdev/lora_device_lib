@@ -19,51 +19,49 @@
  *
  * */
 
-#ifndef MBED_LDL_CMWX1ZZABZ_H
-#define MBED_LDL_CMWX1ZZABZ_H
+#ifndef MBED_LDL_SX127X_H
+#define MBED_LDL_SX127X_H
 
-#include "sx1276.h"
+#include "spi_radio.h"
 
 namespace LDL {
 
-    /**
-     * A module that aggregates:
-     *
-     * - SX1276
-     * - TCXO with power switch
-     * - switches for engaging RFI, RFO, and BOOST
-     * - dedicated SPI peripheral
-     *
-     * Inherits radio so that it can be passed to the MAC.
-     *
-     * */
-    class CMWX1ZZABZ : public Radio {
+    class SX127X : public SPIRadio {
 
         protected:
 
-            SPI spi;
+            DigitalInOut reset;
+            InterruptIn dio0;
+            InterruptIn dio1;
 
-            DigitalOut enable_boost;
-            DigitalOut enable_rfo;
-            DigitalOut enable_rfi;
-            DigitalInOut enable_tcxo;
+            Callback<void(enum ldl_chip_mode)> chip_mode_cb;
 
-            SX1276 radio;
+            static void _chip_set_mode(void *self, enum ldl_chip_mode mode);
+            void chip_set_mode(enum ldl_chip_mode mode);
 
-            void set_mode(enum ldl_chip_mode mode);
-
-            void handle_event(enum ldl_radio_event event);
+            void dio0_handler();
+            void dio1_handler();
 
         public:
 
-            CMWX1ZZABZ(
-                PinName enable_tcxo,
-                int16_t tx_gain = 0
+            SX127X(
+                enum ldl_radio_type type,
+                SPI& spi,
+                PinName nss,
+                PinName reset,
+                PinName dio0,
+                PinName dio1,
+                PinName dio2 = NC,
+                PinName dio3 = NC,
+                PinName dio4 = NC,
+                PinName dio5 = NC,
+                enum ldl_sx127x_pa pa = LDL_SX127X_PA_RFO,
+                int16_t tx_gain = 0,
+                enum ldl_radio_xtal xtal = LDL_RADIO_XTAL_CRYSTAL,
+                Callback<void(enum ldl_chip_mode)> = nullptr
             );
-
-            const struct ldl_radio_interface *get_interface();
-            Radio *get_state();
     };
+
 };
 
 #endif

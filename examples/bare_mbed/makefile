@@ -4,7 +4,7 @@
 DIR_PROJECT_ROOT := $(shell cd ../..;pwd)
 
 # change this to point to your container
-DOCKER := docker run -ti --rm --user 1000:1000 --mount type=bind,source=$(DIR_PROJECT_ROOT),destination=/mbed/lora_device_lib  -v $(shell pwd):/mbed:cached my-mbed-cli
+DOCKER := docker run -ti --rm --user 1000:1000 --mount type=bind,source=$(DIR_PROJECT_ROOT),destination=/mbed/lora_device_lib -v $(shell pwd):/mbed:cached my-mbed-cli
 
 # special MBED name for target
 DEVICE ?= DISCO_L072CZ_LRWAN1

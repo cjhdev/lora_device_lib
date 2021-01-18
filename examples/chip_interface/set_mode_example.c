@@ -1,5 +1,7 @@
 #include "ldl_chip.h"
 
+/* this example is for an SX1276 */
+
 void LDL_Chip_reset(bool state)
 {
     if(state){
@@ -9,7 +11,7 @@ void LDL_Chip_reset(bool state)
     else{
 
         // hiz
-    }    
+    }
 }
 
 /* On more sophisticated hardware you may also need to switch:
@@ -17,7 +19,7 @@ void LDL_Chip_reset(bool state)
  * - on/off an oscillator
  * - rfi circuit
  * - rfo circuit
- * - boost circuit 
+ * - boost circuit
  *
  * */
 void LDL_Chip_setMode(void *self, enum ldl_chip_mode mode)
@@ -28,18 +30,14 @@ void LDL_Chip_setMode(void *self, enum ldl_chip_mode mode)
         break;
     case LDL_CHIP_MODE_SLEEP:
         LDL_Chip_reset(false);
-        break;    
+        break;
     case LDL_CHIP_MODE_STANDBY:
-        LDL_Chip_reset(false);
-        break;    
+        break;
     case LDL_CHIP_MODE_RX:
-        LDL_Chip_reset(false);
         break;
     case LDL_CHIP_MODE_TX_BOOST:
-        LDL_Chip_reset(false);
         break;
     case LDL_CHIP_MODE_TX_RFO:
-        LDL_Chip_reset(false);
-        break;            
+        break;
     }
 }

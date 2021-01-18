@@ -43,8 +43,6 @@
      *
      * If not defined, all LDL_ERROR() messages will be left out of the build.
      *
-     * @param[in] APP   from #ldl_mac_init_arg.app or NULL if not available
-     *
      * */
     #define LDL_ERROR(...)
 #endif
@@ -59,8 +57,6 @@
      * @endcode
      *
      * If not defined, all LDL_INFO() messages will be left out of the build.
-     *
-     * @param[in] APP   from #ldl_mac_init_arg.app or NULL if not available
      *
      * */
     #define LDL_INFO(...)
@@ -101,19 +97,17 @@
      * Example:
      *
      * @code{.c}
-     * #define LDL_DEBUG(APP, ...) do{printf(__VA_ARGS__);printf("\n");}while(0);
+     * #define LDL_DEBUG(...) do{printf(__VA_ARGS__);printf("\n");}while(0);
      * @endcode
      *
      * If not defined, all LDL_DEBUG() messages will be left out of the build.
-     *
-     * @param[in] APP   from #ldl_mac_init_arg.app or NULL if not available
      *
      * */
     #define LDL_DEBUG(...)
 #endif
 
 #ifndef LDL_ASSERT
-    /** An assert-like function that performs run-time assertions on 'X'
+    /** An assert-like function that performs run-time assertions on 'X'.
      *
      * Example:
      *
@@ -123,15 +117,18 @@
      *
      * If not defined, all LDL_ASSERT() checks will be left out of the build.
      *
+     * LDL_ASSERT() should be defined for development and production.
+     *
      * */
     #define LDL_ASSERT(X)
 #endif
 
+#ifndef LDL_ABORT
+    #define LDL_ABORT() LDL_ASSERT(true)
+#endif
+
 #ifndef LDL_PEDANTIC
-    /** A assert-like function that performs run-time assertions on 'X'
-     *
-     * These assertions are considered pedantic. They are useful for development
-     * but excessive for production.
+    /** An assert-like function that performs run-time assertions on 'X'.
      *
      * Example:
      *
@@ -140,6 +137,8 @@
      * @endcode
      *
      * If not defined, all LDL_PEDANTIC() checks will be left out of the build.
+     *
+     * LDL_PEDANTIC() should be defined for development.
      *
      * */
     #define LDL_PEDANTIC(X)

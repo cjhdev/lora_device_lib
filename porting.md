@@ -8,14 +8,17 @@ Porting Guide
     - LDL_SYSTEM_ENTER_CRITICAL() and LDL_SYSTEM_LEAVE_CRITICAL() must be defined
     - the ISR must have a higher priority than the non-interrupt thread of execution
     - bear in mind that interrupt-safe interfaces never block and return as quickly as possible
+- Check in the interface documentation
 
 ## Basic Steps
 
-1. Review Doxygen groups
+1. Select L2 Specification via build options.
 
-    - [system](https://cjhdev.github.io/lora_device_lib_api/group__ldl__system.html)
-    - [radio connector](https://cjhdev.github.io/lora_device_lib_api/group__ldl__radio__connector.html)
-    - [build options](https://cjhdev.github.io/lora_device_lib_api/group__ldl__build__options.html)
+    Define LDL_LL_VERSION as one of:
+
+    - LDL_LL_VERSION_1_0_3
+    - LDL_LL_VERSION_1_0_4
+    - LDL_LL_VERSION_1_1
 
 2. Implement the following system functions
 
@@ -30,21 +33,21 @@ Porting Guide
     - LDL_SYSTEM_ENTER_CRITICAL()
     - LDL_SYSTEM_LEAVE_CRITICAL()
 
-5. Define at least one region via build options
+5. Enable at least one region via build options
 
     - LDL_ENABLE_EU_863_870
     - LDL_ENABLE_US_902_928
     - LDL_ENABLE_AU_915_928
     - LDL_ENABLE_EU_433
 
-6. Define at least one radio driver via build options
+6. Enable at least one radio driver via build options
 
     - LDL_ENABLE_SX1272
     - LDL_ENABLE_SX1276
+    - LDL_ENABLE_SX1261
+    - LDL_ENABLE_SX1262
 
-7. Implement the chip interface
-
-    - See [chip interface](https://cjhdev.github.io/lora_device_lib_api/group__ldl__chip__interfaces.html)
+7. Implement the chip interface to reach radio chip
 
 8. Initialise in correct order
 
@@ -53,17 +56,15 @@ Porting Guide
 
     In other words:
 
-    1. LDL_Radio_init() and LDL_SM_init()
+    1. LDL_SX12xx_init() and LDL_SM_init()
     2. LDL_MAC_init()
     3. LDL_Radio_setEventCallback()
 
-9. Integrate with your application
-
-    - See [main()](examples/doxygen/example.c)
+9. Poll LDL_MAC_process() to make it run
 
 ## Building Source
 
-- define preprocessor symbols as needed ([see build options](https://cjhdev.github.io/lora_device_lib_api/group__ldl__build__options.html))
+- define preprocessor symbols as needed ([see build options](include/ldl_platform.h))
 - add `include` folder to include search path
 - build all sources in `src`
 
@@ -82,7 +83,7 @@ extern uint32_t your_system_ticks(void *app);
 struct ldl_mac_init_arg arg = {0};
 
 arg.ticks = your_system_ticks;
-arg.tps = 1000000UL;    // 1MHz
+arg.tps = 1000000;    // 1MHz
 
 // ...
 
@@ -104,11 +105,11 @@ LDL calculates the amount of compensation using this formula:
 compensation = (delay_seconds * ldl_mac_init_arg.a * 2UL) + ldl_mac_init_arg.b;
 ~~~
 
-- delay seconds is the delay from the end of TX to the beginning of RX (anywhere in the range 1 to 7 seconds)
+- delay_seconds is the delay from the end of TX to the beginning of RX (anywhere in the range 1 to 7 seconds)
 - `ldl_mac_init_arg.a` is clock error per second measured in ticks
 - `ldl_mac_init_arg.b` is a constant value
 
-`ldl_mac_init_arg.tps` is faster than 1KHz (e.g. 1MHz) it may be possible to measure
+If `ldl_mac_init_arg.tps` is faster than 1KHz, it may be possible to measure
 uncertainty in whole ticks. Compensation values may look like this:
 
 | type    | value  |
@@ -116,19 +117,31 @@ uncertainty in whole ticks. Compensation values may look like this:
 | a       | 10     |
 | b       | 0      |
 
-If `ldl_mac_init_arg.tps` is around 1KHz, `ldl_mac_init_arg.a` will be a fraction of a tick.
-At 1KHz there will be a constant error of +/- 500us at the point where the timestamp
-is recorded and again where the scheduler opens the window.
-
+If `ldl_mac_init_arg.tps` is around 1KHz, the error in ticks will be a fraction of 1
+and so `ldl_mac_init_arg.a` will be set to 0.
 You could round `ldl_mac_init_arg.a` up to 1, but this would overcompensate
 for windows that open later than one second. In this situation it makes
-sense to set `ldl_mac_init_arg.b` like so:
+sense to set a constant error correction using `ldl_mac_init_arg.b`.
+
+For example, you might compensate for `ldl_mac_init_arg.tps` of 1KHz
+using the following setting:
 
 | type    | value  |
 | ------- | ------ |
 | a       | 0      |
 | b       | 2      |
 
+
+### Shifting Run-Time Configuration to Compile Time
+
+Some configuration items can be defined at compile time if that
+better suits the application:
+
+- LDL_PARAM_TPS (replaces `ldl_mac_init_arg.tps`)
+- LDL_PARAM_A (replaces `ldl_mac_init_arg.a`)
+- LDL_PARAM_B (replaces `ldl_mac_init_arg.b`)
+- LDL_PARAM_ADVANCE (replaces `ldl_mac_init_arg.advance`)
+- LDL_PARAM_BEACON_INTERVAL (replaces `ldl_mac_init_arg.beaconInterval`)
 
 ### Managing Device Nonce (devNonce)
 
@@ -206,6 +219,9 @@ LDL is designed to work with applications that use sleep mode.
 that keeps working in sleep mode
 - use LDL_MAC_ticksUntilNextEvent() to set a wakeup timer before entering sleep mode
 - use external interrupts to call LDL_Radio_interrupt()
+- use LDL_MAC_priority() to determine if the MCU can enter a deep sleep
+  that would require many milliseconds to wake from since a slow
+  wakeup may cause you to be late to handling an event
 
 ### Co-operative Scheduling
 
@@ -213,7 +229,7 @@ LDL is designed to share a single thread of execution with other tasks.
 
 LDL works by scheduling time based events. Some of these events can be handled
 late without affecting the LoRaWAN, while others will cause serious problems like
-missing frames.
+not being able to receive frames.
 
 LDL provides the LDL_MAC_priority() interface so that a co-operative scheduler can
 check if another tasking running for the next CEIL(n) seconds will cause
@@ -227,7 +243,7 @@ Flash memory usage can be reduced by:
 - not enabling regions which are not needed
 - reimplementing the default Security Module ([ldl_sm.c](src/ldl_sm.c)) to use a hardware peripheral
 - not defining LDL_INFO, LDL_DEBUG, LDL_ERROR, LDL_TRACE_*
-- defining LDL_PARAM_LDL, LDL_PARAM_A, LDL_PARAM_B, LDL_PARAM_ADVANCE at compile time
+- shifting run-time configuration to compile-time [see above](#shifting-run-time-configuration-to-compile-time)
 
 Static RAM usage can be reduced by:
 
@@ -240,44 +256,16 @@ Automatic RAM usage can be reduced by:
 - shifting the frame receive buffer from stack to bss by defining LDL_ENABLE_STATIC_RX_BUFFER
     - this will reduce stack usage during LDL_MAC_process()
 
-### Compensating For Antenna Gain
+### Compensating Antenna Gain
 
-Initialise Radio with ldl_radio_init_arg.tx_gain set to a value you wish to boost
-or attenuate by.
-
-Note the value here is (dB x 10-2) so 2.4dB would be 240.
+See radio driver configuration.
 
 ### Configuring Radio Driver
 
-The radio driver needs to be configured to suit your hardware. The following
-configuration options exist:
+The radio driver needs to be configured to suit your hardware. A range
+of configuration options exist depending on the driver.
 
-- Transceiver type (ldl_radio_init_arg.type)
-
-- Antenna transmit gain compensation (ldl_radio_init_arg.tx_gain)
-
-  Note that the value here is (dB x 10^-2) so 2.4dB would be 240.
-
-- PA amp selection (ldl_radio_init_arg.pa)
-
-  With SX1272/6 transceiver you need to tell the driver if it can use one
-  or both power amplifier circuits. This is because your hardware might not
-  implement switching required to use both.
-
-- XTAL selection (ldl_radio_init_arg.xtal)
-
-  The driver needs to know if the transceiver is clocked by a crystal or
-  external oscillator.
-
-- XTAL startup delay in milliseconds (ldl_radio_init_arg.xtal_delay)
-
-  A crystal will stabilise in less than one millisecond, but an external
-  oscillator might take several milliseconds. This value is returned
-  to MAC and used to set a delay between turning on the transceiver
-  and performing an operation.
-
-
-The rest should be explained in the chip interface documentation.
+These options are documented in the radio driver interface documentation.
 
 ### Debugging Radio Driver
 
@@ -289,8 +277,8 @@ the transceiver you can see this information printed by defining:
 
 Enabling this feature will increase RAM and flash usage. The RAM is used
 to buffer register accesses so that printing doesn't affect time
-sensitive operations. You probably shouldn't leave this on in releases
-since it is very verbose.
+sensitive operations but this can still cause timing problems.
+Enabling this logging for releases is not recommended.
 
 ### LoRaWAN 1.1 Errata
 
@@ -301,6 +289,8 @@ proposed.
 By default this change is not applied to the source, but it can be enabled
 by defining:
 
-- LDL_ENABLE_POINTONE_ERRATA_A1
+- LDL_ENABLE_ERRATA_A1
+
+
 
 

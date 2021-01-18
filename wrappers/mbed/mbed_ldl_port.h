@@ -30,15 +30,18 @@
 
 #define LDL_ASSERT(X) MBED_ASSERT(X);
 
-#define LDL_INFO(FMT, ...) tr_info(FMT, ##__VA_ARGS__);
+#define LDL_INFO(FMT, ...) my_trace_lock();tr_info(FMT, ##__VA_ARGS__);my_trace_unlock();
 
-#define LDL_DEBUG(FMT, ...) tr_debug(FMT, ##__VA_ARGS__);
+#define LDL_DEBUG(FMT, ...) my_trace_lock();tr_debug(FMT, ##__VA_ARGS__);my_trace_unlock();
 
-#define LDL_ERROR(FMT, ...)  tr_error(FMT, ##__VA_ARGS__);
+#define LDL_ERROR(FMT, ...)  my_trace_lock();tr_error(FMT, ##__VA_ARGS__);my_trace_unlock();
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+void my_trace_lock(void);
+void my_trace_unlock(void);
 
 void my_trace_begin(void);
 void my_trace_part(const char *fmt, ...);

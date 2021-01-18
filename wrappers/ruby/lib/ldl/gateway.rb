@@ -7,225 +7,149 @@ module LDL
     include LoggerMethods
     include RadioModel
 
-    MAX_TOKENS = 100
-
-    # maximum allowable advance send scheduling
-    MAX_ADVANCE_TIME = 10
-
     attr_reader :eui
-
-    # shorter name assigned to make the log easier to read
     attr_reader :name
-
-    # GPS latitude of the gateway in degree (float, N is +)
-    attr_reader :lati
-
-    # GPS latitude of the gateway in degree (float, E is +)
-    attr_reader :long
-
-    # GPS altitude of the gateway in meter RX (integer)
-    attr_reader :alti
-
-    # Number of radio packets received (unsigned integer)
-    attr_reader :rxnb
-
-    # Number of radio packets received with a valid PHY CRC
-    attr_reader :rxok
-
-    # Number of radio packets forwarded (unsigned integer)
-    attr_reader :rxfw
-
-    # Number of downlink datagrams received (unsigned integer)
-    attr_reader :dwnb
-
-    # Number of packets emitted (unsigned integer)
-    attr_reader :txnb
 
     attr_reader :host
     attr_reader :port
+    attr_reader :socket
 
-    # @return [Integer] seconds
-    attr_reader :keepalive_interval
+    attr_reader :keepalive
 
-    def broker
-      @scenario.broker
-    end
+    attr_reader :broker, :clock
 
-    attr_reader :gain, :location
+    attr_reader :rx_log, :tx_log
 
-    def increment_token
-      @token += 1
-      self
-    end
+    # @param broker [Broker]
+    # @param clock [Clock]
+    #
+    # @param opts [Hash]
+    #
+    # @option opts [Integer] :port
+    # @option opts [String] :host
+    # @option opts [Number] :keepalive
+    # @option opts [String] :gw_eui
+    #
+    #
+    #
+    def initialize(broker, clock, **opts)
 
-    def initialize(scenario, **opts)
+      # gateway logs are rather noisy
+      self.enable_log
 
-      @disable_log = true
+      @logger = opts[:logger]||LoggerMethods::NULL_LOGGER
+      @broker = broker
+      @clock = clock
 
-      @scenario = scenario
+      self.path_loss = opts[:path_loss] if opts[:path_loss]
 
-      if opts[:gw_eui]
-        @eui = EUI.new(opts[:gw_eui])
-      else
-        @eui = EUI.new(SecureRandom.bytes(8))
-      end
+      @eui = EUI.new(opts[:gw_eui]||SecureRandom.bytes(8)).bytes
 
-      @tokens = []
+      @name = EUI.new(@eui).to_s("")
 
       # use as message token, increment for each message sent
       @token = 0
 
-      @gain = opts[:gain]||0
-      @lati = opts[:lati]||51.4576
-      @long = opts[:long]||0.9705
-      @alti = opts[:alti]||61
-      @port = opts[:port]||4002
+      @port = opts[:port]||1700
       @host = opts[:host]||"localhost"
-      @keepalive_interval = opts[:keepalive_interval]||10
-      @name = opts[:name]||@eui.to_s("")
-      @location = opts[:location]||Location.new(0,0)
+      @keepalive = opts[:keepalive]||10
 
-      @log_header = "GATEWAY(#{name})"
+      @ev_keepalive = nil
+      @ev_tx_begin = nil
+      @ev_tx_end = nil
 
-      @q = Queue.new
+      @mutex = Mutex.new
+      @running = false
 
-      # worker thread
-      @worker = Thread.new do
+      @rx_log = FrameLogger.new
+      @tx_log = FrameLogger.new
 
-        # nothing old
-        @q.clear
+    end
 
-        # start the keep alive push
-        @q.push({:task => :keepalive})
+    def transmit(txpk)
+
+      t_sym = (((2 ** txpk.sf) * clock.tps) / txpk.bw)
+
+      msg = {
+        station: self,
+        time: clock.time,
+        ticks: clock.ticks,
+        preamble: (tmst..(tmst + (8*t_sym))),
+        data: txpk.data,
+        sf: txpk.sf,
+        bw: txpk.bw,
+        cr: txpk.codr,
+        freq: (txpk.freq * 1000000).to_i,
+        power: txpk.powe.to_f,
+        air_time: Radio.transmit_time_down(txpk.bw, txpk.sf, txpk.size),
+        reliability: self.reliability
+      }
+
+      broker.publish(
+        msg,
+        "tx_begin"
+      )
+
+      tx_log.log(msg)
+
+      clock.call_in(Radio.transmit_time_down(txpk.bw, txpk.sf, txpk.data.size)) do
+
+        broker.publish(
+          {
+            station: self
+          },
+          "tx_end"
+        )
+
+      end
+
+    end
+
+    # start worker
+    def start
+      with_mutex do
+
+        return if running?
 
         buffer = []
 
-        tx_begin = broker.subscribe "tx_begin" do |m1|
+        @socket = UDPSocket.new
+        #@socket.connect(host, port)
 
-          # don't listen to our own stuff
-          if m1[:station] != self
-            buffer.push m1
-          end
+        @running = true
 
-        end
-
-        tx_end = broker.subscribe "tx_end" do |m2|
-
-          if m1 = buffer.detect{ |v| v[:station] == m2[:station] }
-
-            log_debug{"received frame"}
-
-            @q.push(
-              {
-                :task => :upstream,
-                :rxpk => Semtech::RXPacket.new(
-                  tmst: tmst,
-                  freq: m1[:freq].to_f / 1000000.0,
-                  data: m1[:data],
-                  datr: "SF#{m1[:sf]}BW#{m1[:bw]/1000}",
-                  rssi: -rand(10..50),
-                  lsnr: rand(-1..10),
-                  rfch: 0
-                )
-              }
-            )
-
-            buffer.delete m1
-
-          end
-
-        end
-
-        s = UDPSocket.new
-
-        s.connect(host, port)
-
-        Thread.new do
+        @worker = Thread.new do
 
           begin
 
             loop do
 
-              reply = s.recvfrom(1024, 0)
+              input, sender = @socket.recvfrom(1024, 0)
 
-              @q.push({:task => :downstream, :data => reply.first})
-
-            end
-
-          rescue
-            log_debug{"could not recv"}
-          end
-
-        end
-
-        broker.publish({:station => self}, 'up')
-
-        loop do
-
-          job = @q.pop
-
-          # stop the gateway by closing the socket and breaking this loop
-          if job[:task] == :stop
-            s.close # will cause exception for rx thread waiting on socket
-            break
-          end
-
-          @scenario.clock.call do
-
-            case job[:task]
-            # perform a keep alive
-            when :keepalive
-
-              m = Semtech::PullData.new(token: @token, eui: @eui)
-
-              add_token @token
-
-              increment_token
-
-              # schedule keep alive: note this will probably fire once after we stop this thread
-              @scenario.clock.call_in(keepalive_interval * ExtMAC::TICKS_PER_SECOND) do
-
-                  @q.push({:task => :keepalive})
-
-              end
-
-              log_debug{"#{self}"}
-              log_debug{"sending PullData (keep alive) #{self.disable_log}"}
-
-              s.write(m.encode)
-
-            # send upstream
-            when :upstream
-
-              m = Semtech::PushData.new(token: @token, eui: @eui, rxpk: [job[:rxpk]])
-
-              add_token @token
-
-              increment_token
-
-              log_debug{"sending PushData (forward)"}
-
-              s.write(m.encode)
-
-            # message received from network
-            when :downstream
+              log_debug{"recv #{input.size} bytes from #{sender}"}
 
               begin
-                msg = Semtech::Message.decode(job[:data])
+                msg = Semtech::Message.decode(input)
 
-                log_debug{"received #{msg.class.name.split("::").last}"}
+                log_debug{"got a #{msg.class}"}
 
-                case msg.class
-                when Semtech::PushAck, Semtech::PullAck
+              rescue
+                log_debug{"cannot decode message"}
+                next
+              end
 
-                  ack_token(msg.token)
+              clock.call do
 
+                case msg
                 when Semtech::PullResp
 
-                  # send now
                   if msg.txpk.imme
 
-                    s.write(
+                    transmit(msg.txpk)
+
+                    log_debug{"transmit frame immediately (imme=true)"}
+
+                    write(
                       Semtech::TXAck.new(
                         token: msg.token,
                         eui: @eui,
@@ -233,21 +157,12 @@ module LDL
                       ).encode
                     )
 
-                    increment_token
-
-                    log_debug{"transmit frame immediately (imme=true)"}
-
-                    transmit(msg.txpk)
-
-                  # send according to time stamp
                   elsif msg.txpk.tmst
 
-                    timeNow = tmst
-
-                    if msg.txpk.tmst > timeNow
-                      delta = msg.txpk.tmst - timeNow
+                    if msg.txpk.tmst > tmst
+                      delta = msg.txpk.tmst - tmst
                     else
-                      delta = ((2**32)-1) - timeNow + msg.txpk.tmst
+                      delta = ((2**32)-1) - tmst + msg.txpk.tmst
                     end
 
                     # I expect the advance time to never be more than tens of seconds
@@ -256,7 +171,9 @@ module LDL
                       log_debug{"transmit frame in #{delta}us (tmst=#{msg.txpk.tmst})"}
                       log_debug{"send up TXAck (error=NONE)"}
 
-                      s.write(
+                      clock.call_in(delta){ transmit(msg.txpk) }
+
+                      write(
                         Semtech::TXAck.new(
                           token: msg.token,
                           eui: @eui,
@@ -264,28 +181,18 @@ module LDL
                         ).encode
                       )
 
-                      increment_token
-
-                      @scenario.clock.call_in(delta) do
-
-                        transmit(msg.txpk)
-
-                      end
-
                     else
 
                       log_debug{"too late to transmit frame (tmst=#{msg.txpk.tmst})"}
                       log_debug{"send up TXAck (error=TOO_LATE)"}
 
-                      s.write(
+                      write(
                         Semtech::TXAck.new(
                           token: msg.token,
                           eui: @eui,
                           txpk_ack: Semtech::TXPacketAck.new(error: 'TOO_LATE')
                         ).encode
                       )
-
-                      increment_token
 
                     end
 
@@ -295,7 +202,7 @@ module LDL
                     log_debug{"transmit frame at #{msg.txpk.time} (not supported)"}
                     log_debug{"send up TXAck (error=GPS_UNLOCKED)"}
 
-                    s.write(
+                    write(
                       Semtech::TXAck.new(
                         token: msg.token,
                         eui: @eui,
@@ -303,89 +210,137 @@ module LDL
                       ).encode
                     )
 
-                    increment_token
-
                   end
 
                 end
 
+              end
+
+            # loop do
+            end
+
+          rescue
+          end
+
+        # @worker thread
+        end
+
+        action = Proc.new do
+
+          log_debug{"keep alive!"}
+
+          begin
+            write(
+              Semtech::PullData.new(
+                token: next_token,
+                eui: eui
+              ).encode
+            )
+          rescue => e
+            log_debug{"#{e}"}
+          end
+
+          begin
+            @ev_keepalive = clock.call_in(keepalive * clock.tps, &action)
+          rescue
+          end
+
+        end
+
+        @ev_keepalive = clock.call(&action)
+
+        @ev_tx_begin = broker.subscribe "tx_begin" do |m1|
+
+          buffer.push(m1) if m1[:station] != self
+
+        end
+
+        @ev_tx_end = broker.subscribe "tx_end" do |m2|
+
+          if m1 = buffer.detect { |m1| m1[:station] == m2[:station] }
+
+            if not(rf_detected?(m1[:power], m1[:bw], m1[:sf]))
+
+              log_debug{"rf signal dropped the packet"}
+
+            elsif rand > m1[:reliability]
+
+              log_debug{"reliability dropped the packet"}
+
+            else
+
+              msg = m1.dup
+              msg[:rssi] = rssi(m1[:power])
+              msg[:snr] = snr(m1[:power])
+              rx_log.log(msg)
+
+              log_info{"message received: rssi=#{rssi(m1[:power])} snr=#{snr(m1[:power])}"}
+
+              begin
+                write(
+                  Semtech::PushData.new(
+                    token: next_token,
+                    eui: eui,
+                    rxpk: [
+                      Semtech::RXPacket.new(
+                        tmst: tmst,
+                        freq: m1[:freq].to_f / 1000000.0,
+                        data: m1[:data],
+                        datr: "SF#{m1[:sf]}BW#{m1[:bw]/1000}",
+                        rssi: rssi(m1[:power]).to_i,
+                        lsnr: snr(m1[:power]).to_i,
+                        rfch: 0
+                      )
+                    ]
+                  ).encode
+                )
               rescue => e
-
-                log_debug{"could not decode message received from network: #{e}"}
-                log_debug{e.backtrace.join("\n")}
-
+                log_debug{"#{e}"}
               end
 
             end
+
+            buffer.delete(m1)
 
           end
 
         end
 
-        broker.unsubscribe tx_begin
-        broker.unsubscribe tx_end
-
-        broker.publish({:station => self}, 'down')
-
       end
-
-    end
-
-    def running?
-      @worker.alive?
-    end
-
-    def transmit(txpk)
-
-      t_sym = (((2 ** txpk.sf) * ExtMAC::TICKS_PER_SECOND ) / txpk.bw)
-      time = @scenario.ticks
-
-      m1 = {
-        :station => self,
-        :time => time,
-        :preamble => (time..(time + (8*t_sym))),
-        :data => txpk.data,
-        :sf => txpk.sf,
-        :bw => txpk.bw,
-        :cr => txpk.codr,
-        :freq => (txpk.freq * 1000000).to_i,
-        :power => 0,
-        :gain => gain,
-        :airTime => Radio.transmit_time_down(txpk.bw, txpk.sf, txpk.size),
-        :location => location
-      }
-
-      m2 = {
-        :station => self
-      }
-
-      broker.publish m1, "tx_begin"
-
-      @scenario.clock.call_in(Radio.transmit_time_down(txpk.bw, txpk.sf, txpk.data.size)) do
-
-        broker.publish m2, "tx_end"
-
-      end
-
-      log_debug{"transmit on sf: #{m1[:sf]} bw: #{m1[:bw]} freq: #{m1[:freq]}"}
-
-    end
-
-    # start worker
-    def start
-      if not running?
-        @worker.run
-      end
-      self
     end
 
     # stop worker
     def stop
-      if running?
-        @q.push({:task => :stop})
+      with_mutex do
+
+        return unless running?
+
+        @running = false
+
+        clock.call do
+
+          clock.cancel(@ev_keepalive)
+          broker.unsubscribe(@ev_tx_begin)
+          broker.unsubscribe(@ev_tx_end)
+
+        end
+
+        @socket.close
         @worker.join
+
       end
-      self
+    end
+
+    def running?
+      @running
+    end
+
+    def tmst
+      clock.ticks
+    end
+
+    def next_token
+      @token += 1
     end
 
     def with_mutex
@@ -394,28 +349,11 @@ module LDL
       end
     end
 
-    def add_token(token)
-      if @tokens.size == MAX_TOKENS
-        @tokens.pop
-      end
-      @tokens.unshift([token,false])
-      self
+    def write(msg)
+      @socket.send(msg, 0, host, port)
     end
 
-    def ack_token(token)
-      @tokens.each do |t|
-        if t[0] == token
-          t[1] = true
-        end
-      end
-      self
-    end
-
-    def tmst
-      @scenario.ticks
-    end
-
-    private :with_mutex, :add_token, :ack_token, :tmst, :transmit
+    private :tmst, :transmit, :next_token, :with_mutex, :write
 
   end
 

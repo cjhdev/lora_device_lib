@@ -26,29 +26,19 @@
 
 /**
  * @defgroup ldl_radio Radio
- * @ingroup ldl
  *
- * # Radio Driver Interface
+ * The application should initialise the radio with @ref ldl_mac in the following
+ * order:
  *
- * The application must use the following interfaces to setup LDL:
- *
- * - LDL_Radio_init()
- * - LDL_Radio_setEventCallback() (how @ref ldl_radio passes events to @ref ldl_mac)
- *
- * Sequence of initialisation is as follows:
- *
- * -# LDL_Radio_init()
+ * -# LDL_SX1272_init()/LDL_SX1276_init()/LDL_SX1261_init()/LDL_SX1262_init()
  * -# LDL_MAC_init()
  * -# LDL_Radio_setEventCallback()
- *
- * All other interfaces do not need to be called by the application.
  *
  * @ref ldl_mac calls all non-static (i.e. functions that pass self as first
  * argument) via #ldl_radio_interface. This means it is possible
  * to wrap @ref ldl_radio in a C++ if necessary.
  *
- * Be careful using these interfaces for other projects (i.e. having
- * something other than @ref ldl_mac call them). The driver expects
+ * Be careful using these interfaces for other projects. The driver expects
  * certain functions to be called before others. For best results you
  * should study how @ref ldl_mac calls the interfaces to figure out
  * what will work.
@@ -62,47 +52,39 @@ extern "C" {
 
 #include "ldl_platform.h"
 #include "ldl_radio_defs.h"
-#include "ldl_radio_debug.h"
 #include "ldl_chip.h"
 #include <stdint.h>
 #include <stdbool.h>
 
-/** radio events sent to MAC */
-enum ldl_radio_event {
-    LDL_RADIO_EVENT_TX_COMPLETE,
-    LDL_RADIO_EVENT_RX_READY,
-    LDL_RADIO_EVENT_RX_TIMEOUT,
-    LDL_RADIO_EVENT_NONE
-};
-
 /** Radio driver type
- *
- * The driver selected at LDL_Radio_init() must have first been included
- * in the build.
  *
  * Drivers are included in the build by defining:
  *
  * - #LDL_ENABLE_SX1272
  * - #LDL_ENABLE_SX1276
+ * - #LDL_ENABLE_SX1261
+ * - #LDL_ENABLE_SX1262
  *
  * */
 enum ldl_radio_type {
-#ifdef LDL_ENABLE_SX1272
+    LDL_RADIO_NONE,        /**< no radio */
     LDL_RADIO_SX1272,      /**< SX1272 */
-#endif
-#ifdef LDL_ENABLE_SX1276
     LDL_RADIO_SX1276,      /**< SX1276 */
-#endif
-    LDL_RADIO_NONE         /**< no radio */
+    LDL_RADIO_SX1261,      /**< SX1261 */
+    LDL_RADIO_SX1262       /**< SX1262 */
 };
 
-/** the radio is considered to be in one of these states
- * at all times */
+/** This controls the radio
+ *
+ * */
 enum ldl_radio_mode {
 
-    LDL_RADIO_MODE_RESET,       /** reset line is asserted */
-    LDL_RADIO_MODE_SLEEP,       /** xtal is off */
-    LDL_RADIO_MODE_STANDBY      /** xtal is on */
+    LDL_RADIO_MODE_RESET,       /**< assert reset line */
+    LDL_RADIO_MODE_BOOT,        /**< de-assert reset line */
+    LDL_RADIO_MODE_SLEEP,       /**< cold sleep */
+    LDL_RADIO_MODE_RX,          /**< ready for rx */
+    LDL_RADIO_MODE_TX,          /**< ready for tx */
+    LDL_RADIO_MODE_HOLD         /**< between tx and rx */
 };
 
 /** oscillator type */
@@ -118,6 +100,7 @@ struct ldl_radio_tx_setting {
     enum ldl_signal_bandwidth bw;
     enum ldl_spreading_factor sf;
     int16_t dbm;
+    int16_t max_eirp;
 };
 
 struct ldl_radio_rx_setting {
@@ -136,37 +119,116 @@ struct ldl_radio_packet_metadata {
     int16_t snr;
 };
 
-/** Power amplifier configuration */
-enum ldl_radio_pa {
-    LDL_RADIO_PA_AUTO,  /**< driver decides which PA to use */
-    LDL_RADIO_PA_RFO,   /**< use RFO */
-    LDL_RADIO_PA_BOOST  /**< use BOOST */
+struct ldl_radio_status {
+
+    bool tx;
+    bool rx;
+    bool timeout;
+};
+
+/** SX127X power amplifier setting */
+enum ldl_sx127x_pa {
+    LDL_SX127X_PA_AUTO,  /**< driver decides which PA to use */
+    LDL_SX127X_PA_RFO,   /**< use RFO */
+    LDL_SX127X_PA_BOOST  /**< use BOOST */
+};
+
+/** SX126X regulator setting
+ *
+ * */
+enum ldl_sx126x_regulator {
+
+    LDL_SX126X_REGULATOR_LDO,
+    LDL_SX126X_REGULATOR_DCDC
+};
+
+/* SX126X dio3 voltage output setting */
+enum ldl_sx126x_voltage {
+
+    LDL_SX126X_VOLTAGE_1V6,
+    LDL_SX126X_VOLTAGE_1V7,
+    LDL_SX126X_VOLTAGE_1V8,
+    LDL_SX126X_VOLTAGE_2V2,
+    LDL_SX126X_VOLTAGE_2V4,
+    LDL_SX126X_VOLTAGE_2V7,
+    LDL_SX126X_VOLTAGE_3V0,
+    LDL_SX126X_VOLTAGE_3V3
+};
+
+/* SX126X dio2 txen mode setting */
+enum ldl_sx126x_txen {
+
+    LDL_SX126X_TXEN_DISABLED,
+    LDL_SX126X_TXEN_ENABLED
 };
 
 struct ldl_mac;
 
-typedef void (*ldl_radio_event_fn)(struct ldl_mac *self, enum ldl_radio_event event);
+typedef void (*ldl_radio_event_fn)(struct ldl_mac *self);
+
+struct ldl_sx127x_debug_log_entry {
+
+    uint8_t opcode;
+    uint8_t value;
+    uint8_t size;
+};
+
+#ifndef LDL_RADIO_DEBUG_LOG_SIZE
+#define LDL_RADIO_DEBUG_LOG_SIZE 20
+#endif
+
+struct ldl_sx127x_debug_log {
+
+    struct ldl_sx127x_debug_log_entry log[LDL_RADIO_DEBUG_LOG_SIZE];
+    uint8_t pos;
+    bool overflow;
+};
 
 /** Radio state */
 struct ldl_radio {
 
-    void *chip;
-    enum ldl_radio_pa pa;
     enum ldl_radio_type type;
-    struct ldl_mac *cb_ctx;
-    ldl_radio_event_fn cb;
+    enum ldl_radio_mode mode;
+    enum ldl_radio_xtal xtal;
+
+    void *chip;
     ldl_chip_write_fn chip_write;
     ldl_chip_read_fn chip_read;
     ldl_chip_set_mode_fn chip_set_mode;
-    enum ldl_radio_xtal xtal;
-    enum ldl_radio_mode mode;
-    int16_t tx_gain;
-    uint8_t xtal_delay;
-    volatile uint8_t dio_mapping1;
 
+    struct ldl_mac *cb_ctx;
+    ldl_radio_event_fn cb;
+
+    union {
+
+#if defined(LDL_ENABLE_SX1272) || defined(LDL_ENABLE_SX1276)
+        struct {
+            enum ldl_sx127x_pa pa;
 #ifdef LDL_ENABLE_RADIO_DEBUG
-    struct ldl_radio_debug_log debug;
+            struct ldl_sx127x_debug_log debug;
 #endif
+        } sx127x;
+#endif
+
+#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_SX1262)
+        struct {
+
+            enum ldl_sx126x_regulator regulator;
+            enum ldl_sx126x_voltage voltage;
+            enum ldl_sx126x_txen txen;
+            bool image_calibration_pending;
+            bool trim_xtal;
+            uint8_t xta;
+            uint8_t xtb;
+
+        } sx126x;
+#endif
+        /* make sure this still compiles if radios are not enabled*/
+        int none;
+
+    } state;
+
+    int16_t tx_gain;
 };
 
 /** @ref ldl_mac calls non-static radio functions through these function pointers
@@ -176,64 +238,85 @@ struct ldl_radio {
  *  */
 struct ldl_radio_interface {
 
-    void (*set_mode)(struct ldl_radio *self, enum ldl_radio_mode mode); /**< LDL_Radio_setMode() */
-    uint32_t (*read_entropy)(struct ldl_radio *self);               /**< LDL_Radio_readEntropy() */
-    uint8_t (*read_buffer) (struct ldl_radio *self, struct ldl_radio_packet_metadata *meta, void *data, uint8_t max);       /**< LDL_Radio_readBuffer() */
-    void (*transmit)(struct ldl_radio *self, const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);   /**< LDL_Radio_transmit() */
-    void (*receive)(struct ldl_radio *self, const struct ldl_radio_rx_setting *settings);                                   /**< LDL_Radio_receive() */
-    uint8_t (*get_xtal_delay)(struct ldl_radio *self);     /**< LDL_Radio_getXTALDelay() */
-    void (*receive_entropy)(struct ldl_radio *self);        /**< LDL_Radio_receiveEntropy() */
+    /** Change the mode
+     *
+     * @param[in] self
+     * @param[in] mode
+     *
+     * */
+    void (*set_mode)(struct ldl_radio *self, enum ldl_radio_mode mode);
+
+    /** Read entropy data from radio
+     *
+     * @warning ldl_radio.mode must be LDL_RADIO_MODE_STANDBY
+     *
+     * @param[in] self #ldl_radio
+     *
+     * @return entropy
+     *
+     * */
+    uint32_t (*read_entropy)(struct ldl_radio *self);
+
+    /** Read the receive buffer and meta data
+     *
+     * @warning ldl_radio.mode must be LDL_RADIO_MODE_STANDBY
+     *
+     * @param[in] self
+     * @param[out] meta
+     * @param[out] data     buffer
+     * @param[in] max       maximum size of buffer
+     *
+     * @retval bytes read
+     *
+     * */
+    uint8_t (*read_buffer) (struct ldl_radio *self, struct ldl_radio_packet_metadata *meta, void *data, uint8_t max);
+
+    /** Configure radio to transmit a message
+     *
+     * @warning ldl_radio.mode must be LDL_RADIO_MODE_STANDBY
+     *
+     * @param[in] self
+     * @param[in] settings
+     * @param[in] data
+     * @param[in] len
+     *
+     * */
+    void (*transmit)(struct ldl_radio *self, const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);
+
+    /** Configure radio to receive
+     *
+     * @warning ldl_radio.mode must be LDL_RADIO_MODE_STANDBY
+     *
+     * @param[in] self
+     * @param[in] settings
+     *
+     * */
+    void (*receive)(struct ldl_radio *self, const struct ldl_radio_rx_setting *settings);
+
+    /** Configure radio to receive entropy
+     *
+     * @warning ldl_radio.mode must be LDL_RADIO_MODE_STANDBY
+     *
+     * @param[in] self
+     *
+     * */
+    void (*receive_entropy)(struct ldl_radio *self);
+
+
+    /** Read status from radio
+     *
+     * @param[in] self
+     * @param[out] status
+     *
+     * */
+    void (*get_status)(struct ldl_radio *self, struct ldl_radio_status *status);
+
 };
 
-/** passed to LDL_Radio_init */
-struct ldl_radio_init_arg {
-
-    /** transceiver type */
-    enum ldl_radio_type type;
-
-    /** type of XTAL */
-    enum ldl_radio_xtal xtal;
-
-    /** different XTAL types may have a significant startup delay
-     *
-     * This delay is measured in milliseconds
-     *
-     * */
-    uint8_t xtal_delay;
-
-    /** SX1272/6 transceivers have PAs on different physical pins
-     *
-     * The driver needs to know if one or both are connected.
-     *
-     * */
-    enum ldl_radio_pa pa;
-
-    /** Apply TX gain compensation in units of (dB x 10-2)
-     *
-     * (e.g. -2.4dB == -240)
-     *
-     * */
-    int16_t tx_gain;
-
-    /** a pointer that will be passed as self when calling ldl_chip_*
-     * functions */
-    void *chip;
-
-    ldl_chip_write_fn chip_write;        /**< #ldl_chip_write_fn */
-    ldl_chip_read_fn chip_read;          /**< #ldl_chip_read_fn */
-    ldl_chip_set_mode_fn chip_set_mode;  /**< #ldl_chip_set_mode_fn */
-};
-
-/** default Radio interface */
-extern const struct ldl_radio_interface LDL_Radio_interface;
-
-/** Initialise radio driver
- *
- * @param[in] self
- * @param[in] arg   #ldl_radio_init_arg
+/** Get interface for initialised radio driver
  *
  * */
-void LDL_Radio_init(struct ldl_radio *self, const struct ldl_radio_init_arg *arg);
+const struct ldl_radio_interface *LDL_Radio_getInterface(const struct ldl_radio *self);
 
 /** Receive an interrupt from the chip
  *
@@ -241,6 +324,21 @@ void LDL_Radio_init(struct ldl_radio *self, const struct ldl_radio_init_arg *arg
  * @param[in] n     DIO number
  *
  * @ingroup ldl_chip_interface
+ *
+ * This function will typically be called from an ISR like this:
+ *
+ * @code{.c}
+ * extern ldl_radio radio;
+ *
+ * void dio0_rising_edge_isr(void)
+ * {
+ *   LDL_Radio_handleInterrupt(&radio, 0);
+ * }
+ * void dio1_rising_edge_isr(void)
+ * {
+ *   LDL_Radio_handleInterrupt(&radio, 1);
+ * }
+ * @endcode
  *
  * */
 void LDL_Radio_handleInterrupt(struct ldl_radio *self, uint8_t n);
@@ -251,7 +349,7 @@ void LDL_Radio_handleInterrupt(struct ldl_radio *self, uint8_t n);
  *
  * @param[in] self      #ldl_radio
  * @param[in] ctx       passed back as first argument of handler
- * @param[in] handler   LDL_MAC_radioEvent() or an intermediate
+ * @param[in] cb        LDL_MAC_radioEvent() or an intermediate
  *
  * */
 void LDL_Radio_setEventCallback(struct ldl_radio *self, struct ldl_mac *ctx, ldl_radio_event_fn cb);
@@ -263,70 +361,6 @@ void LDL_Radio_setEventCallback(struct ldl_radio *self, struct ldl_mac *ctx, ldl
  *
  * */
 int16_t LDL_Radio_getMinSNR(enum ldl_spreading_factor sf);
-
-/** Change the mode
- *
- * @param[in] self
- * @param[in] mode
- *
- * */
-void LDL_Radio_setMode(struct ldl_radio *self, enum ldl_radio_mode mode);
-
-/** Configure radio to receive
- *
- * @warning ldl_radio.mode must be LDL_RADIO_MODE_STANDBY
- *
- * @param[in] self
- * @param[in] settings
- *
- * */
-void LDL_Radio_receive(struct ldl_radio *self, const struct ldl_radio_rx_setting *settings);
-
-/** Configure radio to transmit a message
- *
- * @warning ldl_radio.mode must be LDL_RADIO_MODE_STANDBY
- *
- * @param[in] self
- * @param[in] settings
- * @param[in] data
- * @param[in] len
- *
- * */
-void LDL_Radio_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);
-
-/** Read the receive buffer and meta data
- *
- * @warning ldl_radio.mode must be LDL_RADIO_MODE_STANDBY
- *
- * @param[in] self
- * @param[out] meta
- * @param[out] data     buffer
- * @param[in] max       maximum size of buffer
- *
- * @retval bytes read
- *
- * */
-uint8_t LDL_Radio_readBuffer(struct ldl_radio *self, struct ldl_radio_packet_metadata *meta, void *data, uint8_t max);
-
-/** Read entropy data from radio
- *
- * @warning ldl_radio.mode must be LDL_RADIO_MODE_STANDBY
- *
- * @param[in] self #ldl_radio
- *
- * @return entropy
- *
- * */
-uint32_t LDL_Radio_readEntropy(struct ldl_radio *self);
-
-/** Configure radio to receive entropy
- *
- * @warning ldl_radio.mode must be LDL_RADIO_MODE_STANDBY
- *
- * @param[in] self
- *
- * */
-void LDL_Radio_receiveEntropy(struct ldl_radio *self);
 
 /** Time taken to transmit a message of certain size
  *
@@ -340,15 +374,6 @@ void LDL_Radio_receiveEntropy(struct ldl_radio *self);
  * */
 uint32_t LDL_Radio_getAirTime(enum ldl_signal_bandwidth bw, enum ldl_spreading_factor sf, uint8_t size, bool crc);
 
-/** Get the time it takes to start and stabilise the XTAL
- *
- * @param[in] self
- *
- * @return milliseconds
- *
- * */
-uint8_t LDL_Radio_getXTALDelay(struct ldl_radio *self);
-
 /** Convert bandwidth enumeration to Hz
  *
  * @param[in] bw bandwidth
@@ -357,37 +382,8 @@ uint8_t LDL_Radio_getXTALDelay(struct ldl_radio *self);
  * */
 uint32_t LDL_Radio_bwToNumber(enum ldl_signal_bandwidth bw);
 
-/** Convert type enum to a string
- *
- * @param[in] type
- * @return string
- *
- * */
-const char *LDL_Radio_typeToString(enum ldl_radio_type type);
-
-/** Convert mode enum to a string
- *
- * @param[in] mode
- * @return string
- *
- * */
-const char *LDL_Radio_modeToString(enum ldl_radio_mode mode);
-
-/** Convert xtal enum to a string
- *
- * @param[in] xtal
- * @return string
- *
- * */
-const char *LDL_Radio_xtalToString(enum ldl_radio_xtal xtal);
-
-/** Convert pa enum to a string
- *
- * @param[in] pa
- * @return string
- *
- * */
-const char *LDL_Radio_paToString(enum ldl_radio_pa pa);
+#include "ldl_sx126x.h"
+#include "ldl_sx127x.h"
 
 #ifdef __cplusplus
 }

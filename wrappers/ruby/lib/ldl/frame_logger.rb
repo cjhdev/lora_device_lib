@@ -1,34 +1,49 @@
-require 'base64'
 require 'json'
 
 module LDL
 
   class FrameLogger
 
-    include LoggerMethods
-
-    def initialize(scenario)
-
-      @scenario = scenario
-
-      @scenario.broker.subscribe('tx_begin') do |msg|
-
-        log_debug do
-          {
-            time: @scenario.clock.ticks_to_s(msg[:time]).round(5),
-            station: msg[:station] ? msg[:station].name : nil,
-            freq: msg[:freq],
-            sf: msg[:sf],
-            bw: msg[:bw]/1000,
-            power: msg[:power],
-            air_time: @scenario.clock.ticks_to_s(msg[:airTime]),
-            message: Base64.strict_encode64(msg[:data])
-          }.to_json
-        end
-
+    def get
+      with_mutex do
+        @buffer.dup
       end
-
     end
+
+    def initialize(**opts)
+      @buffer = []
+      @limit = opts[:limit]||1000
+      @mutex = Mutex.new
+    end
+
+    def log(m)
+      with_mutex do
+        item = {
+          time: Clock.ticks_to_f(m[:time]),
+          end_time: Clock.ticks_to_f(m[:time] + m[:air_time]),
+          ticks: m[:ticks],
+          freq: m[:freq],
+          sf: m[:sf],
+          bw: m[:bw],
+          data: m[:data],
+          air_time: Clock.ticks_to_f(m[:air_time]),
+          rssi: m[:rssi],
+          snr: m[:snr],
+          power: m[:power]
+        }
+        @buffer.push(item)
+        @buffer.shift if @buffer.size > @limit
+        nil
+      end
+    end
+
+    def with_mutex
+      @mutex.synchronize do
+        yield
+      end
+    end
+
+    private :with_mutex
 
   end
 

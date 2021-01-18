@@ -1,3 +1,5 @@
+require 'securerandom'
+
 module LDL
 
   class Scenario
@@ -5,54 +7,58 @@ module LDL
     attr_reader :region, :gw, :device, :broker, :clock, :logger
 
     def self.log_info(msg)
-      @logger.info(msg) if @logger
+      @logger.info{msg} if @logger
     end
 
     def self.log_debug(msg)
-      @logger.debug(msg) if @logger
+      @logger.debug{msg} if @logger
     end
 
     def self.log_error(msg)
-      @logger.error(msg) if @logger
+      @logger.error{msg} if @logger
     end
 
     def self.logger=(logger)
       @logger = logger
     end
 
+    def self.run(**opts)
+
+      inst = self.new(**opts)
+      inst.start
+      yield(inst) if block_given?
+      inst.stop
+
+    end
+
     # @param opts [Hash]
     #
+    # @option opts [Symbol] :region
     # @option opts [String] :gw_eui
     # @option opts [String] :join_eui
     # @option opts [String] :dev_eui
-    # @option opts [String] :dev_key
+    # @option opts [String] :nwk_key
     # @option opts [String] :app_key
     # @option opts [String] :lorawan_version
     # @option opts [String] :budget_margin
     #
-    # @param app [Block] this is the device application
-    #
-    def initialize(**opts, &app)
+    def initialize(**opts)
 
       @logger = opts[:logger]||LoggerMethods::NULL_LOGGER
 
       self.class.logger = @logger
 
-      unless opts[:dev_eui]
-        opts[:dev_eui] = SecureRandom.bytes(8)
-      end
-
-      unless opts[:join_eui]
-        opts[:join_eui] = SecureRandom.bytes(8)
-      end
-
       @broker = Broker.new
-      @clock = Clock.new(self)
-      @frame_logger = FrameLogger.new(self)
+      @clock = Clock.new(logger: logger)
 
-      @gw = Gateway.new(self, **opts)
-      @device = Device.new(self, **opts, &app)
+      @gw = Gateway.new(broker, clock, **opts.merge(logger: logger))
 
+      @device = Device.new(broker, clock, **opts.merge(logger: logger))
+
+    end
+
+    def region
+      @device.region
     end
 
     def ticks
@@ -60,14 +66,16 @@ module LDL
     end
 
     def start
-      gw.start
+      clock.start
       device.start
+      gw.start
       self
     end
 
     def stop
       gw.stop
       device.stop
+      clock.stop
       self
     end
 

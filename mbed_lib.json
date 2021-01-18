@@ -3,6 +3,8 @@
     "macros" : [
         "LDL_ENABLE_SX1272",
         "LDL_ENABLE_SX1276",
+        "LDL_ENABLE_SX1261",
+        "LDL_ENABLE_SX1262",
         "LDL_ENABLE_EU_863_870",
         "LDL_ENABLE_US_902_928",
         "LDL_ENABLE_AU_915_928",
@@ -37,26 +39,26 @@
         "tps" : {
             "help" : "this timebase works with all the high level timer objects (so don't change it)",
             "macro_name" : "LDL_PARAM_TPS",
-            "value" : "1000000UL"
+            "value" : "1000000"
         },
         "advance" : {
             "help" : "advance timing of events by this many ticks (probably never required since xtal-error-b can provide fudge factor)",
             "macro_name" : "LDL_PARAM_ADVANCE",
-            "value" : "0UL"
+            "value" : "0"
         },
         "xtal-error-a" : {
             "help" : "(error = (seconds * xtal-error-a * 2) + xtal-error-b) with 1us tick",
             "macro_name" : "LDL_PARAM_A",
-            "value" : "0UL"
+            "value" : "0"
         },
         "xtal-error-b" : {
             "help" : "(error = (seconds * xtal-error-a * 2) + xtal-error-b) with 1us tick",
             "macro_name" : "LDL_PARAM_B",
-            "value" : "4000UL"
+            "value" : "4000"
         },
-        "default-rate" : {
-            "help" : "The maximum data rate LDL will use",
-            "macro_name" : "LDL_DEFAULT_RATE",
+        "disable-sf12" : {
+            "help" : "Ensure MAC doesn't use SF12 on inadequate hardware",
+            "macro_name" : "LDL_DISABLE_SF12",
             "value" : 1
         },
         "enable-verbose-debug" : {
@@ -68,10 +70,10 @@
             "macro_name" : "LDL_ENABLE_RADIO_DEBUG",
             "value" : null
         },
-
-        "disable-point-one" : {
-            "macro_name" : "LDL_DISABLE_POINTONE",
-            "value" : null
+        "l2-version" : {
+            "help" : "Choose L2 version",
+            "macro_name" : "LDL_L2_VERSION",
+            "value" : "LDL_L2_VERSION_1_1"
         }
 
 

@@ -1,81 +1,68 @@
+require 'forwardable'
+
 module LDL
 
   class Device
 
+    extend Forwardable
+
     include LoggerMethods
 
-    attr_reader :mac, :sm, :radio, :scenario, :name
+    attr_reader :mac, :sm, :radio
 
-    def broker
-      scenario.broker
-    end
+    def_delegators :@mac,
+      :dev_eui,
+      :join_eui,
+      :otaa,
+      :unconfirmed,
+      :confirmed,
+      :ready,
+      :joined,
+      :forget,
+      :power,
+      :power=,
+      :rate,
+      :rate=,
+      :op,
+      :state,
+      :max_dcycle,
+      :max_dcycle=,
+      :name,
+      :start,
+      :stop,
+      :entropy,
+      :region,
+      :adr=,
+      :adr,
+      :unlimited_duty_cycle=,
+      :on_rx,
+      :on_device_time,
+      :on_link_status,
+      :dev_addr,
+      :net_id,
+      :join_nonce
 
-    def initialize(scenario, **opts)
+    def_delegators :@sm,
+      :nwk_key,
+      :app_key,
+      :keys
 
-      @running = false
-      @scenario = scenario
+    def_delegators :@radio,
+      :reliability=,
+      :rx_log,
+      :tx_log
 
-      @radio =  Radio.new(scenario, **opts)
-      @sm = SM.new(scenario, **opts)
-      @mac = MAC.new(scenario, sm, radio, **opts)
+    def initialize(broker, clock, **opts)
 
-      @name = opts[:name]||mac.dev_eui.to_s("")
+      opts[:dev_eui] ||= SecureRandom.bytes(8)
+      opts[:join_eui] ||= SecureRandom.bytes(8)
+      opts[:nwk_key] ||= SecureRandom.bytes(16)
+      opts[:app_key] ||= SecureRandom.bytes(16)
 
-      @log_header = "DEVICE(#{name})"
+      @radio =  Radio.new(broker, clock, **opts)
+      @sm = SM.new(broker, clock, **opts)
+      @mac = MAC.new(broker, clock, sm, radio, **opts)
 
-      @worker = Thread.new do
-
-        broker.publish({:eui => dev_eui}, "up")
-
-        begin
-
-          # wait for stack to become ready
-          loop do
-            break if @mac.ready
-            @scenario.clock.wait 1000000
-          end
-
-          yield(self) if block_given?
-
-        rescue Interrupt
-        rescue => e
-          log_error e
-          raise
-        end
-
-        broker.publish({:eui => dev_eui}, "down")
-
-      end
-
-    end
-
-    def dev_eui
-      mac.send __method__
-    end
-
-    def join_eui
-      mac.send __method__
-    end
-
-    def running?
-      @running
-    end
-
-    def start
-      if not running?
-        @worker.run
-        @running = true
-      end
-      self
-    end
-
-    def stop
-      if running?
-        @worker.raise Interrupt
-        @worker.join
-        @running = false
-      end
-      self
     end
 
   end

@@ -8,12 +8,16 @@
 
 static VALUE cSM;
 static VALUE cKey;
+static VALUE cSecureRandom;
 
 static VALUE initialize(int argc, VALUE *argv, VALUE self);
 static VALUE alloc_state(VALUE klass);
 
 static VALUE get_keys(VALUE self);
 static VALUE key_desc_to_sym(enum ldl_sm_key key);
+
+static VALUE get_app_key(VALUE self);
+static VALUE get_nwk_key(VALUE self);
 
 static void updateSessionKey(struct ldl_sm *self, enum ldl_sm_key keyDesc, enum ldl_sm_key rootDesc, const void *iv);
 static void beginUpdateSessionKey(struct ldl_sm *self);
@@ -35,7 +39,10 @@ const struct ldl_sm_interface ext_sm_interface = {
 
 void ext_sm_init(void)
 {
-    rb_require("ldl/key.rb");
+    rb_require("ldl/key");
+    rb_require("securerandom");
+
+    cSecureRandom = rb_const_get(rb_cObject, rb_intern("SecureRandom"));
 
     cSM = rb_define_class_under(cLDL, "SM", rb_cObject);
 
@@ -46,40 +53,55 @@ void ext_sm_init(void)
     rb_define_method(cSM, "initialize", initialize, -1);
 
     rb_define_method(cSM, "keys", get_keys, 0);
+    rb_define_method(cSM, "nwk_key", get_nwk_key, 0);
+    rb_define_method(cSM, "app_key", get_app_key, 0);
 }
 
 /* static functions ***************************************************/
 
 static VALUE initialize(int argc, VALUE *argv, VALUE self)
 {
-    static const char key[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-
     struct ldl_sm *sm;
 
-    VALUE scenario;
+    VALUE broker;
+    VALUE clock;
     VALUE options;
 
     VALUE app_key;
     VALUE nwk_key;
 
-    VALUE default_key = rb_str_new(key, sizeof(key));
-
     Data_Get_Struct(self, struct ldl_sm, sm);
 
-    (void)rb_scan_args(argc, argv, "10:", &scenario, &options);
+    (void)rb_scan_args(argc, argv, "20:", &broker, &clock, &options);
 
     options = (options == Qnil) ? rb_hash_new() : options;
 
     app_key = rb_hash_aref(options, ID2SYM(rb_intern("app_key")));
     nwk_key = rb_hash_aref(options, ID2SYM(rb_intern("nwk_key")));
 
-    app_key = rb_funcall(cKey, rb_intern("new"), 1, (app_key != Qnil) ? app_key : default_key);
-    nwk_key = rb_funcall(cKey, rb_intern("new"), 1, (nwk_key != Qnil) ? nwk_key : default_key);
+    if(app_key == Qnil){
 
-    LDL_SM_init(sm,
-        RSTRING_PTR(rb_funcall(app_key, rb_intern("bytes"), 0)),
-        RSTRING_PTR(rb_funcall(nwk_key, rb_intern("bytes"), 0))
-    );
+        app_key = rb_funcall(cSecureRandom, rb_intern("bytes"), 1, INT2NUM(16));
+    }
+    else{
+
+        app_key = rb_funcall(rb_funcall(cKey, rb_intern("new"), 1, app_key), rb_intern("bytes"), 0);
+
+    }
+
+    if(nwk_key == Qnil){
+
+        nwk_key = rb_funcall(cSecureRandom, rb_intern("bytes"), 1, INT2NUM(16));
+    }
+    else{
+
+        nwk_key = rb_funcall(rb_funcall(cKey, rb_intern("new"), 1, nwk_key), rb_intern("bytes"), 0);
+    }
+
+    rb_iv_set(self, "@nwk_key", nwk_key);
+    rb_iv_set(self, "@app_key", app_key);
+
+    LDL_SM_init(sm, RSTRING_PTR(app_key), RSTRING_PTR(nwk_key));
 
     return self;
 }
@@ -184,4 +206,14 @@ static VALUE key_desc_to_sym(enum ldl_sm_key key)
     case LDL_SM_KEY_NWK:
         return ID2SYM(rb_intern("nwk"));
     }
+}
+
+static VALUE get_nwk_key(VALUE self)
+{
+    return rb_iv_get(self, "@nwk_key");
+}
+
+static VALUE get_app_key(VALUE self)
+{
+    return rb_iv_get(self, "@app_key");
 }

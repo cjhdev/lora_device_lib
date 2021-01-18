@@ -1,8 +1,12 @@
 require 'ldl/composite_logger'
 require 'ldl/logger_methods'
 
+require 'small_event'
+require 'timeout_queue'
+
+include SmallEvent
+
 require 'ldl/eui'
-require 'ldl/broker'
 require 'ldl/key'
 
 require 'ldl/radio_model'

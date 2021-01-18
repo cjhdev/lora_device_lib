@@ -29,7 +29,10 @@
 
 #include "sx1272.h"
 #include "sx1276.h"
-#include "cmwx1zzabz.h"
+#include "sx126x.h"
+#include "hw/cmwx1zzabz.h"
+#include "hw/sx1272mb2xas.h"
+#include "hw/sx126xmb2xas.h"
 #include "sm.h"
 #include "store.h"
 
@@ -54,9 +57,7 @@ namespace LDL {
             Store& store;
             LowPowerTimer timer;
 
-            Callback<void(unsigned int)> entropy_cb;
             Callback<void(enum ldl_mac_response_type, const union ldl_mac_response_arg *)> event_cb;
-            Callback<void(uint8_t, const void *, uint8_t)> data_cb;
 
             static MAC *to_obj(void *ptr);
 
@@ -69,9 +70,9 @@ namespace LDL {
         public:
 
             /* called by radio in ISR */
-            void handle_radio_event(enum ldl_radio_event event);
+            void handle_radio_event();
 
-            MAC(Store& store, SM& sm, Radio& radio);
+            MAC(Store& store, SM& sm, LDL::Radio& radio);
 
             bool start(enum ldl_region region);
 
@@ -81,6 +82,9 @@ namespace LDL {
             enum ldl_mac_status otaa();
 
             void forget();
+            void cancel();
+
+            enum ldl_mac_status entropy();
 
             enum ldl_mac_status set_rate(uint8_t value);
             uint8_t get_rate();
@@ -104,16 +108,6 @@ namespace LDL {
             void set_event_cb(Callback<void(enum ldl_mac_response_type, const union ldl_mac_response_arg *)> cb)
             {
                 event_cb = cb;
-            }
-
-            void set_entropy_cb(Callback<void(unsigned int)> cb)
-            {
-                entropy_cb = cb;
-            }
-
-            void set_data_cb(Callback<void(uint8_t, const void *, uint8_t)> cb)
-            {
-                data_cb = cb;
             }
     };
 

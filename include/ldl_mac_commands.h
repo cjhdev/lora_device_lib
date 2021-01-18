@@ -135,9 +135,7 @@ struct ldl_rx_timing_setup_req {
 
 struct ldl_tx_param_setup_req {
 
-    bool downlinkDwell;
-    bool uplinkDwell;
-    uint8_t maxEIRP;
+    uint8_t value;
 };
 
 struct ldl_rekey_ind {
@@ -228,7 +226,7 @@ struct ldl_downstream_cmd {
         struct ldl_new_channel_req newChannel;
         struct ldl_dl_channel_req dlChannel;
         struct ldl_rx_timing_setup_req rxTimingSetup;
-        struct ldl_tx_param_setup_req txParamSetup;
+        uint8_t txParamSetup;
         struct ldl_rekey_conf rekey;
         struct ldl_adr_param_setup_req adrParamSetup;
         struct ldl_device_time_ans deviceTime;
@@ -287,7 +285,6 @@ void LDL_MAC_putDLChannelReq(struct ldl_stream *s, const struct ldl_dl_channel_r
 void LDL_MAC_putDLChannelAns(struct ldl_stream *s, const struct ldl_dl_channel_ans *value);
 void LDL_MAC_putRXTimingSetupReq(struct ldl_stream *s, const struct ldl_rx_timing_setup_req *value);
 void LDL_MAC_putRXTimingSetupAns(struct ldl_stream *s);
-void LDL_MAC_putTXParamSetupReq(struct ldl_stream *s, const struct ldl_tx_param_setup_req *value);
 void LDL_MAC_putTXParamSetupAns(struct ldl_stream *s);
 void LDL_MAC_putRekeyInd(struct ldl_stream *s, const struct ldl_rekey_ind *value);
 void LDL_MAC_putADRParamSetupAns(struct ldl_stream *s);

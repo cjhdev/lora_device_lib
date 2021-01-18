@@ -49,10 +49,10 @@ enum ldl_signal_bandwidth {
 };
 
 enum ldl_coding_rate {
-    CR_5 = 1,
-    CR_6,
-    CR_7,
-    CR_8,
+    LDL_CR_5 = 1,
+    LDL_CR_6,
+    LDL_CR_7,
+    LDL_CR_8,
 };
 
 /** @} */

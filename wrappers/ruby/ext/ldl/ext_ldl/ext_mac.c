@@ -12,6 +12,8 @@
 static VALUE cExtMAC;
 static VALUE cEUI;
 static VALUE cError;
+static VALUE cLoggerMethods;
+static VALUE cSecureRandom;
 
 static VALUE cErrNoChannel;
 static VALUE cErrTooLarge;
@@ -31,11 +33,12 @@ static void statusToException(enum ldl_mac_status status);
 static enum ldl_region symbol_to_region(VALUE symbol);
 
 static VALUE process(VALUE self);
+static VALUE entropy(VALUE self);
 static VALUE otaa(VALUE self);
 static VALUE forget(VALUE self);
 static VALUE unconfirmed(int argc, VALUE *argv, VALUE self);
 static VALUE confirmed(int argc, VALUE *argv, VALUE self);
-static VALUE radioEvent(VALUE self, VALUE ev);
+static VALUE radioEvent(VALUE self);
 static VALUE ticksUntilNextEvent(VALUE self);
 static VALUE setRate(VALUE self, VALUE rate);
 static VALUE getRate(VALUE self);
@@ -51,12 +54,13 @@ static VALUE joined(VALUE self);
 static VALUE getMaxDCycle(VALUE self);
 static VALUE setMaxDCycle(VALUE self, VALUE value);
 static VALUE ticks(VALUE self);
+static VALUE setUnlimitedDutyCycle(VALUE self, VALUE value);
+
+static VALUE get_region(VALUE self);
 
 static VALUE get_dev_eui(VALUE self);
 static VALUE get_join_eui(VALUE self);
 static VALUE get_name(VALUE self);
-
-static VALUE seconds_since_valid_downlink(VALUE self);
 
 static uint32_t system_ticks(void *app);
 static uint32_t system_rand(void *app);
@@ -66,14 +70,19 @@ static void response(void *receiver, enum ldl_mac_response_type type, const unio
 
 void ext_mac_init(void)
 {
-    rb_require("ldl/eui.rb");
-    rb_require("ldl/error.rb");
+    rb_require("ldl/eui");
+    rb_require("ldl/error");
+    rb_require("securerandom");
+
+    cSecureRandom = rb_const_get(rb_cObject, rb_intern("SecureRandom"));
 
     cExtMAC = rb_define_class_under(cLDL, "ExtMAC", rb_cObject);
 
     rb_define_alloc_func(cExtMAC, alloc_state);
 
-    rb_include_module(cExtMAC, rb_const_get(cLDL, rb_intern("LoggerMethods")));
+    cLoggerMethods = rb_const_get(cLDL, rb_intern("LoggerMethods"));
+
+    rb_include_module(cExtMAC, cLoggerMethods);
 
     rb_define_const(cExtMAC, "TICKS_PER_SECOND", UINT2NUM(TPS));
 
@@ -96,22 +105,25 @@ void ext_mac_init(void)
     rb_define_method(cExtMAC, "max_dcycle=", setMaxDCycle, 1);
     rb_define_method(cExtMAC, "max_dcycle", getMaxDCycle, 0);
 
+    rb_define_method(cExtMAC, "unlimited_duty_cycle=", setUnlimitedDutyCycle, 1);
+
     rb_define_method(cExtMAC, "dev_eui", get_dev_eui, 0);
     rb_define_method(cExtMAC, "join_eui", get_join_eui, 0);
     rb_define_method(cExtMAC, "name", get_name, 0);
 
+    rb_define_method(cExtMAC, "entropy", entropy, 0);
     rb_define_method(cExtMAC, "otaa", otaa, 0);
     rb_define_method(cExtMAC, "forget", forget, 0);
     rb_define_method(cExtMAC, "cancel", cancel, 0);
     rb_define_method(cExtMAC, "unconfirmed", unconfirmed, -1);
     rb_define_method(cExtMAC, "confirmed", confirmed, -1);
-    rb_define_method(cExtMAC, "radio_event", radioEvent, 1);
+    rb_define_method(cExtMAC, "radio_event", radioEvent, 0);
     rb_define_method(cExtMAC, "ticks_until_next_event", ticksUntilNextEvent, 0);
     rb_define_method(cExtMAC, "ready", ready, 0);
     rb_define_method(cExtMAC, "joined", joined, 0);
     rb_define_method(cExtMAC, "ticks", ticks, 0);
 
-    rb_define_method(cExtMAC, "seconds_since_valid_downlink", seconds_since_valid_downlink, 0);
+    rb_define_method(cExtMAC, "region", get_region, 0);
 
     cEUI = rb_const_get(cLDL, rb_intern("EUI"));
     cError = rb_const_get(cLDL, rb_intern("Error"));
@@ -159,8 +171,6 @@ static VALUE alloc_state(VALUE klass)
 
 static VALUE initialize(int argc, VALUE *argv, VALUE self)
 {
-    static const uint8_t eui[] = {0,0,0,0,0,0,0,0};
-
     struct ldl_mac *mac;
     struct ldl_mac_init_arg arg = {0};
 
@@ -172,32 +182,67 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
     VALUE join_eui;
     VALUE dev_eui;
     VALUE events;
-    VALUE scenario;
     VALUE dev_nonce;
-    VALUE default_eui = rb_str_new((char *)eui, sizeof(eui));
+    VALUE otaa_dither;
+    VALUE logger;
+    VALUE clock;
 
     Data_Get_Struct(self, struct ldl_mac, mac);
 
-    (void)rb_scan_args(argc, argv, "30:&", &scenario, &sm, &radio, &options, &events);
+    (void)rb_scan_args(argc, argv, "30:&", &clock, &sm, &radio, &options, &events);
 
     options = (options == Qnil) ? rb_hash_new() : options;
 
+    logger = rb_hash_aref(options, ID2SYM(rb_intern("logger")));
     join_eui = rb_hash_aref(options, ID2SYM(rb_intern("join_eui")));
     dev_eui = rb_hash_aref(options, ID2SYM(rb_intern("dev_eui")));
     region = rb_hash_aref(options, ID2SYM(rb_intern("region")));
 
+    otaa_dither = rb_hash_aref(options, ID2SYM(rb_intern("otaa_dither")));
+
     dev_nonce = rb_hash_aref(options, ID2SYM(rb_intern("dev_nonce")));
     dev_nonce = (dev_nonce == Qnil) ? UINT2NUM(0U) : dev_nonce;
 
-    join_eui = rb_funcall(cEUI, rb_intern("new"), 1, (join_eui != Qnil) ? join_eui : default_eui);
-    dev_eui = rb_funcall(cEUI, rb_intern("new"), 1, (dev_eui != Qnil) ? dev_eui : default_eui);
+    if(join_eui == Qnil){
+
+        join_eui = rb_funcall(cSecureRandom, rb_intern("bytes"), 1, INT2NUM(8));
+    }
+    else{
+
+        join_eui = rb_funcall(rb_funcall(cEUI, rb_intern("new"), 1, join_eui), rb_intern("bytes"), 0);
+    }
+
+    if(dev_eui == Qnil){
+
+        dev_eui = rb_funcall(cSecureRandom, rb_intern("bytes"), 1, INT2NUM(8));
+    }
+    else{
+
+        dev_eui = rb_funcall(rb_funcall(cEUI, rb_intern("new"), 1, dev_eui), rb_intern("bytes"), 0);
+    }
 
     name = rb_hash_aref(options, ID2SYM(rb_intern("name")));
-    name = (name == Qnil) ? rb_funcall(dev_eui, rb_intern("to_s"), 1, rb_str_new2("")) : name;
+
+    if(name == Qnil){
+
+        name = rb_funcall(rb_funcall(cEUI, rb_intern("new"), 1, dev_eui), rb_intern("to_s"), 1, rb_str_new2(""));
+    }
+
+    if(logger == Qnil){
+
+        logger = rb_const_get(cLoggerMethods, rb_intern("NULL_LOGGER"));
+    }
+
+    if(region == Qnil){
+
+
+        region = ID2SYM(rb_intern("EU_863_870"));
+    }
 
     rb_iv_set(self, "@radio", radio);
     rb_iv_set(self, "@sm", sm);
-    rb_iv_set(self, "@scenario", scenario);
+    rb_iv_set(self, "@logger", logger);
+    rb_iv_set(self, "@clock", clock);
     rb_iv_set(self, "@join_eui", join_eui);
     rb_iv_set(self, "@dev_eui", dev_eui);
     rb_iv_set(self, "@dev_nonce", dev_nonce);
@@ -205,6 +250,7 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
     rb_iv_set(self, "@events", events);
     rb_iv_set(self, "@name", name);
     rb_iv_set(self, "@log_header", name);
+    rb_iv_set(self, "@region", region);
 
     arg.ticks = system_ticks;
     arg.rand = system_rand;
@@ -218,9 +264,19 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
     arg.sm = (struct ldl_sm *)sm;
     arg.sm_interface = &ext_sm_interface;
 
-    arg.joinEUI = RSTRING_PTR(rb_funcall(join_eui, rb_intern("bytes"), 0));
-    arg.devEUI = RSTRING_PTR(rb_funcall(dev_eui, rb_intern("bytes"), 0));
+    arg.joinEUI = RSTRING_PTR(join_eui);
+    arg.devEUI = RSTRING_PTR(dev_eui);
     arg.devNonce = (uint16_t)NUM2UINT(dev_nonce);
+
+
+    if(otaa_dither != Qnil){
+
+        arg.otaaDither = (uint32_t)NUM2UINT(otaa_dither);
+    }
+    else{
+
+        arg.otaaDither = 30;
+    }
 
     LDL_MAC_init(mac, symbol_to_region(region), &arg);
 
@@ -345,6 +401,9 @@ static void statusToException(enum ldl_mac_status status)
     case LDL_STATUS_NOTJOINED:
         rb_raise(cErrNotJoined, "MAC must be joined");
         break;
+    case LDL_STATUS_JOINED:
+        rb_raise(cErrNotJoined, "MAC must not be joined");
+        break;
     case LDL_STATUS_POWER:
         rb_raise(cErrPower, "invalid power setting");
         break;
@@ -352,6 +411,19 @@ static void statusToException(enum ldl_mac_status status)
         rb_raise(cErrMACPriority, "MAC commands prioritised (try again)");
         break;
     }
+}
+
+static VALUE entropy(VALUE self)
+{
+    enum ldl_mac_status retval;
+    struct ldl_mac *this;
+    Data_Get_Struct(self, struct ldl_mac, this);
+
+    retval = LDL_MAC_entropy(this);
+
+    statusToException(retval);
+
+    return self;
 }
 
 static VALUE otaa(VALUE self)
@@ -390,20 +462,23 @@ static VALUE cancel(VALUE self)
 static VALUE unconfirmed(int argc, VALUE *argv, VALUE self)
 {
     enum ldl_mac_status retval;
-    VALUE port, data, options, check, nbTrans, dither, getTime;
+    VALUE port, data, options, check, nbTrans, getTime;
     struct ldl_mac_data_opts opts;
     struct ldl_mac *this;
     Data_Get_Struct(self, struct ldl_mac, this);
 
-    const void *ptr;
-    uint8_t len;
+    const void *ptr = NULL;
+    uint8_t len = 0U;
 
     (void)memset(&opts, 0, sizeof(opts));
 
     (void)rb_scan_args(argc, argv, "20:", &port, &data, &options);
 
-    ptr = RSTRING_PTR(data);
-    len = RSTRING_LEN(data);
+    if(data != Qnil){
+
+        ptr = RSTRING_PTR(data);
+        len = RSTRING_LEN(data);
+    }
 
     if(options == Qnil){
 
@@ -412,10 +487,8 @@ static VALUE unconfirmed(int argc, VALUE *argv, VALUE self)
 
     check = rb_hash_aref(options, ID2SYM(rb_intern("check")));
     nbTrans = rb_hash_aref(options, ID2SYM(rb_intern("nbTrans")));
-    dither = rb_hash_aref(options, ID2SYM(rb_intern("dither")));
     getTime = rb_hash_aref(options, ID2SYM(rb_intern("time")));
 
-    opts.dither = (dither != Qnil) ? NUM2UINT(dither) : 0U;
     opts.nbTrans = (nbTrans != Qnil) ? NUM2UINT(nbTrans) : 0U;
     opts.check = (check == Qtrue);
     opts.getTime = (getTime == Qtrue);
@@ -430,18 +503,23 @@ static VALUE unconfirmed(int argc, VALUE *argv, VALUE self)
 static VALUE confirmed(int argc, VALUE *argv, VALUE self)
 {
     enum ldl_mac_status retval;
-    VALUE port, data, options, check, nbTrans, dither;
+    VALUE port, data, options, check, nbTrans, getTime;
     struct ldl_mac_data_opts opts;
     struct ldl_mac *this;
     Data_Get_Struct(self, struct ldl_mac, this);
 
-    const void *ptr;
-    uint8_t len;
+    const void *ptr = NULL;
+    uint8_t len = 0U;
+
+    (void)memset(&opts, 0, sizeof(opts));
 
     (void)rb_scan_args(argc, argv, "20:", &port, &data, &options);
 
-    ptr = RSTRING_PTR(data);
-    len = RSTRING_LEN(data);
+    if(data != Qnil){
+
+        ptr = RSTRING_PTR(data);
+        len = RSTRING_LEN(data);
+    }
 
     if(options == Qnil){
 
@@ -450,11 +528,11 @@ static VALUE confirmed(int argc, VALUE *argv, VALUE self)
 
     check = rb_hash_aref(options, ID2SYM(rb_intern("check")));
     nbTrans = rb_hash_aref(options, ID2SYM(rb_intern("nbTrans")));
-    dither = rb_hash_aref(options, ID2SYM(rb_intern("dither")));
+    getTime = rb_hash_aref(options, ID2SYM(rb_intern("time")));
 
-    opts.dither = (dither != Qnil) ? NUM2UINT(dither) : 0U;
     opts.nbTrans = (nbTrans != Qnil) ? NUM2UINT(nbTrans) : 0U;
     opts.check = (check == Qtrue);
+    opts.getTime = (getTime == Qtrue);
 
     retval = LDL_MAC_confirmedData(this, NUM2UINT(port), ptr, len, &opts);
 
@@ -487,11 +565,15 @@ static void response(void *receiver, enum ldl_mac_response_type type, const unio
     VALUE event = Qnil;
 
     switch(type){
+    case LDL_MAC_CHANNEL_READY:
+        event = ID2SYM(rb_intern("channel_ready"));
+        break;
     case LDL_MAC_JOIN_COMPLETE:
         event = ID2SYM(rb_intern("join_complete"));
-        break;
-    case LDL_MAC_JOIN_TIMEOUT:
-        event = ID2SYM(rb_intern("join_timeout"));
+        rb_hash_aset(param, ID2SYM(rb_intern("dev_addr")), UINT2NUM(arg->join_complete.devAddr));
+        rb_hash_aset(param, ID2SYM(rb_intern("join_nonce")), UINT2NUM(arg->join_complete.joinNonce));
+        rb_hash_aset(param, ID2SYM(rb_intern("net_id")), UINT2NUM(arg->join_complete.netID));
+        rb_hash_aset(param, ID2SYM(rb_intern("next_dev_nonce")), UINT2NUM(arg->join_complete.nextDevNonce));
         break;
     case LDL_MAC_DATA_COMPLETE:
         event = ID2SYM(rb_intern("data_complete"));
@@ -499,23 +581,25 @@ static void response(void *receiver, enum ldl_mac_response_type type, const unio
     case LDL_MAC_DATA_TIMEOUT:
         event = ID2SYM(rb_intern("data_timeout"));
         break;
-    case LDL_MAC_DATA_NAK:
-        event = ID2SYM(rb_intern("data_nack"));
+    case LDL_MAC_OP_ERROR:
+        event = ID2SYM(rb_intern("op_error"));
+        break;
+    case LDL_MAC_OP_CANCELLED:
+        event = ID2SYM(rb_intern("op_cancelled"));
         break;
     case LDL_MAC_RX:
         event = ID2SYM(rb_intern("rx"));
-        rb_hash_aset(param, ID2SYM(rb_intern("counter")), UINT2NUM(arg->rx.counter));
         rb_hash_aset(param, ID2SYM(rb_intern("port")), UINT2NUM(arg->rx.port));
         rb_hash_aset(param, ID2SYM(rb_intern("data")), rb_str_new((const char *)arg->rx.data, arg->rx.size));
         break;
-    case LDL_MAC_STARTUP:
-        event = ID2SYM(rb_intern("startup"));
-        rb_hash_aset(param, ID2SYM(rb_intern("entropy")), UINT2NUM(arg->startup.entropy));
+    case LDL_MAC_ENTROPY:
+        event = ID2SYM(rb_intern("entropy"));
+        rb_hash_aset(param, ID2SYM(rb_intern("value")), UINT2NUM(arg->entropy.value));
         break;
     case LDL_MAC_LINK_STATUS:
         event = ID2SYM(rb_intern("link_status"));
         rb_hash_aset(param, ID2SYM(rb_intern("gw_count")), UINT2NUM(arg->link_status.gwCount));
-        rb_hash_aset(param, ID2SYM(rb_intern("gw_margin")), UINT2NUM(arg->link_status.margin));
+        rb_hash_aset(param, ID2SYM(rb_intern("margin")), UINT2NUM(arg->link_status.margin));
         break;
     case LDL_MAC_SESSION_UPDATED:
         event = ID2SYM(rb_intern("session_updated"));
@@ -535,26 +619,12 @@ static void response(void *receiver, enum ldl_mac_response_type type, const unio
     }
 }
 
-static VALUE radioEvent(VALUE self, VALUE ev)
+static VALUE radioEvent(VALUE self)
 {
     struct ldl_mac *this;
     Data_Get_Struct(self, struct ldl_mac, this);
-    size_t i;
 
-    VALUE signals[] = {
-        ID2SYM(rb_intern("tx_complete")),
-        ID2SYM(rb_intern("rx_ready")),
-        ID2SYM(rb_intern("rx_timeout"))
-    };
-
-    for(i=0U; i < sizeof(signals)/sizeof(*signals); i++){
-
-        if(ev == signals[i]){
-
-            LDL_MAC_radioEvent(this, i);
-            break;
-        }
-    }
+    LDL_MAC_radioEvent(this);
 
     return self;
 }
@@ -591,7 +661,7 @@ static VALUE joined(VALUE self)
 
 static VALUE ticks(VALUE self)
 {
-    return rb_funcall(rb_iv_get(self, "@scenario"), rb_intern("ticks"), 0);
+    return rb_funcall(rb_iv_get(self, "@clock"), rb_intern("ticks"), 0);
 }
 
 static uint32_t system_ticks(void *app)
@@ -675,13 +745,17 @@ static VALUE get_name(VALUE self)
     return rb_iv_get(self, "@name");
 }
 
-static VALUE seconds_since_valid_downlink(VALUE self)
+static VALUE get_region(VALUE self)
 {
-    uint32_t retval;
+    return rb_iv_get(self, "@region");
+}
+
+static VALUE setUnlimitedDutyCycle(VALUE self, VALUE value)
+{
     struct ldl_mac *this;
     Data_Get_Struct(self, struct ldl_mac, this);
 
-    retval = LDL_MAC_secondsSinceValidDownlink(this);
+    LDL_MAC_setUnlimitedDutyCycle(this, (value != Qfalse));
 
-    return (retval != INT32_MAX) ? UINT2NUM(retval) : Qnil;
+    return self;
 }

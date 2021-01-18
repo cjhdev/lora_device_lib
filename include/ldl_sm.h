@@ -28,6 +28,10 @@
 extern "C" {
 #endif
 
+/**@addtogroup ldl_tsm
+ * @{
+ * */
+
 #include "ldl_platform.h"
 #include "ldl_sm_internal.h"
 
@@ -42,23 +46,14 @@ struct ldl_key {
 
 /** default in-memory security module state */
 struct ldl_sm {
-#ifdef LDL_DISABLE_POINTONE
-    struct ldl_key keys[3U];
-#else
+#if defined(LDL_ENABLE_L2_1_1)
     struct ldl_key keys[8U];
+#else
+    struct ldl_key keys[3U];
 #endif
 };
 
-#ifdef LDL_DISABLE_POINTONE
-/**
- * Initialise Default Security Module with root key
- *
- * @param[in] self      #ldl_sm
- * @param[in] appKey    pointer to 16 byte field
- *
- * */
-void LDL_SM_init(struct ldl_sm *self, const void *appKey);
-#else
+#if defined(LDL_ENABLE_L2_1_1)
 /**
  * Initialise Default Security Module with root keys
  *
@@ -68,6 +63,15 @@ void LDL_SM_init(struct ldl_sm *self, const void *appKey);
  *
  * */
 void LDL_SM_init(struct ldl_sm *self, const void *appKey, const void *nwkKey);
+#else
+/**
+ * Initialise Default Security Module with root key
+ *
+ * @param[in] self      #ldl_sm
+ * @param[in] appKey    pointer to 16 byte field
+ *
+ * */
+void LDL_SM_init(struct ldl_sm *self, const void *appKey);
 #endif
 
 #ifdef __cplusplus

@@ -31,35 +31,38 @@ const struct ldl_radio_interface SPIRadio::_interface = {
     .read_buffer = SPIRadio::_read_buffer,
     .transmit = SPIRadio::_transmit,
     .receive = SPIRadio::_receive,
-    .get_xtal_delay = SPIRadio::_get_xtal_delay,
-    .receive_entropy = SPIRadio::_receive_entropy
+    .receive_entropy = SPIRadio::_receive_entropy,
+    .get_status = SPIRadio::_get_status
 };
 
 /* constructors *******************************************************/
 
 SPIRadio::SPIRadio(
     SPI& spi,
-    PinName nss
+    PinName nss,
+    PinName busy
 )
     :
     Radio(),
     spi(spi),
-    nss(nss, 1)
+    nss(nss, 1),
+    busy(busy)
 {
+    timer.start();
 }
 
 /* static protected ***************************************************/
 
-void
-SPIRadio::_chip_write(void *self, uint8_t opcode, const void *data, uint8_t size)
+bool
+SPIRadio::_chip_write(void *self, const void *opcode, size_t opcode_size, const void *data, size_t size)
 {
-    static_cast<SPIRadio *>(self)->chip_write(opcode, data, size);
+    return static_cast<SPIRadio *>(self)->chip_write(opcode, opcode_size, data, size);
 }
 
-void
-SPIRadio::_chip_read(void *self, uint8_t opcode, void *data, uint8_t size)
+bool
+SPIRadio::_chip_read(void *self, const void *opcode, size_t opcode_size, void *data, size_t size)
 {
-    static_cast<SPIRadio *>(self)->chip_read(opcode, data, size);
+    return static_cast<SPIRadio *>(self)->chip_read(opcode, opcode_size, data, size);
 }
 
 SPIRadio *
@@ -93,18 +96,12 @@ SPIRadio::_receive(struct ldl_radio *self, const struct ldl_radio_rx_setting *se
 }
 
 void
-SPIRadio::_interrupt_handler(struct ldl_mac *self, enum ldl_radio_event event)
+SPIRadio::_interrupt_handler(struct ldl_mac *self)
 {
     if(to_radio(self)->event_cb){
 
-        to_radio(self)->event_cb(event);
+        to_radio(self)->event_cb();
     }
-}
-
-uint8_t
-SPIRadio::_get_xtal_delay(struct ldl_radio *self)
-{
-    return to_radio(self)->get_xtal_delay();
 }
 
 void
@@ -118,6 +115,13 @@ SPIRadio::_receive_entropy(struct ldl_radio *self)
 {
     to_radio(self)->receive_entropy();
 }
+
+void
+SPIRadio::_get_status(struct ldl_radio *self, struct ldl_radio_status *status)
+{
+    to_radio(self)->get_status(status);
+}
+
 
 /* protected **********************************************************/
 
@@ -138,28 +142,72 @@ SPIRadio::chip_select(bool state)
     }
 }
 
-void
-SPIRadio::chip_write(uint8_t opcode, const void *data, uint8_t size)
+bool
+SPIRadio::chip_write(const void *opcode, size_t opcode_size, const void *data, size_t size)
 {
+    bool retval = false;
+
+    timer.reset();
+
     chip_select(true);
 
-    spi.write(opcode);
+    while(!retval){
 
-    spi.write((const char *)data, size, nullptr, 0);
+        if(!busy || (busy.read() == 0)){
+
+            spi.write((const char *)opcode, opcode_size, nullptr, 0);
+
+            spi.write((const char *)data, size, nullptr, 0);
+
+            retval = true;
+        }
+        else if(timer.elapsed_time() > 1s){
+
+            break;
+        }
+        else{
+
+            /* loop */
+        }
+    }
 
     chip_select(false);
+
+    return retval;
 }
 
-void
-SPIRadio::chip_read(uint8_t opcode, void *data, uint8_t size)
+bool
+SPIRadio::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
 {
+    bool retval = false;
+
+    timer.reset();
+
     chip_select(true);
 
-    spi.write(opcode);
+    while(!retval){
 
-    spi.write(nullptr, 0, (char *)data, size);
+        if(!busy || (busy.read() == 0)){
+
+            spi.write((const char *)opcode, opcode_size, nullptr, 0);
+
+            spi.write(nullptr, 0, (char *)data, size);
+
+            retval = true;
+        }
+        else if(timer.elapsed_time() > 1s){
+
+            break;
+        }
+        else{
+
+            /* loop */
+        }
+    }
 
     chip_select(false);
+
+    return retval;
 }
 
 /* public *************************************************************/
@@ -167,43 +215,43 @@ SPIRadio::chip_read(uint8_t opcode, void *data, uint8_t size)
 uint32_t
 SPIRadio::read_entropy()
 {
-    return LDL_Radio_readEntropy(&radio);
+    return internal_if->read_entropy(&radio);
 }
 
 uint8_t
 SPIRadio::read_buffer(struct ldl_radio_packet_metadata *meta, void *data, uint8_t max)
 {
-    return LDL_Radio_readBuffer(&radio, meta, data, max);
+    return internal_if->read_buffer(&radio, meta, data, max);
 }
 
 void
 SPIRadio::transmit(const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len)
 {
-    LDL_Radio_transmit(&radio, settings, data, len);
+    internal_if->transmit(&radio, settings, data, len);
 }
 
 void
 SPIRadio::receive(const struct ldl_radio_rx_setting *settings)
 {
-    LDL_Radio_receive(&radio, settings);
-}
-
-uint8_t
-SPIRadio::get_xtal_delay()
-{
-    return LDL_Radio_getXTALDelay(&radio);
+    internal_if->receive(&radio, settings);
 }
 
 void
 SPIRadio::receive_entropy()
 {
-    LDL_Radio_receiveEntropy(&radio);
+    internal_if->receive_entropy(&radio);
 }
 
 void
 SPIRadio::set_mode(enum ldl_radio_mode mode)
 {
-    LDL_Radio_setMode(&radio, mode);
+    internal_if->set_mode(&radio, mode);
+}
+
+void
+SPIRadio::get_status(struct ldl_radio_status *status)
+{
+    internal_if->get_status(&radio, status);
 }
 
 const struct ldl_radio_interface *

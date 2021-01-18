@@ -32,11 +32,14 @@ namespace LDL {
 
             SPI& spi;
             DigitalOut nss;
+            DigitalIn busy;
+            LowPowerTimer timer;
 
             struct ldl_radio radio;
+            const struct ldl_radio_interface *internal_if;
 
-            static void _chip_write(void *self, uint8_t opcode, const void *data, uint8_t size);
-            static void _chip_read(void *self, uint8_t opcode, void *data, uint8_t size);
+            static bool _chip_write(void *self, const void *opcode, size_t opcode_size, const void *data, size_t size);
+            static bool _chip_read(void *self, const void *opcode, size_t opcode_size, void *data, size_t size);
 
             static SPIRadio * to_radio(void *self);
 
@@ -44,15 +47,15 @@ namespace LDL {
             static uint8_t _read_buffer(struct ldl_radio *self, struct ldl_radio_packet_metadata *meta, void *data, uint8_t max);
             static void _transmit(struct ldl_radio *self, const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);
             static void _receive(struct ldl_radio *self, const struct ldl_radio_rx_setting *settings);
-            static void _interrupt_handler(struct ldl_mac *self, enum ldl_radio_event event);
-            static uint8_t _get_xtal_delay(struct ldl_radio *self);
+            static void _interrupt_handler(struct ldl_mac *self);
             static void _set_mode(struct ldl_radio *self, enum ldl_radio_mode mode);
             static void _receive_entropy(struct ldl_radio *self);
+            static void _get_status(struct ldl_radio *self, struct ldl_radio_status *status);
 
             void chip_select(bool state);
 
-            void chip_write(uint8_t opcode, const void *data, uint8_t size);
-            void chip_read(uint8_t opcode, void *data, uint8_t size);
+            bool chip_write(const void *opcode, size_t opcode_size, const void *data, size_t size);
+            bool chip_read(const void *opcode, size_t opcode_size, void *data, size_t size);
 
         public:
 
@@ -60,17 +63,18 @@ namespace LDL {
 
             SPIRadio(
                 SPI& spi,
-                PinName nss
+                PinName nss,
+                PinName busy
             );
 
             uint32_t read_entropy();
             uint8_t read_buffer(struct ldl_radio_packet_metadata *meta, void *data, uint8_t max);
             void transmit(const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);
             void receive(const struct ldl_radio_rx_setting *settings);
-            void interrupt_handler(enum ldl_radio_event event);
-            uint8_t get_xtal_delay();
+            void interrupt_handler();
             void set_mode(enum ldl_radio_mode mode);
             void receive_entropy();
+            void get_status(struct ldl_radio_status *status);
 
             const struct ldl_radio_interface *get_interface();
     };

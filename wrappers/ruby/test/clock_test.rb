@@ -2,122 +2,72 @@ require 'minitest/autorun'
 require 'ldl'
 require 'timeout'
 
-class TestClock < Minitest::Test
+describe "ClockTest" do
 
-    include LDL
+  let(:clock){ LDL::Clock.new }
+  let(:q){ Queue.new }
 
-    def setup
-      @scenario = Scenario.new
-      Thread.abort_on_exception = true
-    end
+  before do
+    Thread.abort_on_exception = true
+    clock.start
+  end
 
-    def clock
-      @scenario.clock
-    end
+  after do
+    clock.stop
+    Thread.abort_on_exception = false
+  end
 
-    def test_wait
+  it "can wait" do
+    Timeout::timeout(1){ clock.wait 500000 }
+  end
 
-      Timeout::timeout 1 do
-        clock.wait 500000
-      end
+  it "can return ticks" do
+    clock.ticks
+  end
 
-    end
+  it "can execute on timeout" do
 
-    def test_time
+    clock.call_in(500000) { q.push nil }
 
-      clock.ticks
+    Timeout::timeout(1) { q.pop }
 
-    end
+  end
 
-    def test_on_timeout
+  it "can execute immediately" do
 
-        q = Queue.new
+    clock.call { q.push nil }
 
-        clock.on_timeout(500000) do
-            q.push nil
-        end
+    Timeout::timeout(1) { q.pop }
 
-        Timeout::timeout 1 do
-            q.pop
-        end
+  end
 
-    end
+  it "can execute multiple timeouts in correct order" do
 
-    def test_zero_on_timeout
+    clock.call do
 
-      q = Queue.new
-
-      clock.on_timeout(0) do
-        q.push nil
-      end
-
-      Timeout::timeout 1 do
-        q.pop
-      end
+      clock.call_in(100000) { q.push 1 }
+      clock.call_in(50000) { q.push 0 }
+      clock.call_in(200000) { q.push 3 }
+      clock.call_in(150000) { q.push 2 }
 
     end
 
-    def test_zero_short_timeout
+    result = []
 
-      q = Queue.new
-
-      clock.on_timeout(42) do
-        q.push nil
-      end
-
-      Timeout::timeout 1 do
-        q.pop
-      end
-
+    Timeout::timeout 1 do
+      result << q.pop
+      result << q.pop
+      result << q.pop
+      result << q.pop
     end
 
-    def test_multiple_on_timeout
+    iter = result.each
 
-        q = Queue.new
+    assert_equal 0, iter.next
+    assert_equal 1, iter.next
+    assert_equal 2, iter.next
+    assert_equal 3, iter.next
 
-        clock.on_timeout 0 do
-
-            clock.on_timeout 50000 do
-              q.push 0
-            end
-
-            clock.on_timeout 100000 do
-              q.push 1
-            end
-
-            clock.on_timeout 150000 do
-              q.push 2
-            end
-
-            clock.on_timeout 200000 do
-              q.push 3
-            end
-
-        end
-
-        result = []
-
-        Timeout::timeout 1 do
-            result << q.pop
-            result << q.pop
-            result << q.pop
-            result << q.pop
-        end
-
-        iter = result.each
-
-        assert_equal 0, iter.next
-        assert_equal 1, iter.next
-        assert_equal 2, iter.next
-        assert_equal 3, iter.next
-
-
-    end
-
-    def teardown
-        clock.clear
-        Thread.abort_on_exception = false
-    end
-
+  end
 
 end

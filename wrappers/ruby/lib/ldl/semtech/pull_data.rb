@@ -2,7 +2,7 @@ module LDL::Semtech
 
   class PullData < Message
 
-    @type = 2
+    @type = PULL_DATA
 
     def self.decode(msg)
 

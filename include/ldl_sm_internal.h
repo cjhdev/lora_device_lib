@@ -26,9 +26,6 @@
 
 /**
  * @defgroup ldl_tsm Security Module
- * @ingroup ldl
- *
- * # Security Module Interface
  *
  * LDL depends on the interfaces in this group for performing cryptographic operations.
  *
@@ -80,14 +77,14 @@ struct ldl_sm_interface {
  *
  *      // ...
  *
- *      .sm_interface = LDL_SM_interface
+ *      .sm_interface = LDL_SM_getInterface()
  *
  *      // ...
  * };
  * @endcode
  *
  * */
-extern const struct ldl_sm_interface LDL_SM_interface;
+const struct ldl_sm_interface *LDL_SM_getInterface(void);
 
 /** Update a session key and save the result in the key store
  *

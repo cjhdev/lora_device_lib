@@ -5,6 +5,93 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
+## 0.5.0
+
+This release introduces breaking changes for those updating from 0.4.6 and earlier.
+Read the porting notes section below if this affects you.
+
+### new features
+
+- added SX1261 and SX1262 radio drivers
+- added LDL_MAC_CHANNEL_READY event to indicate when subbands become ready
+- added LDL_MAC_OP_ERROR event to indicate when a radio error causes requested operation to fail
+- added LDL_MAC_entropy() for applications to read radio entropy if it is required
+- added blocking interfaces to ruby wrapper for otaa, confirmed, unconfirmed, entropy
+- added radio model and feature for dropping frames to Ruby wrapper
+- added Readthedocs integration
+- added unlimited duty cycle test mode
+- added max EIRP limiting and dwell time control for regions that require it
+
+### changes
+
+- changed ldl_chip_write_fn and ldl_chip_read_fn to support SX126X as well as older SX127X
+- updated chip interface documentation and examples
+- changed LDL_MAC_radioEvent interface so that radio driver no longer indicates a specific event (required for SX126X)
+- added LDL_Radio_getEvent() which is used to read the specific event from the radio
+- removed LDL_MAC_DATA_NAK event since it is not useful to the application
+- changed next band timing feature to reduce spurious wakeups for sleepy devices
+- changed confirmed data retry to use an exponential back-off (previously used OTAA retry algorithm)
+- changed OTAA retry algorithm to make use of the LDL_BAND_GLOBAL down-counter instead of a dedicated down-counter
+- changed MAC startup behavior so that radio entropy is no longer read automatically
+- removed send time dither option from LDL_MAC_unconfirmedData() and LDL_MAC_confirmedData()
+- changed OTAA dither time to be configurable at run-time or compile-time
+- changed US/AU OTAA to scan all sub-bands before increasing spreading factor
+- changed channel selection code to use rate setting as desired rate rather than actual rate
+- change MBED LDL::MAC so that duty cycle limit is no longer applied by default
+- changed LDL_MAC_init() so that ldl_mac_init_arg.radio_interface must be defined (do not leave NULL!)
+- changed LDL_MAC_init() so that ldl_mac_init_arg.sm_interface must be defined (do not leave NULL!)
+- removed LDL_Radio_init()
+- added specialised radio init functions: LDL_SX1272_init(), LDL_SX1276_init(), LDL_SX1261_init(), LDL_SX1262_init()
+- removed non-essential "toString" functions
+- removed LDL_DEFAULT_RATE option (prints error if defined)
+- added LDL_DISABLE_SF12 option
+- added LDL_DISABLE_LINK_CHECK option to alias LDL_DISABLE_CHECK (prints warning if LDL_DISABLE_CHECK defined)
+- added LDL_DISABLE_TX_PARAM_SETUP option
+- changed LDL_MAC_cancel() behaviour so that radio is always reset when this function is called
+
+### bugs
+
+- fixed bug where cflist didn't apply channel mask for US/AU regions
+- fixed bug where duty-cycle off-time was registered before TX meaning off-time was always slightly shorter than
+  it should be, especially for large spreading factors
+
+### Porting From 0.4.6
+
+Changes to the chip interfaces were necessary to support both SX126x and SX127x types.
+
+- "opcode" is changed from a single byte to a variable byte buffer
+- the read/write functions now return true if they were successful or false if they fail
+- SX127x drivers never fail at chip interface and always always return true
+- SX126x drivers can fail at chip interface waiting for the busy line to clear
+- refer to chip interface example code
+
+MAC no longer reads random from radio on startup. Random must now be requested
+using LDL_MAC_entropy() and read from the LDL_MAC_ENTROPY event.
+
+The LDL_MAC_ENTROPY event has been added, the LDL_STARTUP event has been removed.
+
+All MAC interfaces can now be used regardless of the reset state of the radio driver.
+
+The struct ldl_mac_data_opts no longer has a member for timing dither.
+
+ldl_mac_init_arg.radio_interface and ldl_mac_init_arg.sm_interface MUST be defined
+for LDL_MAC_init() to be successful. Assertions will remind you if you forget, hence
+it is recommneded to have these on at least for development.
+This change necessary to ensure that unused code can be removed by the linker.
+
+The radio driver must now be initialised using a specialised init function
+for the driver you are initialising:
+
+- LDL_SX1272_init()
+- LDL_SX1276_init()
+- LDL_SX1261_init()
+- LDL_SX1262_init()
+
+LDL_Radio_init() has been removed.
+
+LDL_DEFAULT_RATE build option has been removed. It has been replaced by
+LDL_DISABLE_SF12.
+
 ## 0.4.6
 
 - added Ruby wrapper and example

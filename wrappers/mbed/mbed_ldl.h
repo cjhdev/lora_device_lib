@@ -23,6 +23,6 @@
 #define MBED_LDL_H
 
 #include "mac.h"
-#include "big_device.h"
+#include "_device.h"
 
 #endif

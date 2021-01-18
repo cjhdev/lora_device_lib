@@ -37,19 +37,19 @@ const struct ldl_sm_interface SM::interface = {
 
 DefaultSM::DefaultSM(const void *app_key)
 {
-#ifdef LDL_DISABLE_POINTONE
-    LDL_SM_init(&state, app_key);
-#else
+#if defined(LDL_ENABLE_L2_1_1)
     LDL_SM_init(&state, app_key, app_key);
+#else
+    LDL_SM_init(&state, app_key);
 #endif
 }
 
 DefaultSM::DefaultSM(const void *app_key, const void *nwk_key)
 {
-#ifdef LDL_DISABLE_POINTONE
-    LDL_SM_init(&state, nwk_key);
-#else
+#if defined(LDL_ENABLE_L2_1_1)
     LDL_SM_init(&state, app_key, app_key);
+#else
+    LDL_SM_init(&state, nwk_key);
 #endif
 }
 
