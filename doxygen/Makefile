@@ -12,7 +12,6 @@ UMLS := $(notdir $(wildcard *.uml))
 
 all: clean
 	LDL_VERSION=$(VERSION) doxygen
-	rm -f html/*.js
 
 uml: $(UMLS:.uml=.png)
 
