@@ -1,5 +1,5 @@
 module LDL
 
-  VERSION = '0.0.1'.freeze
-    
+  VERSION = File.read(File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "..", "..", "version"))).strip.freeze
+
 end
