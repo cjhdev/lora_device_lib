@@ -17,7 +17,7 @@ Gem::Specification.new do |s|
   s.files += Dir.glob("#{root_dir}/ext/**/*.{c,h,rb}") + Dir.glob("#{root_dir}/lib/**/*.rb")
   s.files += Dir.glob("#{root_dir}/lib/**/*.rb")
 
-  s.extensions = ["#{root_dir}/ext/ldl/ext_ldl/extconf.rb"]
+  s.extensions = ["wrappers/ruby/ext/ldl/ext_ldl/extconf.rb"]
 
   s.license = 'MIT'
 
