@@ -5,6 +5,16 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
+## 0.5.1
+
+- refactored examples/mbed to contain all mbed examples in subdirectories
+- refactored wrappers/mbed to adhere to one class per file
+- added one makefile for building all mbed examples in situ
+- added Dockerfile for setting up mbed-cli environment
+- changed documentation generator to include missing resources causing some page load errors
+- changed Ruby wrapper so that gem version is read from version file
+- fixed path problem causing Ruby wrapper to not compile when installed via Bundler
+
 ## 0.5.0
 
 This release introduces breaking changes for those updating from 0.4.6 and earlier.
