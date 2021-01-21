@@ -1,4 +1,4 @@
-/* Copyright (c) 2020 Cameron Harper
+/* Copyright (c) 2021 Cameron Harper
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -23,6 +23,7 @@
 #define MBED_LDL_STORE_H
 
 #include <string.h>
+#include <stdint.h>
 
 namespace LDL {
 
@@ -78,64 +79,7 @@ namespace LDL {
              *
              * */
             virtual void save_session(const void *data, size_t size);
-
-    };
-
-    /** Stores all state in volatile memory.
-     *
-     * Suitable for demonstrations.
-     *
-     * */
-    class DefaultStore : public Store {
-
-        private:
-
-            const void *dev_eui;
-            const void *join_eui;
-
-            uint16_t next_dev_nonce;
-            uint32_t join_nonce;
-
-        public:
-
-            DefaultStore(const void *dev_eui, const void *join_eui) :
-                dev_eui(dev_eui),
-                join_eui(join_eui)
-            {
-                next_dev_nonce = 0xf1ff;
-            }
-
-            void get_init_params(struct init_params *params)
-            {
-                params->dev_nonce = next_dev_nonce;
-                params->join_nonce = join_nonce;
-                (void)memcpy(params->dev_eui, dev_eui, sizeof(params->dev_eui));
-                (void)memcpy(params->join_eui, join_eui, sizeof(params->join_eui));
-            }
-
-            size_t get_session(void *data, size_t max)
-            {
-                return 0U;
-            }
-
-            void save_join_accept(uint32_t join_nonce, uint16_t next_dev_nonce)
-            {
-                this->join_nonce = join_nonce;
-                this->next_dev_nonce = next_dev_nonce;
-            }
-
-            void save_session(const void *data, size_t size)
-            {
-            }
-
-            void reset()
-            {
-                next_dev_nonce = 0U;
-                join_nonce = 0U;
-            }
-
     };
 };
-
 
 #endif

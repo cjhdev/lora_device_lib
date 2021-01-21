@@ -27,13 +27,8 @@
 #include "ldl_mac.h"
 #include "ldl_system.h"
 
-#include "sx1272.h"
-#include "sx1276.h"
-#include "sx126x.h"
-#include "hw/cmwx1zzabz.h"
-#include "hw/sx1272mb2xas.h"
-#include "hw/sx126xmb2xas.h"
 #include "sm.h"
+#include "radio.h"
 #include "store.h"
 
 namespace LDL {

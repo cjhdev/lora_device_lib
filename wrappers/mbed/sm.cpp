@@ -34,25 +34,6 @@ const struct ldl_sm_interface SM::interface = {
 
 /* constructors *******************************************************/
 
-
-DefaultSM::DefaultSM(const void *app_key)
-{
-#if defined(LDL_ENABLE_L2_1_1)
-    LDL_SM_init(&state, app_key, app_key);
-#else
-    LDL_SM_init(&state, app_key);
-#endif
-}
-
-DefaultSM::DefaultSM(const void *app_key, const void *nwk_key)
-{
-#if defined(LDL_ENABLE_L2_1_1)
-    LDL_SM_init(&state, app_key, app_key);
-#else
-    LDL_SM_init(&state, nwk_key);
-#endif
-}
-
 /* protected static ***************************************************/
 
 SM *
@@ -98,40 +79,3 @@ SM::_ctr(struct ldl_sm *self, enum ldl_sm_key desc, const void *iv, void *data, 
 }
 
 /* protected **********************************************************/
-
-void
-DefaultSM::begin_update_session_key()
-{
-    LDL_SM_beginUpdateSessionKey(&state);
-}
-
-void
-DefaultSM::end_update_session_key()
-{
-    LDL_SM_endUpdateSessionKey(&state);
-}
-
-void
-DefaultSM::update_session_key(enum ldl_sm_key key_desc, enum ldl_sm_key root_desc, const void *iv)
-{
-    LDL_SM_updateSessionKey(&state, key_desc, root_desc, iv);
-}
-
-uint32_t
-DefaultSM::mic(enum ldl_sm_key desc, const void *hdr, uint8_t hdrLen, const void *data, uint8_t dataLen)
-{
-    return LDL_SM_mic(&state, desc, hdr, hdrLen, data, dataLen);
-}
-
-void
-DefaultSM::ecb(enum ldl_sm_key desc, void *b)
-{
-    LDL_SM_ecb(&state, desc, b);
-}
-
-void
-DefaultSM::ctr(enum ldl_sm_key desc, const void *iv, void *data, uint8_t len)
-{
-    LDL_SM_ctr(&state, desc, iv, data, len);
-}
-

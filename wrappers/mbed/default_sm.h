@@ -19,21 +19,38 @@
  *
  * */
 
-#ifndef MBED_LDL_H
-#define MBED_LDL_H
+#ifndef MBED_LDL_DEFAULT_SM_H
+#define MBED_LDL_DEFAULT_SM_H
 
-#include "mac.h"
-#include "_device.h"
+#include "sm.h"
 
-#include "default_store.h"
-#include "default_sm.h"
+namespace LDL {
 
-#include "sx1272.h"
-#include "sx1276.h"
-#include "sx126x.h"
+    /** A default Security Module suitable for demo apps.
+     *
+     * Uses the default LDL cryptographic implementation and takes
+     * pointers to the root keys on construction.
+     *
+     * */
+    class DefaultSM : public SM {
 
-#include "hw/cmwx1zzabz.h"
-#include "hw/sx1272mb2xas.h"
-#include "hw/sx126xmb2xas.h"
+        protected:
+
+            struct ldl_sm state;
+
+            void begin_update_session_key();
+            void end_update_session_key();
+            void update_session_key(enum ldl_sm_key key_desc, enum ldl_sm_key root_desc, const void *iv);
+            uint32_t mic(enum ldl_sm_key desc, const void *hdr, uint8_t hdrLen, const void *data, uint8_t dataLen);
+            void ecb(enum ldl_sm_key desc, void *b);
+            void ctr(enum ldl_sm_key desc, const void *iv, void *data, uint8_t len);
+
+        public:
+
+            DefaultSM(const void *app_key);
+            DefaultSM(const void *app_key, const void *nwk_key);
+    };
+
+};
 
 #endif

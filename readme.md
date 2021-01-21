@@ -110,7 +110,7 @@ Behind the scenes you will need to implement:
 This and other details are explained in the [porting guide](porting.md).
 
 If you want to avoid the hassle of porting, you can use the [MBED wrapper](wrappers/mbed) by
-simply cloning this git repository into an existing MBED project.
+simply cloning this git repository into an existing MBED project. See examples for more information.
 
 It is important to keep in mind that LDL is still experimental. This means that things may not work properly and that
 interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_device_lib/releases) commits for best results
@@ -145,8 +145,8 @@ and read [history.md](history.md) if updating from an older version.
 - Linted to MISRA 2012
 - Examples
     - [readme example](examples/doxygen/example.c)
-    - [rtos mbed example](examples/mbed)
-    - [bare-metal mbed example](examples/bare_mbed)
+    - [rtos mbed example](examples/mbed/rtos)
+    - [bare-metal mbed example](examples/mbed/bare_mbed)
     - [chip interface example](examples/chip_interface)
     - [ruby example](examples/ruby)
     - [avr-gcc example](examples/avr)
