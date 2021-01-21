@@ -15,9 +15,9 @@ PROFILE ?= debug
 
 JLINK_SPEED := 4000
 
-GDB        := arm-none-eabi-gdb
-GDB_SERVER := JLinkGDBServer
-JLINK      := JLinkExe
+GDB        ?= arm-none-eabi-gdb
+GDB_SERVER ?= JLinkGDBServer
+JLINK      ?= JLinkExe
 
 DIR_BUILD = BUILD/$(DEVICE)/GCC_ARM-$(shell echo $(PROFILE) | tr a-z A-Z)
 
@@ -74,16 +74,19 @@ compile:
 	@ echo building $(APP)
 	cd $(DIR_APP) && $(DOCKER) $(VOLUMES) -v $(DIR_APP):/mbed:cached $(NAME):$(TAG) compile -m $(DEVICE) -t GCC_ARM --profile $(PROFILE)
 
-flash: upload_flash.jlink compile
-	$(JLINK) -device $(JLINK_DEVICE) -if swd -speed $(JLINK_SPEED) -CommanderScript $<
+flash: $(DIR_APP)/upload_flash.jlink $(DIR_APP)/$(DIR_BUILD)/mbed.hex
+	cd $(DIR_APP) && $(JLINK) -device $(JLINK_DEVICE) -if swd -speed $(JLINK_SPEED) -CommanderScript $<
 
-gdb: .gdbinit flash
-	$(GDB) --command=.gdbinit -tui -q $<
+gdb: $(DIR_APP)/.gdbinit flash
+	cd $(DIR_APP) && $(GDB) --command=.gdbinit -tui -q $(DIR_BUILD)/mbed.elf
 
 gdb_server:
 	$(GDB_SERVER) -if swd -device $(JLINK_DEVICE) -vd -speed $(JLINK_SPEED) -endian little
 
-upload_flash.jlink:
+$(DIR_APP)/$(DIR_BUILD)/mbed.hex: compile
+	cd $(DIR_APP) && $(DOCKER) $(VOLUMES) -v $(DIR_APP):/mbed:cached --entrypoint arm-none-eabi-objcopy $(NAME):$(TAG) -O ihex $(DIR_BUILD)/mbed.elf $(DIR_BUILD)/mbed.hex
+
+$(DIR_APP)/upload_flash.jlink:
 	@ rm -f $@
 	@ touch $@
 	@ echo r                          >> $@
@@ -93,7 +96,7 @@ upload_flash.jlink:
 	@ echo g                          >> $@
 	@ echo q                          >> $@
 
-.gdbinit:
+$(DIR_APP)/.gdbinit:
 	@ rm -f $@
 	@ touch $@
 	@ echo target remote localhost:2331  >> $@
@@ -104,7 +107,7 @@ upload_flash.jlink:
 	@ echo focus cmd                     >> $@
 
 clean:
-	rm -f .gdbinit upload_flash.jlink
+	rm -f $(DIR_BUILD)/.gdbinit $(DIR_BUILD)/upload_flash.jlink
 	rm -rf $(DIR_APP)/BUILD
 	rm -rf $(DIR_APP)/mbed-os
 	rm -rf $(DIR_APP)/lora_device_lib

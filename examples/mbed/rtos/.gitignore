@@ -2,5 +2,5 @@ BUILD
 mbed-os
 lora_device_lib
 .mbed
-
-
+upload_flash.jlink
+.gdbinit
