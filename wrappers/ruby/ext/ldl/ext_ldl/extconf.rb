@@ -1,7 +1,7 @@
 require 'mkmf'
 
 # get from this file back to project root
-project_root = File.join("..","..","..","..")
+project_root = File.join(File.dirname(__FILE__), "..","..","..","..")
 
 $srcs = Dir[File.join(__dir__, "*.c")]
 $srcs += Dir[File.join(project_root, "src", "*.c")]

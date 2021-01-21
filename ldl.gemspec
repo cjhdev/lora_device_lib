@@ -1,6 +1,4 @@
-root_dir = File.expand_path("../wrappers/ruby", __FILE__)
-
-require  File.join(root_dir, "lib", "ldl", "version")
+require File.expand_path("../wrappers/ruby/lib/ldl/version.rb", __FILE__)
 require 'time'
 
 Gem::Specification.new do |s|
@@ -14,8 +12,8 @@ Gem::Specification.new do |s|
 
   s.files = Dir.glob("src/**/*.c")
   s.files += Dir.glob("src/**/*.h")
-  s.files += Dir.glob("#{root_dir}/ext/**/*.{c,h,rb}") + Dir.glob("#{root_dir}/lib/**/*.rb")
-  s.files += Dir.glob("#{root_dir}/lib/**/*.rb")
+  s.files += Dir.glob("wrappers/ruby/ext/**/*.{c,h,rb}")
+  s.files += Dir.glob("wrappers/ruby/lib/**/*.rb")
 
   s.extensions = ["wrappers/ruby/ext/ldl/ext_ldl/extconf.rb"]
 
