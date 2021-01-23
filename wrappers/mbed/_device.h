@@ -33,6 +33,8 @@ namespace LDL {
 
         protected:
 
+            DeepSleepLock sleep_lock;
+
             EventQueue event;
 
             MAC mac;
@@ -62,11 +64,11 @@ namespace LDL {
             /* run by worker_thread */
             void worker();
 
-            /* called by radio in ISR */
-            void handle_radio_event();
-
             /* called by mac */
             void handle_mac_event(enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg);
+
+            /* called by mac in ISR */
+            void handle_wakeup();
 
             struct data_arg {
 

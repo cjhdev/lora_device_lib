@@ -53,6 +53,7 @@ namespace LDL {
             LowPowerTimer timer;
 
             Callback<void(enum ldl_mac_response_type, const union ldl_mac_response_arg *)> event_cb;
+            Callback<void(void)> wakeup_cb;
 
             static MAC *to_obj(void *ptr);
 
@@ -103,6 +104,11 @@ namespace LDL {
             void set_event_cb(Callback<void(enum ldl_mac_response_type, const union ldl_mac_response_arg *)> cb)
             {
                 event_cb = cb;
+            }
+
+            void set_wakeup_cb(Callback<void(void)> cb)
+            {
+                wakeup_cb = cb;
             }
     };
 

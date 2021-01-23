@@ -91,6 +91,11 @@ void
 MAC::handle_radio_event()
 {
     LDL_MAC_radioEvent(&mac);
+
+    if(wakeup_cb){
+
+        wakeup_cb();
+    }
 }
 
 bool

@@ -30,12 +30,13 @@ using namespace LDL;
 
 Device::Device(Store &store, SM &sm, Radio &radio) :
     mac(store, sm, radio),
-    worker_thread(1024U),
+    worker_thread(1024),
     queue_semaphore(1),
     data_semaphore(1),
     radio(radio)
 {
     mac.set_event_cb(callback(this, &Device::handle_mac_event));
+    mac.set_wakeup_cb(callback(this, &Device::handle_wakeup));
 }
 
 /* protected **********************************************************/
@@ -49,11 +50,21 @@ Device::do_work()
 void
 Device::worker()
 {
-    uint32_t next;
+    uint32_t next = 0U;
 
     for(;;){
 
+        if(next < 100000){
+
+            sleep_lock.lock();
+        }
+
         work_semaphore.acquire();
+
+        if(next < 100000){
+
+            sleep_lock.unlock();
+        }
 
         do{
 
@@ -211,13 +222,6 @@ Device::do_entropy(enum ldl_mac_status *retval)
 }
 
 void
-Device::handle_radio_event()
-{
-    mac.handle_radio_event();
-    work_semaphore.release();
-}
-
-void
 Device::handle_mac_event(enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg)
 {
     LDL_DEBUG("%s: event: %i", __FUNCTION__, type);
@@ -286,6 +290,12 @@ Device::handle_mac_event(enum ldl_mac_response_type type, const union ldl_mac_re
         }
     }
     cb_mutex.unlock();
+}
+
+void
+Device::handle_wakeup()
+{
+    work_semaphore.release();
 }
 
 enum ldl_mac_status
@@ -410,9 +420,6 @@ Device::start(enum ldl_region region)
     bool retval = false;
 
     if(mac.start(region)){
-
-        // override the callback set by mac so we can intercept the events
-        radio.set_event_handler(callback(this, &Device::handle_radio_event));
 
         worker_thread.start(callback(this, &Device::worker));
 
