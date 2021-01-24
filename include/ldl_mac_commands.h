@@ -291,6 +291,11 @@ void LDL_MAC_putADRParamSetupAns(struct ldl_stream *s);
 void LDL_MAC_putDeviceTimeReq(struct ldl_stream *s);
 void LDL_MAC_putRejoinParamSetupAns(struct ldl_stream *s, struct ldl_rejoin_param_setup_ans *value);
 
+void LDL_MAC_putPingSlotInfoReq(struct ldl_stream *s, const struct ldl_ping_slot_info_req *value);
+void LDL_MAC_putPingSlotChannelAns(struct ldl_stream *s, const struct ldl_ping_slot_channel_ans *value);
+void LDL_MAC_putBeaconTimingReq(struct ldl_stream *s);
+void LDL_MAC_putBeaconFreqAns(struct ldl_stream *s, const struct ldl_beacon_freq_ans *value);
+
 bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd);
 bool LDL_MAC_getUpCommand(struct ldl_stream *s, struct ldl_upstream_cmd *cmd);
 

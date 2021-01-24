@@ -135,7 +135,12 @@ enum ldl_mac_response_type {
     /** deviceTimeAns received
      *
      * */
-    LDL_MAC_DEVICE_TIME
+    LDL_MAC_DEVICE_TIME,
+
+#ifdef LDL_ENABLE_CLASS_B
+    LDL_MAC_BEACON_LOST,
+    LDL_MAC_BEACON_ACQUIRED,
+#endif
 };
 
 enum ldl_mac_sme {
@@ -144,7 +149,10 @@ enum ldl_mac_sme {
     LDL_SME_TIMER_A,
     LDL_SME_TIMER_B,
     LDL_SME_INTERRUPT,
-    LDL_SME_BAND
+    LDL_SME_BAND,
+#ifdef LDL_ENABLE_CLASS_B
+    LDL_SME_TIMER_BEACON,
+#endif
 };
 
 /** MAC state */
@@ -172,8 +180,13 @@ enum ldl_mac_state {
     LDL_STATE_START_RADIO_FOR_RX2,     /**< waiting for second RX window */
     LDL_STATE_RX2,          /**< second RX window */
 
-    LDL_STATE_RX2_LOCKOUT  /**< used to ensure an out of range RX2 window is not clobbered */
+    LDL_STATE_RX2_LOCKOUT, /**< used to ensure an out of range RX2 window is not clobbered */
 
+#ifdef LDL_ENABLE_CLASS_B
+    LDL_STATE_WAIT_BEACON,
+    LDL_STATE_START_RADIO_FOR_BEACON,
+    LDL_STATE_BEACON
+#endif
 };
 
 /** MAC operations */
@@ -185,6 +198,8 @@ enum ldl_mac_operation {
     LDL_OP_REJOINING,           /**< MAC is performing a rejoin */
     LDL_OP_DATA_UNCONFIRMED,    /**< MAC is sending unconfirmed data */
     LDL_OP_DATA_CONFIRMED,      /**< MAC is sending confirmed data */
+
+    LDL_OP_BEACON,              /**< MAC is receiving a beacon or ping */
 };
 
 /** MAC operation return status codes */
@@ -271,6 +286,12 @@ union ldl_mac_response_arg {
         uint32_t devAddr;
 
     } join_complete;
+
+    struct {
+
+        uint32_t lag;
+
+    } beacon_acquired;
 };
 
 /** LDL calls this function pointer to notify application of events
@@ -328,6 +349,14 @@ struct ldl_mac_time {
     bool parked;
 };
 
+enum ldl_mac_beacon_state {
+
+    LDL_MAC_BEACON_STATE_DISABLED,
+    LDL_MAC_BEACON_STATE_GET_TIME,
+    LDL_MAC_BEACON_STATE_SEARCHING,
+    LDL_MAC_BEACON_STATE_ACTIVE
+};
+
 /** Session cache */
 struct ldl_mac_session {
 
@@ -380,6 +409,13 @@ struct ldl_mac_session {
 
 #ifndef LDL_DISABLE_TX_PARAM_SETUP
     uint8_t tx_param_setup;
+#endif
+
+#ifdef LDL_ENABLE_CLASS_B
+    uint32_t ping_rate_and_freq;
+    uint32_t beacon_freq;
+    struct ldl_beacon_freq_ans beacon_freq_ans;
+    struct ldl_ping_slot_channel_ans ping_slot_ans;
 #endif
 };
 
@@ -479,12 +515,35 @@ struct ldl_mac {
     uint8_t maxDutyCycle;
 
 #ifdef LDL_ENABLE_CLASS_B
+    struct ldl_beacon {
 
-    bool beaconModeEnabled;
-#ifndef LDL_PARAM_BEACON_INTERVAL
-    uint32_t beaconInterval;
-#endif
+        enum ldl_mac_beacon_state state;
 
+        // milliseconds
+        #define LDL_BEACON_PERIOD   128000
+        #define LDL_BEACON_RESERVED 2120
+        #define LDL_BEACON_GUARD    3000
+        #define LDL_BEACON_WINDOW   122880
+        #define LDL_BEACON_SLOT_WIDTH 30000
+
+        /* pingNB = (1U << (7-periodicity)) slots
+         * pingPeriod = (1U << (5+periodicity)) slots
+         *
+         * slotLen = 30ms
+         *
+         * pingOffset = offset calcaulted from BEACON_PERIOD
+         *
+         *
+         * */
+
+        uint8_t periodicity;    /* see above */
+        uint8_t rate;           /* ping slot rate */
+
+        uint32_t missed;        /* increments for each missed beacon */
+        uint32_t error;
+        uint16_t symbols;
+
+    } beacon;
 #endif
 
 #ifdef LDL_ENABLE_OTAA_DITHER
@@ -605,15 +664,6 @@ struct ldl_mac_init_arg {
      *
      * */
     uint32_t advance;
-#endif
-
-#if defined(LDL_ENABLE_CLASS_B) && !defined(LDL_PARAM_BEACON_INTERVAL)
-    /** Beacon interval in ticks (Class B only)
-     *
-     * This is not required if LDL_PARAM_BEACON_INTERVAL has been defined.
-     *
-     * */
-    uint32_t beaconInterval;
 #endif
 
 #ifdef LDL_ENABLE_OTAA_DITHER

@@ -50,7 +50,7 @@ static const struct type_to_tag tags[] = {
     {14U, LDL_CMD_FORCE_REJOIN},
     {15U, LDL_CMD_REJOIN_PARAM_SETUP},
 #endif
-#if defined(LDL_ENABLE_CLASS_B)
+#ifdef LDL_ENABLE_CLASS_B
     {16U, LDL_CMD_PING_SLOT_INFO},
     {17U, LDL_CMD_PING_SLOT_CHANNEL},
     {18U, LDL_CMD_BEACON_TIMING},

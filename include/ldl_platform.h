@@ -222,13 +222,6 @@
     #undef LDL_PARAM_ADVANCE
 
     /**
-     * Define to set at compile time
-     *
-     * */
-    #define LDL_PARAM_BEACON_INTERVAL
-    #undef LDL_PARAM_BEACON_INTERVAL
-
-    /**
      * Define to enable class B features
      *
      * Currently a work in progress.
