@@ -5,6 +5,14 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
+## 0.5.2
+
+- added deep sleep locking to wrappers/mbed/device.cpp
+- added sleep handling to examples/mbed/bare_metal
+- refactored branching in processRX and processTX
+- removed useless debug messages
+- changed definitions for LDL_L2_VERSION_* to ensure unknown macros (which default to 0) are caught
+
 ## 0.5.1
 
 - refactored examples/mbed to contain all mbed examples in subdirectories

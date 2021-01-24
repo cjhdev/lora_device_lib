@@ -478,15 +478,6 @@ struct ldl_mac {
 
     uint8_t maxDutyCycle;
 
-#ifdef LDL_ENABLE_CLASS_B
-
-    bool beaconModeEnabled;
-#ifndef LDL_PARAM_BEACON_INTERVAL
-    uint32_t beaconInterval;
-#endif
-
-#endif
-
 #ifdef LDL_ENABLE_OTAA_DITHER
     uint32_t otaaDither;
 #endif
@@ -605,15 +596,6 @@ struct ldl_mac_init_arg {
      *
      * */
     uint32_t advance;
-#endif
-
-#if defined(LDL_ENABLE_CLASS_B) && !defined(LDL_PARAM_BEACON_INTERVAL)
-    /** Beacon interval in ticks (Class B only)
-     *
-     * This is not required if LDL_PARAM_BEACON_INTERVAL has been defined.
-     *
-     * */
-    uint32_t beaconInterval;
 #endif
 
 #ifdef LDL_ENABLE_OTAA_DITHER
@@ -1043,24 +1025,6 @@ void LDL_MAC_radioEventWithTicks(struct ldl_mac *self, uint32_t ticks);
  *
  * */
 uint32_t LDL_MAC_getTicks(struct ldl_mac *self);
-
-/** Set beacon mode
- *
- * @param[in] self #ldl_mac
- * @param[in] value
- *
- * */
-void LDL_MAC_setBeaconMode(struct ldl_mac *self, bool value);
-
-/** Get beacon mode
- *
- * @param[in] self #ldl_mac
- *
- * @retval true enabled
- * @retval false disable
- *
- * */
-bool LDL_MAC_getBeaconMode(struct ldl_mac *self);
 
 /** Use this setting to remove duty cycle limits to speed up testing
  *

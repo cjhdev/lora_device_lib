@@ -222,13 +222,6 @@
     #undef LDL_PARAM_ADVANCE
 
     /**
-     * Define to set at compile time
-     *
-     * */
-    #define LDL_PARAM_BEACON_INTERVAL
-    #undef LDL_PARAM_BEACON_INTERVAL
-
-    /**
      * Define to enable class B features
      *
      * Currently a work in progress.
@@ -345,9 +338,9 @@
     #error "LDL_DISABLE_RANDOM_DEV_NONCE is depreciated, use LDL_L2_VERSION=LDL_L2_VERSION_1_0_3"
 #endif
 
-#define LDL_L2_VERSION_1_0_3    0
-#define LDL_L2_VERSION_1_0_4    1
-#define LDL_L2_VERSION_1_1      2
+#define LDL_L2_VERSION_1_0_3    1
+#define LDL_L2_VERSION_1_0_4    2
+#define LDL_L2_VERSION_1_1      3
 
 #ifndef LDL_L2_VERSION
     /** Define to change the LoRaWAN L2 version from the default setting.
