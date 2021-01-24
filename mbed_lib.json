@@ -74,8 +74,11 @@
             "help" : "Choose L2 version",
             "macro_name" : "LDL_L2_VERSION",
             "value" : "LDL_L2_VERSION_1_1"
+        },
+        "enable-class-b" : {
+            "help" : "Enable class B",
+            "macro_name" : "LDL_ENABLE_CLASS_B",
+            "value" : 1
         }
-
-
     }
 }
