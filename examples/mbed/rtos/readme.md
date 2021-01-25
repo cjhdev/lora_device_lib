@@ -18,6 +18,8 @@ lines that tell LDL which driver to use.
 
 Region is specified as argument to LDL::Device.start().
 
+## Deep Sleep
 
+Note that MBED will only drop into deep sleep for the "release" profile.
 
 

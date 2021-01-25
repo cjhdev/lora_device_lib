@@ -56,14 +56,14 @@ Device::worker()
 
         if(next < 100000){
 
-            sleep_lock.lock();
+            sleep_manager_lock_deep_sleep();
         }
 
         work_semaphore.acquire();
 
         if(next < 100000){
 
-            sleep_lock.unlock();
+            sleep_manager_unlock_deep_sleep();
         }
 
         do{
@@ -83,7 +83,14 @@ Device::worker()
         }
         else{
 
-            timeout.attach(callback(this, &Device::do_work), std::chrono::microseconds(next));
+            if(next < UINT32_MAX){
+
+                timeout.attach(callback(this, &Device::do_work), std::chrono::microseconds(next));
+            }
+            else{
+
+                timeout.detach();
+            }
         }
     }
 }

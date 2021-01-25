@@ -12,6 +12,8 @@ LDL::HW::CMWX1ZZABZ radio.
 
 Region is specified as argument to LDL::Device.start().
 
+## Deep Sleep
 
+Note that MBED will only drop into deep sleep for the "release" profile.
 
 

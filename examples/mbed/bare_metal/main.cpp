@@ -5,7 +5,7 @@ const uint8_t nwk_key[] = MBED_CONF_APP_NWK_KEY;
 const uint8_t dev_eui[] = MBED_CONF_APP_DEV_EUI;
 const uint8_t join_eui[] = MBED_CONF_APP_JOIN_EUI;
 
-static Semaphore wakeup_flag(1);
+Semaphore wakeup_flag;
 
 void handle_mac_event(enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg)
 {
@@ -31,7 +31,6 @@ int main()
 
     static LowPowerTicker ticker;
     static LowPowerTimeout timeout;
-    static DeepSleepLock sleep_lock;
 
     static LDL::DefaultSM sm(app_key, nwk_key);
     static LDL::DefaultStore store(dev_eui, join_eui);
@@ -42,9 +41,6 @@ int main()
 
     /* wake every 10 seconds */
     ticker.attach(callback(wakeup_handler), std::chrono::microseconds(10000000));
-
-    /* wake when MAC has an ISR */
-    mac.set_event_cb(callback(handle_mac_event));
 
     mac.start(LDL_EU_863_870);
 
@@ -72,28 +68,38 @@ int main()
 
         mac.process();
 
-        uint32_t next_event = mac.ticks_until_next_event();
+        /* if you don't need sleep, you don't need any of this stuff*/
+        {
+            uint32_t next_event = mac.ticks_until_next_event();
 
-        if(next_event > 0){
+            if(next_event > 0){
 
-            timeout.attach(callback(wakeup_handler), std::chrono::microseconds(next_event));
+                if(next_event < UINT32_MAX){
 
-            /* Deep sleep can be slow to wake from.
-             *
-             * Lock it out if there is an event that will
-             * happen soon.
-             *
-             * */
-            if(next_event < 100000){
+                    timeout.attach(callback(wakeup_handler), std::chrono::microseconds(next_event));
+                }
+                else{
 
-                sleep_lock.lock();
-            }
+                    timeout.detach();
+                }
 
-            wakeup_flag.acquire();
+                /* Deep sleep can be slow to wake from.
+                 *
+                 * Lock it out if there is an event that will
+                 * happen soon.
+                 *
+                 * */
+                if(next_event < 100000){
 
-            if(next_event < 100000){
+                    sleep_manager_lock_deep_sleep();
+                }
 
-                sleep_lock.unlock();
+                wakeup_flag.acquire();
+
+                if(next_event < 100000){
+
+                    sleep_manager_unlock_deep_sleep();
+                }
             }
         }
     }

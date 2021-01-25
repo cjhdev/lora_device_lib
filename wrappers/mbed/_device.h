@@ -33,8 +33,6 @@ namespace LDL {
 
         protected:
 
-            DeepSleepLock sleep_lock;
-
             EventQueue event;
 
             MAC mac;

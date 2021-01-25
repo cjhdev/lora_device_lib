@@ -57,9 +57,8 @@ default:
   test_container \
   compile \
   gdb_server \
-  upload_flash.jlink \
-  test_import \
-  .gdbinit
+  $(DIR_APP)/upload_flash.jlink \
+  $(DIR_APP)/.gdbinit
 
 get_mbed_os:
 	git clone https://github.com/ARMmbed/mbed-os
