@@ -97,6 +97,12 @@ WL55::_chip_read(void *self, const void *opcode, size_t opcode_size, void *data,
     return static_cast<WL55 *>(self)->chip_read(opcode, opcode_size, data, size);
 }
 
+void
+WL55::_chip_set_mode(void *self, enum ldl_chip_mode mode)
+{
+    static_cast<WL55 *>(self)->chip_set_mode(mode);
+}
+
 WL55 *
 WL55::to_radio(void *self)
 {
@@ -243,6 +249,27 @@ WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
 
     return retval;
 }
+
+void
+WL55::chip_set_mode(enum ldl_chip_mode mode)
+{
+    switch(mode){
+    case LDL_CHIP_MODE_RESET:
+        LL_RCC_RF_EnableReset();
+        break;
+    case LDL_CHIP_MODE_SLEEP:
+        LL_RCC_RF_DisableReset();
+        break;
+    default:
+        break;
+    }
+
+    if(chip_mode_cb){
+
+        chip_mode_cb(mode);
+    }
+}
+
 
 /* public *************************************************************/
 

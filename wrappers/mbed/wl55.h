@@ -28,6 +28,11 @@
 
 namespace LDL {
 
+    /* This looks like a duplication of SPIRadio because
+     * MBED doesn't have high level abstraction for the internal
+     * SPI and IO connected to the integrated radio.
+     *
+     * */
     class WL55 : public Radio {
 
         protected:
@@ -55,6 +60,9 @@ namespace LDL {
 
             bool chip_write(const void *opcode, size_t opcode_size, const void *data, size_t size);
             bool chip_read(const void *opcode, size_t opcode_size, void *data, size_t size);
+            void chip_set_mode(enum ldl_chip_mode mode);
+
+            static void _chip_set_mode(void *self, enum ldl_chip_mode mode);
 
         public:
 

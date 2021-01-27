@@ -30,6 +30,12 @@ namespace LDL {
 
     namespace HW {
 
+        /* This inherits the WL55 rather than aggregates
+         * as per the other HW variants. This is
+         * due to there being no high level SPI and IO abstractions
+         * to pass in since WL55 does this through the STM HAL.
+         *
+         * */
         class NucleoWL55JCX : public WL55 {
 
             public:
@@ -38,7 +44,7 @@ namespace LDL {
                     int16_t tx_gain = 0
                 )
                     :
-                    Radio(
+                    WL55(
                         tx_gain,
                         LDL_SX126X_REGULATOR_DCDC,
                         LDL_SX126X_TXEN_ENABLED,

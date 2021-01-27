@@ -36,8 +36,6 @@ namespace LDL {
             Callback<void(enum ldl_chip_mode)> chip_mode_cb;
 
             static void _chip_set_mode(void *self, enum ldl_chip_mode mode);
-
-            static void _chip_set_mode(enum ldl_chip_mode mode);
             void chip_set_mode(enum ldl_chip_mode mode);
 
             void dio1_handler();
