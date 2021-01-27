@@ -1,4 +1,4 @@
-/* Copyright (c) 2020 Cameron Harper
+/* Copyright (c) 2021 Cameron Harper
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -19,23 +19,38 @@
  *
  * */
 
-#ifndef MBED_LDL_H
-#define MBED_LDL_H
+#ifndef MBED_LDL_HW_NUCLEO_WL55JCX_H
+#define MBED_LDL_HW_NUCLEO_WL55JCX_H
 
-#include "mac.h"
-#include "_device.h"
+#ifdef TARGET_STM32WL55
 
-#include "default_store.h"
-#include "default_sm.h"
-
-#include "sx1272.h"
-#include "sx1276.h"
-#include "sx126x.h"
 #include "wl55.h"
 
-#include "hw/cmwx1zzabz.h"
-#include "hw/sx1272mb2xas.h"
-#include "hw/sx126xmb2xas.h"
-#include "hw/nucleo_wl55jcx.h"
+namespace LDL {
+
+    namespace HW {
+
+        class NucleoWL55JCX : public WL55 {
+
+            public:
+
+                NucleoWL55JCX(
+                    int16_t tx_gain = 0
+                )
+                    :
+                    Radio(
+                        tx_gain,
+                        LDL_SX126X_REGULATOR_DCDC,
+                        LDL_SX126X_TXEN_ENABLED,
+                        LDL_SX126X_VOLTAGE_1V6,
+                        LDL_RADIO_XTAL_CRYSTAL
+                    )
+                {
+                }
+        };
+    };
+};
+
+#endif
 
 #endif
