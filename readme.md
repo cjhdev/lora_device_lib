@@ -10,6 +10,8 @@ Below is a partially complete example showing how to:
 - initialise the library (for L2 specification 1.0.4)
 - activate over the air
 - send an empty data frame periodically
+- limit the rate of send via global duty cycle setting
+- allow the server to adjust the data rate and power setting
 
 ~~~ C
 #include "ldl_mac.h"
@@ -34,6 +36,7 @@ struct ldl_mac mac;
 
 void main(void)
 {
+    /* init the security module */
     LDL_SM_init(&sm, app_key_ptr);
 
     /* init the radio */
@@ -71,7 +74,6 @@ void main(void)
 
         LDL_Radio_setEventCallback(&radio, &mac, LDL_MAC_radioEvent);
 
-        /* this will slow down how often mesages are sent */
         LDL_MAC_setMaxDCycle(&mac, 12);
 
         LDL_MAC_entropy(&mac);
@@ -98,19 +100,13 @@ void main(void)
 }
 ~~~
 
-Behind the scenes you will need to implement:
+Everything marked extern needs to be implemented somewhere. There
+are more details in the [porting guide](porting.md).
 
-- [chip interface](https://ldl.readthedocs.io/en/latest/group__ldl__chip__interface.html): `chip_set_mode()`, `chip_write()`, `chip_read()`
-- keys: `app_key_ptr`, `nwk_key_ptr`, `dev_eui_ptr`, `join_eui_ptr`
-- system interfaces: `your_ticks()`, `your_rand()`
-- `your_app_handler()`
+The fastest way to get up and running is to use the [MBED wrapper](wrappers/mbed) and
+copy one of the examples.
 
-This and other details are explained in the [porting guide](porting.md).
-
-If you want to avoid the hassle of porting, you can use the [MBED wrapper](wrappers/mbed) by
-simply cloning this git repository into an existing MBED project. See examples for more information.
-
-It is important to keep in mind that LDL is still experimental. This means that things may not work properly and that
+It is important to keep in mind that LDL is experimental. This means that things may not work properly and that
 interfaces may change. Use one of the [tagged](https://github.com/cjhdev/lora_device_lib/releases) commits for best results
 and read [history.md](history.md) if updating from an older version.
 
