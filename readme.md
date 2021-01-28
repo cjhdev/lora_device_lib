@@ -38,15 +38,13 @@ void main(void)
 
     /* init the radio */
     {
-        struct ldl_radio_init_arg arg = {0};
-
-        arg.type = LDL_RADIO_SX1272;
+        struct ldl_sx127x_init_arg arg = {0};
 
         arg.chip_set_mode = chip_set_mode;
         arg.chip_write = chip_write;
         arg.chip_read = chip_read;
 
-        LDL_Radio_init(&radio, &arg);
+        LDL_SX1272_init(&radio, &arg);
     }
 
     /* init the mac */
