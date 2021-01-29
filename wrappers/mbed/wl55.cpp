@@ -85,7 +85,7 @@ WL55::~WL55()
 /* functions **********************************************************/
 
 /* copied and changed slightly from stm_spi_api.c */
-static uint32_t get_prescale(int hz)
+static uint32_t get_prescale(uint32_t hz)
 {
     static const uint32_t settings[] =  {
         SPI_BAUDRATEPRESCALER_2,
@@ -98,25 +98,20 @@ static uint32_t get_prescale(int hz)
         SPI_BAUDRATEPRESCALER_256
     };
 
-    int spi_hz = 0;
-    uint8_t prescaler_rank = 0;
-    uint8_t last_index = (sizeof(settings) / sizeof(*settings)) - 1;
+    uint32_t spi_hz = HAL_RCC_GetPCLK1Freq();
+    size_t i;
 
-    spi_hz = HAL_RCC_GetPCLK1Freq() / 2;
+    for(i=0; i < sizeof(settings)/sizeof(*settings); i++){
 
-    /* Define pre-scaler in order to get highest available frequency below requested frequency */
-    while ((spi_hz > hz) && (prescaler_rank < last_index)) {
-        spi_hz = spi_hz / 2;
-        prescaler_rank++;
+        spi_hz >>= 1;
+
+        if(spi_hz <= hz){
+
+            break;
+        }
     }
 
-    /*  In case maximum pre-scaler still gives too high freq, raise an error */
-    if (spi_hz > hz) {
-
-        DEBUG_PRINTF("WARNING: lowest SPI freq (%d)  higher than requested (%d)\r\n", spi_hz, hz);
-    }
-
-    return settings[prescaler_rank];
+    return settings[i];
 }
 
 /* static protected ***************************************************/
@@ -265,6 +260,7 @@ WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
     bool retval = false;
 
     uint32_t mask = LL_PWR_IsActiveFlag_RFBUSYMS();
+    size_t i;
 
     timer.reset();
 
