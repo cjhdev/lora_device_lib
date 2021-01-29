@@ -37,6 +37,8 @@ namespace LDL {
 
         protected:
 
+            SUBGHZ_HandleTypeDef hsubghz;
+
             LowPowerTimer timer;
 
             struct ldl_radio radio;

@@ -25,8 +25,6 @@
 #include "ldl_system.h"
 #include "ldl_radio.h"
 
-#include
-
 using namespace LDL;
 
 const struct ldl_radio_interface WL55::_interface = {
@@ -54,7 +52,8 @@ WL55::WL55(
     chip_mode_cb(chip_mode_cb)
 {
     timer.start();
-    // init SPI?
+
+    HAL_SUBGHZ_Init(&subghz);
 
     internal_if = LDL_SX1262_getInterface();
 
@@ -74,14 +73,45 @@ WL55::WL55(
 
     LDL_SX1262_init(&radio, &arg);
 
-    //setup dio0 interrupt
-    //this->dio1.rise(callback(this, &SX126X::dio1_handler));
-
     LDL_Radio_setEventCallback(&radio, (struct ldl_mac *)this, &Radio::_interrupt_handler);
 }
 
 /* functions **********************************************************/
 
+/* copied and changed slightly from stm_spi_api.c */
+static uint32_t get_prescale(int hz)
+{
+    static const uint32_t settings[] =  {
+        SPI_BAUDRATEPRESCALER_2,
+        SPI_BAUDRATEPRESCALER_4,
+        SPI_BAUDRATEPRESCALER_8,
+        SPI_BAUDRATEPRESCALER_16,
+        SPI_BAUDRATEPRESCALER_32,
+        SPI_BAUDRATEPRESCALER_64,
+        SPI_BAUDRATEPRESCALER_128,
+        SPI_BAUDRATEPRESCALER_256
+    };
+
+    int spi_hz = 0;
+    uint8_t prescaler_rank = 0;
+    uint8_t last_index = (sizeof(settings) / sizeof(*settings)) - 1;
+
+    spi_hz = HAL_RCC_GetPCLK1Freq() / 2;
+
+    /* Define pre-scaler in order to get highest available frequency below requested frequency */
+    while ((spi_hz > hz) && (prescaler_rank < last_index)) {
+        spi_hz = spi_hz / 2;
+        prescaler_rank++;
+    }
+
+    /*  In case maximum pre-scaler still gives too high freq, raise an error */
+    if (spi_hz > hz) {
+
+        DEBUG_PRINTF("WARNING: lowest SPI freq (%d)  higher than requested (%d)\r\n", spi_hz, hz);
+    }
+
+    return settings[prescaler_rank];
+}
 
 /* static protected ***************************************************/
 
@@ -168,13 +198,15 @@ WL55::chip_select(bool state)
 {
     if(state){
 
-        // set format?
+        SUBGHZSPI_Init(get_prescale(MBED_CONF_LDL_SPI_FREQUENCY));
 
         LL_PWR_SelectSUBGHZSPI_NSS();
     }
     else{
 
         LL_PWR_UnselectSUBGHZSPI_NSS();
+
+        SUBGHZSPI_DeInit();
     }
 }
 
@@ -184,6 +216,7 @@ WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_
     bool retval = false;
 
     uint32_t mask = LL_PWR_IsActiveFlag_RFBUSYMS();
+    size_t i;
 
     timer.reset();
 
@@ -193,9 +226,15 @@ WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_
 
         if((LL_PWR_IsActiveFlag_RFBUSYS() & mask) == 0U){
 
-            //spi.write((const char *)opcode, opcode_size, nullptr, 0);
+            for(i=0; i < opcode_size; i++){
 
-            //spi.write((const char *)data, size, nullptr, 0);
+                (void)SUBGHZSPI_Transmit(&hsubghz, ((uint8_t *)opcode)[i]);
+            }
+
+            for(i=0; i < size; i++){
+
+                (void)SUBGHZSPI_Transmit(&hsubghz, ((uint8_t *)data)[i]);
+            }
 
             retval = true;
         }
@@ -229,9 +268,15 @@ WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
 
         if((LL_PWR_IsActiveFlag_RFBUSYS() & mask) == 0U){
 
-            //spi.write((const char *)opcode, opcode_size, nullptr, 0);
+            for(i=0; i < opcode_size; i++){
 
-            //spi.write(nullptr, 0, (char *)data, size);
+                (void)SUBGHZSPI_Transmit(&hsubghz, ((uint8_t *)opcode)[i]);
+            }
+
+            for(i=0; i < size; i++){
+
+                (void)SUBGHZSPI_Receive(&hsubghz, ((uint8_t *)data)[i]);
+            }
 
             retval = true;
         }
