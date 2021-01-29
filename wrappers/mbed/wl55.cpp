@@ -76,6 +76,12 @@ WL55::WL55(
     LDL_Radio_setEventCallback(&radio, (struct ldl_mac *)this, &Radio::_interrupt_handler);
 }
 
+WL55::~WL55()
+{
+    HAL_SUBGHZ_DeInit(&subghz);
+    timer.stop();
+}
+
 /* functions **********************************************************/
 
 /* copied and changed slightly from stm_spi_api.c */

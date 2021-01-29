@@ -79,6 +79,8 @@ namespace LDL {
                 Callback<void(enum ldl_chip_mode)> chip_mode_cb = nullptr
             );
 
+            ~WL55();
+
             uint32_t read_entropy();
             uint8_t read_buffer(struct ldl_radio_packet_metadata *meta, void *data, uint8_t max);
             void transmit(const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);
