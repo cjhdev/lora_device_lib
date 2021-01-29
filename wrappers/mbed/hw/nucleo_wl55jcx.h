@@ -22,7 +22,7 @@
 #ifndef MBED_LDL_HW_NUCLEO_WL55JCX_H
 #define MBED_LDL_HW_NUCLEO_WL55JCX_H
 
-#ifdef TARGET_STM32WL55
+#ifdef STM32WL55xx
 
 #include "wl55.h"
 

@@ -19,11 +19,13 @@
  *
  * */
 
-#ifdef TARGET_STM32WL55
+#ifdef STM32WL55xx
 
 #include "wl55.h"
 #include "ldl_system.h"
 #include "ldl_radio.h"
+
+#include "stm32wlxx.h"
 
 using namespace LDL;
 
@@ -53,7 +55,13 @@ WL55::WL55(
 {
     timer.start();
 
-    HAL_SUBGHZ_Init(&subghz);
+#if defined(CM0PLUS)
+    /* Enable EXTI 44 : Radio IRQ ITs for CPU2 */
+    LL_C2_EXTI_EnableIT_32_63(LL_EXTI_LINE_44);
+#else
+    /* Enable EXTI 44 : Radio IRQ ITs for CPU1 */
+    LL_EXTI_EnableIT_32_63(LL_EXTI_LINE_44);
+#endif
 
     internal_if = LDL_SX1262_getInterface();
 
@@ -78,7 +86,14 @@ WL55::WL55(
 
 WL55::~WL55()
 {
-    HAL_SUBGHZ_DeInit(&subghz);
+#if defined(CM0PLUS)
+    /* Disable EXTI 44 : Radio IRQ ITs for CPU2 */
+    LL_C2_EXTI_DisableIT_32_63(LL_EXTI_LINE_44);
+#else
+    /* Disable EXTI 44 : Radio IRQ ITs for CPU1 */
+    LL_EXTI_DisableIT_32_63(LL_EXTI_LINE_44);
+#endif
+
     timer.stop();
 }
 
@@ -112,6 +127,90 @@ static uint32_t get_prescale(uint32_t hz)
     }
 
     return settings[i];
+}
+
+static void init_spi()
+{
+    CLEAR_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
+
+    WRITE_REG(SUBGHZSPI->CR1, (SPI_CR1_MSTR | SPI_CR1_SSI | get_prescale(MBED_CONF_LDL_SPI_FREQUENCY) | SPI_CR1_SSM));
+
+    WRITE_REG(SUBGHZSPI->CR2, (SPI_CR2_FRXTH |  SPI_CR2_DS_0 | SPI_CR2_DS_1 | SPI_CR2_DS_2));
+
+    SET_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
+}
+
+static void deinit_spi()
+{
+    CLEAR_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
+}
+
+static void write_spi(const void *data, size_t size)
+{
+    size_t i;
+    uint32_t count;
+    const uint32_t count_preset = 100 * ((SystemCoreClock*28)>>19);
+
+    for(count = count_preset; count > 0U; count--){
+
+        if(READ_BIT(SUBGHZSPI->SR, SPI_SR_TXE) == SPI_SR_TXE){
+
+            break;
+        }
+    }
+
+    for(i=0; i < size; i++){
+
+#if defined (__GNUC__)
+        __IO uint8_t *spidr = ((__IO uint8_t *)&SUBGHZSPI->DR);
+        *spidr = ((const uint8_t *)data)[i];
+#else
+        *((__IO uint8_t *)&SUBGHZSPI->DR) = ((const uint8_t *)data)[i];
+#endif
+        for(count = count_preset; count > 0U; count--){
+
+            if(READ_BIT(SUBGHZSPI->SR, SPI_SR_RXNE) == SPI_SR_RXNE){
+
+                break;
+            }
+        }
+
+        READ_REG(SUBGHZSPI->DR);
+    }
+}
+
+static void read_spi(void *data, size_t size)
+{
+    size_t i;
+    uint32_t count;
+    const uint32_t count_preset = 100 * ((SystemCoreClock*28)>>19);
+
+    for(count = count_preset; count > 0U; count--){
+
+        if(READ_BIT(SUBGHZSPI->SR, SPI_SR_TXE) == SPI_SR_TXE){
+
+            break;
+        }
+    }
+
+    for(i=0; i < size; i++){
+
+#if defined (__GNUC__)
+        __IO uint8_t *spidr = ((__IO uint8_t *)&SUBGHZSPI->DR);
+        *spidr = 0;
+#else
+        *((__IO uint8_t *)&SUBGHZSPI->DR) = 0;
+#endif
+        for(count = count_preset; count > 0U; count--){
+
+            if(READ_BIT(SUBGHZSPI->SR, SPI_SR_RXNE) == SPI_SR_RXNE){
+
+                break;
+            }
+        }
+
+        ((uint8_t *)data)[i] = (uint8_t)(READ_REG(SUBGHZSPI->DR));
+    }
 }
 
 /* static protected ***************************************************/
@@ -199,7 +298,7 @@ WL55::chip_select(bool state)
 {
     if(state){
 
-        SUBGHZSPI_Init(get_prescale(MBED_CONF_LDL_SPI_FREQUENCY));
+        init_spi();
 
         LL_PWR_SelectSUBGHZSPI_NSS();
     }
@@ -207,7 +306,7 @@ WL55::chip_select(bool state)
 
         LL_PWR_UnselectSUBGHZSPI_NSS();
 
-        SUBGHZSPI_DeInit();
+        deinit_spi();
     }
 }
 
@@ -217,7 +316,6 @@ WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_
     bool retval = false;
 
     uint32_t mask = LL_PWR_IsActiveFlag_RFBUSYMS();
-    size_t i;
 
     timer.reset();
 
@@ -227,15 +325,8 @@ WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_
 
         if((LL_PWR_IsActiveFlag_RFBUSYS() & mask) == 0U){
 
-            for(i=0; i < opcode_size; i++){
-
-                (void)SUBGHZSPI_Transmit(&hsubghz, ((uint8_t *)opcode)[i]);
-            }
-
-            for(i=0; i < size; i++){
-
-                (void)SUBGHZSPI_Transmit(&hsubghz, ((uint8_t *)data)[i]);
-            }
+            write_spi(opcode, opcode_size);
+            write_spi(data, size);
 
             retval = true;
         }
@@ -260,7 +351,6 @@ WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
     bool retval = false;
 
     uint32_t mask = LL_PWR_IsActiveFlag_RFBUSYMS();
-    size_t i;
 
     timer.reset();
 
@@ -270,15 +360,8 @@ WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
 
         if((LL_PWR_IsActiveFlag_RFBUSYS() & mask) == 0U){
 
-            for(i=0; i < opcode_size; i++){
-
-                (void)SUBGHZSPI_Transmit(&hsubghz, ((uint8_t *)opcode)[i]);
-            }
-
-            for(i=0; i < size; i++){
-
-                (void)SUBGHZSPI_Receive(&hsubghz, ((uint8_t *)data)[i]);
-            }
+            write_spi(opcode, opcode_size);
+            read_spi(data, size);
 
             retval = true;
         }

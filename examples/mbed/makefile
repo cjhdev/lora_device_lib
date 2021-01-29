@@ -37,9 +37,17 @@ DEVICE ?= NUCLEO_F429ZI
 JLINK_DEVICE ?= STM32F429ZI
 
 else
+ifeq  ($(APP),rtos_wl55)
+
+DIR_APP := $(shell pwd)/rtos_wl55
+DEVICE := NUCLEO_WL55JC
+JLINK_DEVICE := STM32L072CZ
+
+else
 
 $(error APP=$(APP) is unknown)
 
+endif
 endif
 endif
 

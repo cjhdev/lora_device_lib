@@ -22,7 +22,7 @@
 #ifndef MBED_LDL_WL55_H
 #define MBED_LDL_WL55_H
 
-#ifdef TARGET_STM32WL55
+#ifdef STM32WL55xx
 
 #include "radio.h"
 
@@ -37,12 +37,12 @@ namespace LDL {
 
         protected:
 
-            SUBGHZ_HandleTypeDef hsubghz;
-
             LowPowerTimer timer;
 
             struct ldl_radio radio;
             const struct ldl_radio_interface *internal_if;
+
+            Callback<void(enum ldl_chip_mode)> chip_mode_cb;
 
             static bool _chip_write(void *self, const void *opcode, size_t opcode_size, const void *data, size_t size);
             static bool _chip_read(void *self, const void *opcode, size_t opcode_size, void *data, size_t size);
