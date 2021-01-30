@@ -1,9 +1,7 @@
 FROM debian:9
 
-# copy in the requirements file from the already checked out mbed-os
-#
-# this will be used to dowload all the missing python stuff
-COPY mbed-os/requirements.txt /tmp/mbed-cli-deps/requirements.txt
+# the latest mbed requirements
+ARG mbed_requirements_url=https://raw.githubusercontent.com/ARMmbed/mbed-os/master/requirements.txt
 
 RUN dpkg --add-architecture i386 \
   && DEBIAN_FRONTEND=noninteractive apt-get update -y -q \
@@ -14,10 +12,11 @@ RUN dpkg --add-architecture i386 \
     crossbuild-essential-armhf build-essential git mercurial \
     wget \
   && pip install mbed-cli \
-  && pip install -r /tmp/mbed-cli-deps/requirements.txt
+  && wget -O /tmp/mbed-cli-requirements.txt $mbed_requirements_url \
+  && pip install -r /tmp/mbed-cli-requirements.txt
 
-ARG toolchain_name
-ARG toolchain_url
+ARG toolchain_name=gcc-arm-none-eabi-9-2020-q2-update
+ARG toolchain_url=https://developer.arm.com/-/media/Files/downloads/gnu-rm/9-2020q2/gcc-arm-none-eabi-9-2020-q2-update-x86_64-linux.tar.bz2?revision=05382cca-1721-44e1-ae19-1e7c3dc96118&la=en&hash=D7C9D18FCA2DD9F894FD9F3C3DC9228498FA281A
 
 # get the toolchain
 RUN cd /opt && wget $toolchain_url -O - | tar xj
