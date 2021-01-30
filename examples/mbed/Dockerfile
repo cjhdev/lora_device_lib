@@ -20,10 +20,11 @@ ARG toolchain_url=https://developer.arm.com/-/media/Files/downloads/gnu-rm/9-202
 # get the toolchain
 RUN cd /opt && wget $toolchain_url -O - | tar xj
 
-ENV GCC_ARM_PATH /opt/toolchain/bin
+ENV GCC_ARM_PATH="/opt/$toolchain_name/bin"
 ENV PATH="/opt/$toolchain_name/bin:${PATH}"
 
-RUN mbed config --global toolchain GCC_ARM
+# this doesn't seem to work
+#RUN mbed config --global toolchain GCC_ARM
 
 WORKDIR /mbed
 VOLUME /mbed
