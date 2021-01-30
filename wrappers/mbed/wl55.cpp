@@ -27,6 +27,8 @@
 
 #include "stm32wlxx.h"
 
+#include "mbed_critical.h"
+
 using namespace LDL;
 
 const struct ldl_radio_interface WL55::_interface = {
@@ -38,6 +40,9 @@ const struct ldl_radio_interface WL55::_interface = {
     .receive_entropy = WL55::_receive_entropy,
     .get_status = WL55::_get_status
 };
+
+WL55 * WL55::instances = nullptr;
+Mutex WL55::lock;
 
 /* constructors *******************************************************/
 
@@ -51,17 +56,10 @@ WL55::WL55(
 )
     :
     Radio(),
-    chip_mode_cb(chip_mode_cb)
+    chip_mode_cb(chip_mode_cb),
+    next_instance(nullptr)
 {
     timer.start();
-
-#if defined(CM0PLUS)
-    /* Enable EXTI 44 : Radio IRQ ITs for CPU2 */
-    LL_C2_EXTI_EnableIT_32_63(LL_EXTI_LINE_44);
-#else
-    /* Enable EXTI 44 : Radio IRQ ITs for CPU1 */
-    LL_EXTI_EnableIT_32_63(LL_EXTI_LINE_44);
-#endif
 
     internal_if = LDL_SX1262_getInterface();
 
@@ -82,24 +80,72 @@ WL55::WL55(
     LDL_SX1262_init(&radio, &arg);
 
     LDL_Radio_setEventCallback(&radio, (struct ldl_mac *)this, &Radio::_interrupt_handler);
+
+    NVIC_SetVector(SUBGHZ_Radio_IRQn, (uint32_t)_handle_irq);
+
+    LL_EXTI_ClearFlag_32_63(LL_EXTI_LINE_44);
+    LL_EXTI_EnableRisingTrig_32_63(LL_EXTI_LINE_44);
+
+#if defined(CM0PLUS)
+    LL_C2_EXTI_EnableIT_32_63(LL_EXTI_LINE_44);
+#else
+    LL_EXTI_EnableIT_32_63(LL_EXTI_LINE_44);
+#endif
+
+    if(instances){
+
+        WL55 *ptr;
+
+        core_util_critical_section_enter();
+
+        for(ptr=instances; ptr->next_instance; ptr = ptr->next_instance);
+
+        ptr->next_instance = this;
+
+        core_util_critical_section_exit();
+    }
+    else{
+
+        instances = this;
+    }
 }
 
 WL55::~WL55()
 {
 #if defined(CM0PLUS)
-    /* Disable EXTI 44 : Radio IRQ ITs for CPU2 */
     LL_C2_EXTI_DisableIT_32_63(LL_EXTI_LINE_44);
 #else
-    /* Disable EXTI 44 : Radio IRQ ITs for CPU1 */
     LL_EXTI_DisableIT_32_63(LL_EXTI_LINE_44);
 #endif
 
+    LL_EXTI_ClearFlag_32_63(LL_EXTI_LINE_44);
+
     timer.stop();
+
+    WL55 *ptr, *prev = nullptr;
+
+    core_util_critical_section_enter();
+
+    for(ptr=instances; ptr; prev = ptr, ptr = ptr->next_instance){
+
+        if(ptr == this){
+
+            if(prev){
+
+                prev->next_instance = next_instance;
+            }
+            else{
+
+                instances = next_instance;
+            }
+        }
+    }
+
+    core_util_critical_section_exit();
 }
 
 /* functions **********************************************************/
 
-/* copied and changed slightly from stm_spi_api.c */
 static uint32_t get_prescale(uint32_t hz)
 {
     static const uint32_t settings[] =  {
@@ -215,6 +261,17 @@ static void read_spi(void *data, size_t size)
 
 /* static protected ***************************************************/
 
+void
+WL55::_handle_irq()
+{
+    LL_EXTI_ClearFlag_32_63(LL_EXTI_LINE_44);
+
+    for(WL55 *ptr=instances; ptr; ptr = ptr->next_instance){
+
+        LDL_Radio_handleInterrupt(&ptr->radio, 1);
+    }
+}
+
 bool
 WL55::_chip_write(void *self, const void *opcode, size_t opcode_size, const void *data, size_t size)
 {
@@ -298,6 +355,8 @@ WL55::chip_select(bool state)
 {
     if(state){
 
+        lock.lock();
+
         init_spi();
 
         LL_PWR_SelectSUBGHZSPI_NSS();
@@ -307,6 +366,8 @@ WL55::chip_select(bool state)
         LL_PWR_UnselectSUBGHZSPI_NSS();
 
         deinit_spi();
+
+        lock.unlock();
     }
 }
 

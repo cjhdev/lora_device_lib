@@ -28,7 +28,8 @@
 
 namespace LDL {
 
-    /** Radio driver base class
+    /**
+     * Radio driver base class
      *
      * Users should instantiate one of the subclasses named for the
      * transciever or module they wish to drive.

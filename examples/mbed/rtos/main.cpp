@@ -7,9 +7,6 @@ const uint8_t nwk_key[] = MBED_CONF_APP_NWK_KEY;
 const uint8_t dev_eui[] = MBED_CONF_APP_DEV_EUI;
 const uint8_t join_eui[] = MBED_CONF_APP_JOIN_EUI;
 
-LDL::DefaultSM sm(app_key, nwk_key);
-LDL::DefaultStore store(dev_eui, join_eui);
-
 void handle_rx(uint8_t port, const void *data, uint8_t size)
 {
 }
@@ -30,7 +27,8 @@ int main()
 
     //static LDL::HW::SX1272MB2XAS radio;
     static LDL::HW::SX126XMB2XAS radio;
-
+    static LDL::DefaultSM sm(app_key, nwk_key);
+    static LDL::DefaultStore store(dev_eui, join_eui);
     static LDL::Device device(store, sm, radio);
 
     device.set_rx_cb(callback(handle_rx));

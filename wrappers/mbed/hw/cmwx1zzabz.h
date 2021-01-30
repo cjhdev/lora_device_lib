@@ -29,14 +29,12 @@ namespace LDL {
     namespace HW {
 
         /**
-         * A module that aggregates:
+         * The CMWX1ZZABZ module aggregates:
          *
          * - SX1276
          * - TCXO with power switch
          * - switches for engaging RFI, RFO, and BOOST
          * - dedicated SPI peripheral
-         *
-         * Inherits radio so that it can be passed to the MAC.
          *
          * */
         class CMWX1ZZABZ : public Radio {

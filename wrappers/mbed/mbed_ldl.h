@@ -36,6 +36,6 @@
 #include "hw/cmwx1zzabz.h"
 #include "hw/sx1272mb2xas.h"
 #include "hw/sx126xmb2xas.h"
-#include "hw/nucleo_wl55jcx.h"
+#include "hw/nucleo_wl55jc.h"
 
 #endif

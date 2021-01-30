@@ -28,6 +28,10 @@ namespace LDL {
 
     namespace HW {
 
+        /**
+         * SX1272MB2XAS shield
+         *
+         * */
         class SX1272MB2XAS : public Radio {
 
             protected:

@@ -28,8 +28,10 @@ namespace LDL {
 
     namespace HW {
 
-        /* This shield series has IO lines that
-         * indicate:
+        /**
+         * SX126XMB2XAS series shields.
+         *
+         * This shield has IO lines that indicate:
          *
          * - SX1261 or SX1262
          * - crystal or tcxo

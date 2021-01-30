@@ -28,9 +28,10 @@
 
 namespace LDL {
 
-    /* This looks like a duplication of SPIRadio because
-     * MBED doesn't have high level abstraction for the internal
-     * SPI and IO connected to the integrated radio.
+    /**
+     * STM32WL55x driver
+     *
+     * This is essentially an SX1262 driver with special IO handling.
      *
      * */
     class WL55 : public Radio {
@@ -58,6 +59,8 @@ namespace LDL {
             static void _receive_entropy(struct ldl_radio *self);
             static void _get_status(struct ldl_radio *self, struct ldl_radio_status *status);
 
+            static void _handle_irq(void);
+
             void chip_select(bool state);
 
             bool chip_write(const void *opcode, size_t opcode_size, const void *data, size_t size);
@@ -66,10 +69,27 @@ namespace LDL {
 
             static void _chip_set_mode(void *self, enum ldl_chip_mode mode);
 
+            /* it's absurd to have more than one instance but this
+             * this list and mutex ensures MBED won't go mad if you do
+             *
+             * */
+            WL55 *next_instance;
+            static WL55 *instances;
+            static Mutex lock;
+
         public:
 
             static const struct ldl_radio_interface _interface;
 
+            /** create
+             *
+             * @param[in] tx_gain
+             * @param[in] regulator
+             * @param[in] voltage
+             * @param[in] xtal
+             * @param[in] chip_mode_cb
+             *
+             * */
             WL55(
                 int16_t tx_gain = 0,
                 enum ldl_sx126x_regulator regulator = LDL_SX126X_REGULATOR_LDO,

@@ -26,10 +26,31 @@
 
 namespace LDL {
 
+    /**
+     * SX1276 driver
+     *
+     * */
     class SX1276 : public SX127X {
 
         public:
 
+            /** create
+             *
+             * @param[in] spi
+             * @param[in] nss
+             * @param[in] reset
+             * @param[in] dio0
+             * @param[in] dio1
+             * @param[in] dio2
+             * @param[in] dio3
+             * @param[in] dio4
+             * @param[in] dio5
+             * @param[in] pa
+             * @param[in] tx_gain
+             * @param[in] xtal
+             * @param[in] chip_mode_cb
+             *
+             * */
             SX1276(
                 SPI& spi,
                 PinName nss,

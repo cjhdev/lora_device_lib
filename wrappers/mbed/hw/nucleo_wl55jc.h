@@ -19,8 +19,8 @@
  *
  * */
 
-#ifndef MBED_LDL_HW_NUCLEO_WL55JCX_H
-#define MBED_LDL_HW_NUCLEO_WL55JCX_H
+#ifndef MBED_LDL_HW_NUCLEO_WL55JC_H
+#define MBED_LDL_HW_NUCLEO_WL55JC_H
 
 #ifdef STM32WL55xx
 
@@ -30,17 +30,15 @@ namespace LDL {
 
     namespace HW {
 
-        /* This inherits the WL55 rather than aggregates
-         * as per the other HW variants. This is
-         * due to there being no high level SPI and IO abstractions
-         * to pass in since WL55 does this through the STM HAL.
+        /**
+         * NUCLEO-WL55JC development kit
          *
          * */
-        class NucleoWL55JCX : public WL55 {
+        class NucleoWL55JC : public WL55 {
 
             public:
 
-                NucleoWL55JCX(
+                NucleoWL55JC(
                     int16_t tx_gain = 0
                 )
                     :

@@ -26,10 +26,29 @@
 
 namespace LDL {
 
+    /**
+     * SX1261 driver
+     *
+     * */
     class SX1261 : public SX126X {
 
         public:
 
+            /** create
+             *
+             * @param[in] spi
+             * @param[in] nss
+             * @param[in] reset
+             * @param[in] dio1
+             * @param[in] dio2
+             * @param[in] dio3
+             * @param[in] tx_gain
+             * @param[in] regulator
+             * @param[in] voltage
+             * @param[in] xtal
+             * @param[in] chip_mode_cb
+             *
+             * */
             SX1261(
                 SPI& spi,
                 PinName nss,

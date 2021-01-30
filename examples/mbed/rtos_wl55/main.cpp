@@ -16,7 +16,7 @@ int main()
 
     static LDL::DefaultSM sm(app_key, nwk_key);
     static LDL::DefaultStore store(dev_eui, join_eui);
-    static LDL::HW::NucleoWL55JCX radio;
+    static LDL::HW::NucleoWL55JC radio;
 
     static LDL::Device device(store, sm, radio);
 
