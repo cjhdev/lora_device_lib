@@ -80,8 +80,9 @@ test_container:
 compile:
 	@ echo building $(APP)
 	cd $(DIR_APP) && $(DOCKER) $(VOLUMES) -v $(DIR_APP):/mbed:cached $(NAME):$(TAG) compile -m $(DEVICE) -t GCC_ARM --profile $(PROFILE)
+	@ cd $(DIR_APP) && $(DOCKER) $(VOLUMES) -v $(DIR_APP):/mbed:cached --entrypoint arm-none-eabi-objcopy $(NAME):$(TAG) -O ihex $(DIR_BUILD)/mbed.elf $(DIR_BUILD)/mbed.hex
 
-flash: $(DIR_APP)/upload_flash.jlink $(DIR_APP)/$(DIR_BUILD)/mbed.hex
+flash: $(DIR_APP)/upload_flash.jlink compile
 	cd $(DIR_APP) && $(JLINK) -device $(JLINK_DEVICE) -if swd -speed $(JLINK_SPEED) -CommanderScript $<
 
 gdb: $(DIR_APP)/.gdbinit flash
@@ -89,9 +90,6 @@ gdb: $(DIR_APP)/.gdbinit flash
 
 gdb_server:
 	$(GDB_SERVER) -if swd -device $(JLINK_DEVICE) -vd -speed $(JLINK_SPEED) -endian little
-
-$(DIR_APP)/$(DIR_BUILD)/mbed.hex: compile
-	cd $(DIR_APP) && $(DOCKER) $(VOLUMES) -v $(DIR_APP):/mbed:cached --entrypoint arm-none-eabi-objcopy $(NAME):$(TAG) -O ihex $(DIR_BUILD)/mbed.elf $(DIR_BUILD)/mbed.hex
 
 $(DIR_APP)/upload_flash.jlink:
 	@ rm -f $@
