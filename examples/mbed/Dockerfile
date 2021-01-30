@@ -8,8 +8,7 @@ RUN dpkg --add-architecture i386 \
   && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
     python python-pip \
-    libc6:i386 libncurses5:i386 libstdc++6:i386 \
-    crossbuild-essential-armhf build-essential git mercurial \
+    git mercurial \
     wget \
   && pip install mbed-cli \
   && wget -O /tmp/mbed-cli-requirements.txt $mbed_requirements_url \
