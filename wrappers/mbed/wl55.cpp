@@ -108,6 +108,8 @@ WL55::WL55(
 
         instances = this;
     }
+
+    NVIC_EnableIRQ(SUBGHZ_Radio_IRQn);
 }
 
 WL55::~WL55()
