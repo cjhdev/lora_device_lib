@@ -110,6 +110,9 @@ WL55::WL55(
     }
 
     NVIC_EnableIRQ(SUBGHZ_Radio_IRQn);
+
+
+    //LL_RCC_HSE_EnableTcxo();
 }
 
 WL55::~WL55()
@@ -151,17 +154,18 @@ WL55::~WL55()
 static uint32_t get_prescale(uint32_t hz)
 {
     static const uint32_t settings[] =  {
-        SPI_BAUDRATEPRESCALER_2,
-        SPI_BAUDRATEPRESCALER_4,
-        SPI_BAUDRATEPRESCALER_8,
-        SPI_BAUDRATEPRESCALER_16,
-        SPI_BAUDRATEPRESCALER_32,
-        SPI_BAUDRATEPRESCALER_64,
-        SPI_BAUDRATEPRESCALER_128,
-        SPI_BAUDRATEPRESCALER_256
+        SUBGHZSPI_BAUDRATEPRESCALER_2,
+        SUBGHZSPI_BAUDRATEPRESCALER_4,
+        SUBGHZSPI_BAUDRATEPRESCALER_8,
+        SUBGHZSPI_BAUDRATEPRESCALER_16,
+        SUBGHZSPI_BAUDRATEPRESCALER_32,
+        SUBGHZSPI_BAUDRATEPRESCALER_64,
+        SUBGHZSPI_BAUDRATEPRESCALER_128,
+        SUBGHZSPI_BAUDRATEPRESCALER_256
     };
 
-    uint32_t spi_hz = HAL_RCC_GetPCLK1Freq();
+    /* apparently PCLK3 and HCLK3 are the same thing */
+    uint32_t spi_hz = HAL_RCC_GetHCLK3Freq();
     size_t i;
 
     for(i=0; i < sizeof(settings)/sizeof(*settings); i++){
@@ -179,6 +183,8 @@ static uint32_t get_prescale(uint32_t hz)
 
 static void init_spi()
 {
+    __HAL_RCC_SUBGHZSPI_CLK_ENABLE();
+
     CLEAR_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
 
     WRITE_REG(SUBGHZSPI->CR1, (SPI_CR1_MSTR | SPI_CR1_SSI | get_prescale(MBED_CONF_LDL_SPI_FREQUENCY) | SPI_CR1_SSM));
@@ -191,6 +197,8 @@ static void init_spi()
 static void deinit_spi()
 {
     CLEAR_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
+
+    __HAL_RCC_SUBGHZSPI_CLK_DISABLE();
 }
 
 static void write_spi(const void *data, size_t size)
@@ -395,6 +403,7 @@ WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_
         }
         else if(timer.elapsed_time() > 1s){
 
+            LDL_ERROR("RF BUSY")
             break;
         }
         else{
@@ -430,6 +439,7 @@ WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
         }
         else if(timer.elapsed_time() > 1s){
 
+            LDL_ERROR("RF BUSY")
             break;
         }
         else{

@@ -41,7 +41,7 @@ ifeq  ($(APP),rtos_wl55)
 
 DIR_APP := $(shell pwd)/rtos_wl55
 DEVICE := NUCLEO_WL55JC
-JLINK_DEVICE := STM32L072CZ
+JLINK_DEVICE := STM32WL55JC
 
 else
 
