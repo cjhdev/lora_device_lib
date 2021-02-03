@@ -83,6 +83,7 @@ namespace LDL {
                         enable_rfo = 0;
                         enable_boost = 1;
                         break;
+                    case LDL_CHIP_MODE_TX:
                     case LDL_CHIP_MODE_TX_RFO:
                         enable_rfi = 0;
                         enable_rfo = 1;

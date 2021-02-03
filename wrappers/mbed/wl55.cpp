@@ -44,6 +44,21 @@ const struct ldl_radio_interface WL55::_interface = {
 WL55 * WL55::instances = nullptr;
 Mutex WL55::lock;
 
+static void enable_irq()
+{
+    /* clear the pending that will be hanging around
+     * from the last time we silenced an active interrupt
+     * source */
+    NVIC_ClearPendingIRQ(SUBGHZ_Radio_IRQn);
+
+    NVIC_EnableIRQ(SUBGHZ_Radio_IRQn);
+}
+
+static void disable_irq()
+{
+    NVIC_DisableIRQ(SUBGHZ_Radio_IRQn);
+}
+
 /* constructors *******************************************************/
 
 WL55::WL55(
@@ -81,51 +96,40 @@ WL55::WL55(
 
     LDL_Radio_setEventCallback(&radio, (struct ldl_mac *)this, &Radio::_interrupt_handler);
 
-    NVIC_SetVector(SUBGHZ_Radio_IRQn, (uint32_t)_handle_irq);
+    core_util_critical_section_enter();
 
-    LL_EXTI_ClearFlag_32_63(LL_EXTI_LINE_44);
-    LL_EXTI_EnableRisingTrig_32_63(LL_EXTI_LINE_44);
+    if(instances){
 
+        WL55 *ptr;
+
+        for(ptr=instances; ptr->next_instance; ptr = ptr->next_instance);
+
+        ptr->next_instance = this;
+    }
+    else{
+
+        NVIC_SetVector(SUBGHZ_Radio_IRQn, (uint32_t)_handle_irq);
+
+        instances = this;
+    }
+
+    /* this is about waking from sleep, nothing to do with the interrupt */
 #if defined(CM0PLUS)
     LL_C2_EXTI_EnableIT_32_63(LL_EXTI_LINE_44);
 #else
     LL_EXTI_EnableIT_32_63(LL_EXTI_LINE_44);
 #endif
 
-    if(instances){
-
-        WL55 *ptr;
-
-        core_util_critical_section_enter();
-
-        for(ptr=instances; ptr->next_instance; ptr = ptr->next_instance);
-
-        ptr->next_instance = this;
-
-        core_util_critical_section_exit();
-    }
-    else{
-
-        instances = this;
-    }
-
-    NVIC_EnableIRQ(SUBGHZ_Radio_IRQn);
+    //LL_PWR_SetRadioIRQTrigger(LL_PWR_RADIO_IRQ_TRIGGER_WU_IT);
 
 
-    //LL_RCC_HSE_EnableTcxo();
+    core_util_critical_section_exit();
+
 }
 
 WL55::~WL55()
 {
-#if defined(CM0PLUS)
-    LL_C2_EXTI_DisableIT_32_63(LL_EXTI_LINE_44);
-#else
-    LL_EXTI_DisableIT_32_63(LL_EXTI_LINE_44);
-#endif
-
-    LL_EXTI_ClearFlag_32_63(LL_EXTI_LINE_44);
-
-    timer.stop();
+   timer.stop();
 
     WL55 *ptr, *prev = nullptr;
 
@@ -179,26 +183,6 @@ static uint32_t get_prescale(uint32_t hz)
     }
 
     return settings[i];
-}
-
-static void init_spi()
-{
-    __HAL_RCC_SUBGHZSPI_CLK_ENABLE();
-
-    CLEAR_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
-
-    WRITE_REG(SUBGHZSPI->CR1, (SPI_CR1_MSTR | SPI_CR1_SSI | get_prescale(MBED_CONF_LDL_SPI_FREQUENCY) | SPI_CR1_SSM));
-
-    WRITE_REG(SUBGHZSPI->CR2, (SPI_CR2_FRXTH |  SPI_CR2_DS_0 | SPI_CR2_DS_1 | SPI_CR2_DS_2));
-
-    SET_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
-}
-
-static void deinit_spi()
-{
-    CLEAR_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
-
-    __HAL_RCC_SUBGHZSPI_CLK_DISABLE();
 }
 
 static void write_spi(const void *data, size_t size)
@@ -271,14 +255,46 @@ static void read_spi(void *data, size_t size)
 
 /* static protected ***************************************************/
 
+volatile uint16_t last_status = 0;
+
 void
 WL55::_handle_irq()
 {
-    LL_EXTI_ClearFlag_32_63(LL_EXTI_LINE_44);
+    uint8_t opcode[] = {0x12,0};
 
-    for(WL55 *ptr=instances; ptr; ptr = ptr->next_instance){
+    if(instances){
 
-        LDL_Radio_handleInterrupt(&ptr->radio, 1);
+        for(WL55 *ptr=instances; ptr; ptr = ptr->next_instance){
+
+    #if 0
+            HAL_Delay(100);
+    #endif
+
+
+            last_status = 0;
+
+    #if 1
+            ptr->chip_select(true);
+            ptr->chip_read(opcode, sizeof(opcode), (void *)&last_status, sizeof(last_status));
+            ptr->chip_select(false);
+
+            if(last_status != 0){
+
+                LDL_Radio_handleInterrupt(&ptr->radio, 1);
+
+                /* this is a direct that can only be cleared by accessing radio via subghz
+                 * in this handler.
+                 *
+                 * this is not how the driver expects to work and so workaround is
+                 * just to turn it off here and on later when required */
+                disable_irq();
+            }
+    #endif
+        }
+    }
+    else{
+
+        disable_irq();
     }
 }
 
@@ -365,9 +381,17 @@ WL55::chip_select(bool state)
 {
     if(state){
 
-        lock.lock();
+        //lock.lock();
 
-        init_spi();
+        __HAL_RCC_SUBGHZSPI_CLK_ENABLE();
+
+        CLEAR_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
+
+        WRITE_REG(SUBGHZSPI->CR1, (SPI_CR1_MSTR | SPI_CR1_SSI | get_prescale(MBED_CONF_LDL_SPI_FREQUENCY) | SPI_CR1_SSM));
+
+        WRITE_REG(SUBGHZSPI->CR2, (SPI_CR2_FRXTH |  SPI_CR2_DS_0 | SPI_CR2_DS_1 | SPI_CR2_DS_2));
+
+        SET_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
 
         LL_PWR_SelectSUBGHZSPI_NSS();
     }
@@ -375,9 +399,11 @@ WL55::chip_select(bool state)
 
         LL_PWR_UnselectSUBGHZSPI_NSS();
 
-        deinit_spi();
+        CLEAR_BIT(SUBGHZSPI->CR1, SPI_CR1_SPE);
 
-        lock.unlock();
+        __HAL_RCC_SUBGHZSPI_CLK_DISABLE();
+
+        //lock.unlock();
     }
 }
 
@@ -386,7 +412,7 @@ WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_
 {
     bool retval = false;
 
-    uint32_t mask = LL_PWR_IsActiveFlag_RFBUSYMS();
+    //uint32_t mask = LL_PWR_IsActiveFlag_RFBUSYMS();
 
     timer.reset();
 
@@ -394,7 +420,7 @@ WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_
 
     while(!retval){
 
-        if((LL_PWR_IsActiveFlag_RFBUSYS() & mask) == 0U){
+        if((LL_PWR_IsActiveFlag_RFBUSYS() & LL_PWR_IsActiveFlag_RFBUSYMS()) == 0U){
 
             write_spi(opcode, opcode_size);
             write_spi(data, size);
@@ -422,7 +448,7 @@ WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
 {
     bool retval = false;
 
-    uint32_t mask = LL_PWR_IsActiveFlag_RFBUSYMS();
+    //uint32_t mask = ;
 
     timer.reset();
 
@@ -430,7 +456,7 @@ WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
 
     while(!retval){
 
-        if((LL_PWR_IsActiveFlag_RFBUSYS() & mask) == 0U){
+        if((LL_PWR_IsActiveFlag_RFBUSYS() & LL_PWR_IsActiveFlag_RFBUSYMS()) == 0U){
 
             write_spi(opcode, opcode_size);
             read_spi(data, size);
@@ -462,6 +488,15 @@ WL55::chip_set_mode(enum ldl_chip_mode mode)
         break;
     case LDL_CHIP_MODE_SLEEP:
         LL_RCC_RF_DisableReset();
+        break;
+    case LDL_CHIP_MODE_STANDBY:
+        break;
+    case LDL_CHIP_MODE_RX:
+    case LDL_CHIP_MODE_TX:
+    case LDL_CHIP_MODE_TX_RFO:
+    case LDL_CHIP_MODE_TX_BOOST:
+        last_status = UINT16_MAX;
+        enable_irq();
         break;
     default:
         break;

@@ -336,6 +336,8 @@ void LDL_SX127X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
 
     case LDL_RADIO_MODE_HOLD:
 
+        self->chip_set_mode(self->chip, LDL_CHIP_MODE_STANDBY);
+
         switch(self->mode){
         case LDL_RADIO_MODE_RX:
         case LDL_RADIO_MODE_TX:

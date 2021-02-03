@@ -78,8 +78,13 @@ extern "C" {
 #include <stddef.h>
 #include <stdbool.h>
 
-/** chip mode tells the chip interface code what to do
+/** Chip mode tells the chip interface code what to do
  * with various IO lines.
+ *
+ * sx126x and sx127x drivers set slightly different TX modes.
+ *
+ * - sx126x chip handles PA switching hence one TX mode
+ * - sx127x chip does not handle PA switching hence two modes
  *
  * */
 enum ldl_chip_mode {
@@ -88,8 +93,9 @@ enum ldl_chip_mode {
     LDL_CHIP_MODE_SLEEP,        /**< oscillator is off */
     LDL_CHIP_MODE_STANDBY,      /**< oscillator is on */
     LDL_CHIP_MODE_RX,           /**< receiving */
-    LDL_CHIP_MODE_TX_RFO,       /**< transmit using RFO PA */
-    LDL_CHIP_MODE_TX_BOOST      /**< transmit using BOOST PA */
+    LDL_CHIP_MODE_TX_RFO,       /**< transmit using RFO PA (sx127x) */
+    LDL_CHIP_MODE_TX_BOOST,     /**< transmit using BOOST PA (sx127x) */
+    LDL_CHIP_MODE_TX            /**< transmit (sx126x) */
 };
 
 /** Use this function to configure the transceiver and associated

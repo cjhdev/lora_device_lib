@@ -94,8 +94,8 @@ namespace LDL {
                 int16_t tx_gain = 0,
                 enum ldl_sx126x_regulator regulator = LDL_SX126X_REGULATOR_LDO,
                 enum ldl_sx126x_txen txen = LDL_SX126X_TXEN_ENABLED,
-                enum ldl_sx126x_voltage voltage = LDL_SX126X_VOLTAGE_1V7,
-                enum ldl_radio_xtal xtal = LDL_RADIO_XTAL_TCXO,
+                enum ldl_sx126x_voltage voltage = LDL_SX126X_VOLTAGE_1V6,
+                enum ldl_radio_xtal xtal = LDL_RADIO_XTAL_CRYSTAL,
                 Callback<void(enum ldl_chip_mode)> chip_mode_cb = nullptr
             );
 

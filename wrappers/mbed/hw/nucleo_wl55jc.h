@@ -46,8 +46,8 @@ namespace LDL {
                         tx_gain,
                         LDL_SX126X_REGULATOR_DCDC,
                         LDL_SX126X_TXEN_ENABLED,
-                        LDL_SX126X_VOLTAGE_1V6,
-                        LDL_RADIO_XTAL_CRYSTAL
+                        LDL_SX126X_VOLTAGE_1V7,
+                        LDL_RADIO_XTAL_TCXO
                     )
                 {
                 }
