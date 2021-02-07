@@ -142,6 +142,7 @@ and read [history.md](history.md) if updating from an older version.
     - SX1276
     - SX1261
     - SX1262
+    - STM32WL55
 - Linted to MISRA 2012
 - Examples
     - [readme example](examples/doxygen/example.c)

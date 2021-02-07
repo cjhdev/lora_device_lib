@@ -278,7 +278,7 @@ static void printDeviceErrors(struct ldl_radio *self);
 static bool ReadBuffer(struct ldl_radio *self, uint8_t offset, uint8_t *data, uint8_t size);
 static bool WriteBuffer(struct ldl_radio *self, uint8_t offset, const uint8_t *data, uint8_t size);
 
-static bool setPower(struct ldl_radio *self, int16_t dbm);
+static bool SetPower(struct ldl_radio *self, int16_t dbm);
 static bool SetPaConfig(struct ldl_radio *self, uint8_t paDutyCycle, uint8_t hpMax, uint8_t pa);
 
 static bool SetSyncWord(struct ldl_radio *self, uint16_t value);
@@ -500,7 +500,7 @@ void LDL_SX126X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
     bool ok;
 
     /* note this is dbm x 100 */
-    int16_t dbm = settings->dbm + self->tx_gain;
+    int16_t dbm = settings->dbm - self->tx_gain;
 
     (void)ClearIrqStatus(self, UINT16_MAX);
 
@@ -523,7 +523,7 @@ void LDL_SX126X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
         }
 
         /* set power up here so that IO has time to settle */
-        ok = setPower(self, dbm);
+        ok = SetPower(self, dbm);
         if(!ok){ break; }
 
         ok = SetBufferBaseAddress(self, 0, 0);
@@ -782,7 +782,7 @@ static void init_state(struct ldl_radio *self, enum ldl_radio_type type, const s
     self->state.sx126x.xtb = arg->xtb;
 }
 
-static bool setPower(struct ldl_radio *self, int16_t dbm)
+static bool SetPower(struct ldl_radio *self, int16_t dbm)
 {
     bool retval = false;
     uint8_t paDutyCycle;

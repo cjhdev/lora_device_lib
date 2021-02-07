@@ -83,7 +83,7 @@ namespace LDL {
 
             /** create
              *
-             * @param[in] tx_gain
+             * @param[in] tx_gain       antenna gain (dB x 100)
              * @param[in] pa            power amplifier to use
              * @param[in] regulator     LDO or DCDC regulator option
              * @param[in] voltage       voltage to supply to XTAL (ignored if using crystal type)
@@ -92,7 +92,7 @@ namespace LDL {
              *
              * */
             WL55(
-                int16_t tx_gain = 0,
+                int16_t tx_gain = 200,
                 enum ldl_sx126x_pa pa = LDL_SX126X_PA_AUTO,
                 enum ldl_sx126x_regulator regulator = LDL_SX126X_REGULATOR_LDO,
                 enum ldl_sx126x_voltage voltage = LDL_SX126X_VOLTAGE_1V6,

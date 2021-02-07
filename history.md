@@ -5,6 +5,14 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
+## 0.5.3
+
+- added support for STM32WL55x
+- added MBED wrapper for Nucleo STM32WL55JC kit
+- added antenna gain defaults to MBED wrapper
+- changed the way tx_gain compensation so that a positive gain
+  will subtract from the requested power setting (instead of adding to it)
+
 ## 0.5.2
 
 - added deep sleep locking to wrappers/mbed/device.cpp

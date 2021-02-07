@@ -383,7 +383,7 @@ void LDL_SX127X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
         .crc = true
     };
 
-    int16_t dbm = settings->dbm + self->tx_gain;
+    int16_t dbm = settings->dbm - self->tx_gain;
 
 #ifdef LDL_ENABLE_RADIO_DEBUG
     debugLogReset(self);
@@ -419,7 +419,7 @@ void LDL_SX127X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
     writeReg(self, RegIrqFlagsMask, 0xf7U);             // unmask TX_DONE interrupt
     writeReg(self, RegFifoTxBaseAddr, 0U);              // set tx base
     writeReg(self, RegFifoAddrPtr, 0U);                 // set address pointer
-    writeReg(self, LoraRegPayloadLength, len);          // bytes to transmit (note. datasheet doesn't say we have to but in practice we do)
+    writeReg(self, LoraRegPayloadLength, len);          // bytes to transmit
     burstWrite(self, RegFifo, data, len);               // write buffer
 
     setFreq(self, settings->freq);                      // set carrier frequency

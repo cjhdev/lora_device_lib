@@ -93,16 +93,21 @@ namespace LDL {
 
             public:
 
-                /* PA_12 is where the reference design puts the TCXO on/off
+                /** Create
+                 *
+                 * PA_12 is where the reference design puts the TCXO on/off
                  * control line, and also where you will find it on the LRWAN
                  * kit.
                  *
                  * If you want to use USB this needs to move to another pin.
                  *
+                 * @param[in] enable_tcxo   pin that switches on TCXO
+                 * @param[in] tx_gain       antenna gain (dB x 100)
+                 *
                  * */
                 CMWX1ZZABZ(
                     PinName enable_tcxo = PA_12,
-                    int16_t tx_gain = 0
+                    int16_t tx_gain = 200
                 )
                     :
                     Radio(),

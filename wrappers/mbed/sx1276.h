@@ -46,7 +46,7 @@ namespace LDL {
              * @param[in] dio4
              * @param[in] dio5
              * @param[in] pa
-             * @param[in] tx_gain
+             * @param[in] tx_gain       antenna gain (dB x 100)
              * @param[in] xtal
              * @param[in] chip_mode_cb
              *
@@ -62,7 +62,7 @@ namespace LDL {
                 PinName dio4 = NC,
                 PinName dio5 = NC,
                 enum ldl_sx127x_pa pa = LDL_SX127X_PA_RFO,
-                int16_t tx_gain = 0,
+                int16_t tx_gain = 200,
                 enum ldl_radio_xtal xtal = LDL_RADIO_XTAL_CRYSTAL,
                 Callback<void(enum ldl_chip_mode)> chip_mode_cb = nullptr
             )

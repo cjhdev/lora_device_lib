@@ -36,9 +36,9 @@ struct ldl_sx127x_init_arg {
     /** type of XTAL */
     enum ldl_radio_xtal xtal;
 
-    /** Apply TX gain compensation in units of (dB x 10-2)
+    /** Apply TX gain compensation in units of (dB x 100)
      *
-     * (e.g. -2.4dB == -240)
+     * (e.g. 2.4dB == 240)
      *
      * */
     int16_t tx_gain;

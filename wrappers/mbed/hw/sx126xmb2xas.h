@@ -54,8 +54,13 @@ namespace LDL {
 
             public:
 
+                /** Create
+                 *
+                 * @param[in] tx_gain       antenna gain (dB x 100)
+                 *
+                 * */
                 SX126XMB2XAS(
-                    int16_t tx_gain = 0
+                    int16_t tx_gain = 200
                 )
                     :
                     Radio(),

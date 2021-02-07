@@ -44,6 +44,7 @@ TESTS += tc_only_sx1272
 TESTS += tc_only_sx1276
 TESTS += tc_only_sx1261
 TESTS += tc_only_sx1262
+TESTS += tc_only_wl55
 TESTS += tc_only_us902
 TESTS += tc_only_au915
 
@@ -147,6 +148,13 @@ $(DIR_BIN)/tc_only_sx1261: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_dummy.o mock_ldl
 $(DIR_BIN)/tc_only_sx1262: CFLAGS += -DLDL_ENABLE_EU_863_870
 $(DIR_BIN)/tc_only_sx1262: CFLAGS += -DLDL_ENABLE_SX1262
 $(DIR_BIN)/tc_only_sx1262: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_dummy.o mock_ldl_system.o $(OBJ_CMOCKA))
+	@ echo linking $@
+	@ $(CC) $(LDFLAGS) $^ -o $@
+
+# check only wl55
+$(DIR_BIN)/tc_only_wl55: CFLAGS += -DLDL_ENABLE_EU_863_870
+$(DIR_BIN)/tc_only_wl55: CFLAGS += -DLDL_ENABLE_WL55
+$(DIR_BIN)/tc_only_wl55: $(addprefix $(DIR_BUILD)/, $(OBJ) tc_dummy.o mock_ldl_system.o $(OBJ_CMOCKA))
 	@ echo linking $@
 	@ $(CC) $(LDFLAGS) $^ -o $@
 

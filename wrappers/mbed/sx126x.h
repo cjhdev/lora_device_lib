@@ -52,7 +52,7 @@ namespace LDL {
                 PinName dio1,
                 PinName dio2,
                 PinName dio3,
-                int16_t tx_gain = 0,
+                int16_t tx_gain = 200,
                 enum ldl_sx126x_regulator regulator = LDL_SX126X_REGULATOR_LDO,
                 enum ldl_sx126x_txen txen = LDL_SX126X_TXEN_ENABLED,
                 enum ldl_sx126x_voltage voltage = LDL_SX126X_VOLTAGE_1V6,

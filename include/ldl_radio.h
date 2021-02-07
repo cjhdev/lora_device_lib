@@ -30,7 +30,7 @@
  * The application should initialise the radio with @ref ldl_mac in the following
  * order:
  *
- * -# LDL_SX1272_init()/LDL_SX1276_init()/LDL_SX1261_init()/LDL_SX1262_init()
+ * -# LDL_SX1272_init()/LDL_SX1276_init()/LDL_SX1261_init()/LDL_SX1262_init()/LDL_WL55_init()
  * -# LDL_MAC_init()
  * -# LDL_Radio_setEventCallback()
  *
@@ -219,7 +219,7 @@ struct ldl_radio {
         } sx127x;
 #endif
 
-#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_SX1262)
+#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_SX1262) || defined(LDL_ENABLE_WL55)
         struct {
 
             enum ldl_sx126x_pa pa;

@@ -85,6 +85,17 @@
     #define LDL_ENABLE_SX1262
     //#undef LDL_ENABLE_SX126X
 
+    /**
+     * Define to add support for WL55
+     *
+     * This is an SX126X except:
+     *
+     * - two power amplifiers
+     * - no dio2 switching function
+     *
+     * */
+    #define LDL_ENABLE_WL55
+    //#undef LDL_ENABLE_WL55
 
     #define LDL_DISABLE_CHECK
     #undef LDL_DISABLE_CHECK
