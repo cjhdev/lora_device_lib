@@ -31,7 +31,10 @@ namespace LDL {
     /**
      * STM32WL55x driver
      *
-     * This is essentially an SX1262 driver with special IO handling.
+     * Similar to SX126X except:
+     *
+     * - two power amplifiers
+     * - dio2 txen disabled
      *
      * */
     class WL55 : public Radio {
@@ -69,12 +72,9 @@ namespace LDL {
 
             static void _chip_set_mode(void *self, enum ldl_chip_mode mode);
 
-            /* it's absurd to have more than one instance but this
-             * this list and mutex ensures MBED won't go mad if you do
-             *
-             * */
-            WL55 *next_instance;
-            static WL55 *instances;
+            /* it would be absurd to have more than one instance of this class
+             * but nothing should crash */
+            static WL55 *instance;
             static Mutex lock;
 
         public:

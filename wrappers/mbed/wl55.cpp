@@ -41,7 +41,7 @@ const struct ldl_radio_interface WL55::_interface = {
     .get_status = WL55::_get_status
 };
 
-WL55 * WL55::instances = nullptr;
+WL55 * WL55::instance = nullptr;
 Mutex WL55::lock;
 
 static void enable_irq()
@@ -71,8 +71,7 @@ WL55::WL55(
 )
     :
     Radio(),
-    chip_mode_cb(chip_mode_cb),
-    next_instance(nullptr)
+    chip_mode_cb(chip_mode_cb)
 {
     timer.start();
 
@@ -98,20 +97,8 @@ WL55::WL55(
 
     core_util_critical_section_enter();
 
-    if(instances){
-
-        WL55 *ptr;
-
-        for(ptr=instances; ptr->next_instance; ptr = ptr->next_instance);
-
-        ptr->next_instance = this;
-    }
-    else{
-
-        NVIC_SetVector(SUBGHZ_Radio_IRQn, (uint32_t)_handle_irq);
-
-        instances = this;
-    }
+    instance = this;
+    NVIC_SetVector(SUBGHZ_Radio_IRQn, (uint32_t)_handle_irq);
 
     /* this is about waking from sleep, nothing to do with the interrupt */
 #if defined(CM0PLUS)
@@ -129,28 +116,8 @@ WL55::WL55(
 
 WL55::~WL55()
 {
-   timer.stop();
-
-    WL55 *ptr, *prev = nullptr;
-
-    core_util_critical_section_enter();
-
-    for(ptr=instances; ptr; prev = ptr, ptr = ptr->next_instance){
-
-        if(ptr == this){
-
-            if(prev){
-
-                prev->next_instance = next_instance;
-            }
-            else{
-
-                instances = next_instance;
-            }
-        }
-    }
-
-    core_util_critical_section_exit();
+    timer.stop();
+    instance = nullptr;
 }
 
 /* functions **********************************************************/
@@ -261,41 +228,38 @@ volatile int nothing_interrupt = 0;
 void
 WL55::_handle_irq()
 {
-    if(instances){
+    if(instance){
 
-        for(WL55 *ptr=instances; ptr; ptr = ptr->next_instance){
+#if 0
+        HAL_Delay(100);
+#endif
 
-    #if 0
-            HAL_Delay(100);
-    #endif
+#if 0
+        last_status = 0;
+        uint8_t opcode[] = {0x12,0};
 
-    #if 0
-            last_status = 0;
-            uint8_t opcode[] = {0x12,0};
+        instance->chip_select(true);
+        instance->chip_read(opcode, sizeof(opcode), (void *)&last_status, sizeof(last_status));
+        instance->chip_select(false);
 
-            ptr->chip_select(true);
-            ptr->chip_read(opcode, sizeof(opcode), (void *)&last_status, sizeof(last_status));
-            ptr->chip_select(false);
+        if(last_status != 0){
 
-            if(last_status != 0){
+            LDL_Radio_handleInterrupt(&instance->radio, 1);
 
-                LDL_Radio_handleInterrupt(&ptr->radio, 1);
-
-                /* this is a direct that can only be cleared by accessing radio via subghz
-                 * in this handler.
-                 *
-                 * this is not how the driver expects to work and so workaround is
-                 * just to turn it off here and on later when required */
-                disable_irq();
-            }
-            else{
-
-                nothing_interrupt++;
-            }
-    #else
-            LDL_Radio_handleInterrupt(&ptr->radio, 1);
-    #endif
+            /* this is a direct that can only be cleared by accessing radio via subghz
+             * in this handler.
+             *
+             * this is not how the driver expects to work and so workaround is
+             * just to turn it off here and on later when required */
+            disable_irq();
         }
+        else{
+
+            nothing_interrupt++;
+        }
+#else
+        LDL_Radio_handleInterrupt(&instance->radio, 1);
+#endif
     }
 
     disable_irq();
