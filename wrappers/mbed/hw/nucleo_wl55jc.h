@@ -103,6 +103,8 @@ namespace LDL {
                         callback(this, &NucleoWL55JC::set_mode)
                     )
                 {
+                    /* ensure that radio events can make it out of the real driver */
+                    radio.set_event_handler(callback(this, &NucleoWL55JC::handle_event));
                 }
 
                 const struct ldl_radio_interface *get_interface()

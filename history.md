@@ -7,6 +7,9 @@ work in progress.
 
 ## 0.5.3
 
+This release changes the way tx_gain is applied. Check your code before
+updating.
+
 - added support for STM32WL55x
 - added MBED wrapper for Nucleo STM32WL55JC kit
 - added antenna gain defaults to MBED wrapper

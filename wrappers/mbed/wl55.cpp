@@ -222,44 +222,12 @@ static void read_spi(void *data, size_t size)
 
 /* static protected ***************************************************/
 
-volatile uint16_t last_status = 0;
-volatile int nothing_interrupt = 0;
-
 void
 WL55::_handle_irq()
 {
     if(instance){
 
-#if 0
-        HAL_Delay(100);
-#endif
-
-#if 0
-        last_status = 0;
-        uint8_t opcode[] = {0x12,0};
-
-        instance->chip_select(true);
-        instance->chip_read(opcode, sizeof(opcode), (void *)&last_status, sizeof(last_status));
-        instance->chip_select(false);
-
-        if(last_status != 0){
-
-            LDL_Radio_handleInterrupt(&instance->radio, 1);
-
-            /* this is a direct that can only be cleared by accessing radio via subghz
-             * in this handler.
-             *
-             * this is not how the driver expects to work and so workaround is
-             * just to turn it off here and on later when required */
-            disable_irq();
-        }
-        else{
-
-            nothing_interrupt++;
-        }
-#else
         LDL_Radio_handleInterrupt(&instance->radio, 1);
-#endif
     }
 
     disable_irq();
@@ -464,7 +432,6 @@ WL55::chip_set_mode(enum ldl_chip_mode mode)
     case LDL_CHIP_MODE_RX:
     case LDL_CHIP_MODE_TX_RFO:
     case LDL_CHIP_MODE_TX_BOOST:
-        last_status = UINT16_MAX;
         enable_irq();
         break;
     default:

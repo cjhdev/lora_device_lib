@@ -1136,8 +1136,6 @@ static bool SetDioIrqParams(struct ldl_radio *self, uint16_t irq, uint16_t dio1,
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
 
-extern uint16_t last_status;
-
 static bool GetIrqStatus(struct ldl_radio *self, uint16_t *irq)
 {
     bool retval = false;
@@ -1156,7 +1154,6 @@ static bool GetIrqStatus(struct ldl_radio *self, uint16_t *irq)
         *irq |= buffer[1];
 
         LDL_INFO("status=0x%04X", *irq)
-        LDL_INFO("last_status=0x%04X", last_status)
 
         retval = true;
     }
