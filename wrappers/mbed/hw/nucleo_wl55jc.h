@@ -31,10 +31,53 @@ namespace LDL {
     namespace HW {
 
         /**
-         * NUCLEO-WL55JC development kit
+         * NUCLEO-WL55JC development kit in default configuration
          *
          * */
-        class NucleoWL55JC : public WL55 {
+        class NucleoWL55JC : public Radio {
+
+            private:
+
+                DigitalOut fe_ctrl1;
+                DigitalOut fe_ctrl2;
+                DigitalOut fe_ctrl3;
+
+                WL55 radio;
+
+                void set_mode(enum ldl_chip_mode mode)
+                {
+                    switch(mode){
+                    default:
+                        break;
+                    case LDL_CHIP_MODE_RESET:
+                    case LDL_CHIP_MODE_SLEEP:
+                    case LDL_CHIP_MODE_STANDBY:
+                        fe_ctrl1 = 0;
+                        fe_ctrl2 = 0;
+                        fe_ctrl3 = 0;
+                        break;
+                    case LDL_CHIP_MODE_TX_BOOST:
+                        fe_ctrl1 = 0;
+                        fe_ctrl2 = 1;
+                        fe_ctrl3 = 1;
+                        break;
+                    case LDL_CHIP_MODE_TX_RFO:
+                        fe_ctrl1 = 1;
+                        fe_ctrl2 = 1;
+                        fe_ctrl3 = 1;
+                        break;
+                    case LDL_CHIP_MODE_RX:
+                        fe_ctrl1 = 1;
+                        fe_ctrl2 = 0;
+                        fe_ctrl3 = 1;
+                        break;
+                    }
+                }
+
+                void handle_event()
+                {
+                    _interrupt_handler((struct ldl_mac *)this);
+                }
 
             public:
 
@@ -42,14 +85,29 @@ namespace LDL {
                     int16_t tx_gain = 0
                 )
                     :
-                    WL55(
+                    Radio(),
+                    fe_ctrl1(PC_4),
+                    fe_ctrl2(PC_5),
+                    fe_ctrl3(PC_3),
+                    radio(
                         tx_gain,
+                        LDL_SX126X_PA_AUTO,  // select based on requested power
                         LDL_SX126X_REGULATOR_DCDC,
-                        LDL_SX126X_TXEN_ENABLED,
                         LDL_SX126X_VOLTAGE_1V7,
-                        LDL_RADIO_XTAL_TCXO
+                        LDL_RADIO_XTAL_TCXO,
+                        callback(this, &NucleoWL55JC::set_mode)
                     )
                 {
+                }
+
+                const struct ldl_radio_interface *get_interface()
+                {
+                    return radio.get_interface();
+                }
+
+                Radio *get_state()
+                {
+                    return radio.get_state();
                 }
         };
     };

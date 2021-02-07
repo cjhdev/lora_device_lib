@@ -26,7 +26,7 @@
 #include "ldl_system.h"
 #include "ldl_internal.h"
 
-#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_SX1262)
+#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_SX1262) || defined(LDL_ENABLE_WL55)
 
 #define OPCODE_SET_SLEEP                    0x84
 #define OPCODE_SET_STANDBY                  0x80
@@ -253,7 +253,9 @@ static bool SetRxTxFallbackMode(struct ldl_radio *self, enum _rx_tx_fallback_mod
 static bool SetDioIrqParams(struct ldl_radio *self, uint16_t irq, uint16_t dio1, uint16_t dio2, uint16_t dio3);
 static bool GetIrqStatus(struct ldl_radio *self, uint16_t *irq);
 static bool ClearIrqStatus(struct ldl_radio *self, uint16_t irq);
+#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_SX1262)
 static bool SetDIO2AsRfSwitchCtrl(struct ldl_radio *self, enum ldl_sx126x_txen setting);
+#endif
 static bool SetDIO3AsTcxoCtrl(struct ldl_radio *self, enum ldl_sx126x_voltage setting, uint8_t ms);
 static bool SetRfFrequency(struct ldl_radio *self, uint32_t freq);
 static bool SetPacketType(struct ldl_radio *self, enum ldl_radio_sx126x_packet_type type);
@@ -276,16 +278,8 @@ static void printDeviceErrors(struct ldl_radio *self);
 static bool ReadBuffer(struct ldl_radio *self, uint8_t offset, uint8_t *data, uint8_t size);
 static bool WriteBuffer(struct ldl_radio *self, uint8_t offset, const uint8_t *data, uint8_t size);
 
-#ifdef LDL_ENABLE_SX1261
-static bool SX1261_setPower(struct ldl_radio *self, int16_t dbm);
-static bool SX1261_SetPaConfig(struct ldl_radio *self, uint8_t paDutyCycle, uint8_t hpMax);
-#endif
-
-#ifdef LDL_ENABLE_SX1262
-static bool SX1262_setPower(struct ldl_radio *self, int16_t dbm);
-static bool SX1262_SetPaConfig(struct ldl_radio *self, uint8_t paDutyCycle, uint8_t hpMax);
-#endif
-
+static bool setPower(struct ldl_radio *self, int16_t dbm);
+static bool SetPaConfig(struct ldl_radio *self, uint8_t paDutyCycle, uint8_t hpMax, uint8_t pa);
 
 static bool SetSyncWord(struct ldl_radio *self, uint16_t value);
 
@@ -326,10 +320,22 @@ const struct ldl_radio_interface *LDL_SX1262_getInterface(void)
 }
 #endif
 
+#ifdef LDL_ENABLE_WL55
+void LDL_WL55_init(struct ldl_radio *self, const struct ldl_sx126x_init_arg *arg)
+{
+    init_state(self, LDL_RADIO_WL55, arg);
+}
+
+const struct ldl_radio_interface *LDL_WL55_getInterface(void)
+{
+    return &interface;
+}
+#endif
+
 void LDL_SX126X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
 {
     LDL_PEDANTIC(self != NULL)
-    LDL_PEDANTIC((self->type == LDL_RADIO_SX1261) || (self->type == LDL_RADIO_SX1262))
+    LDL_PEDANTIC((self->type == LDL_RADIO_SX1261) || (self->type == LDL_RADIO_SX1262) || (self->type == LDL_RADIO_WL55))
 
     LDL_ASSERT(self->chip_read != NULL)
     LDL_ASSERT(self->chip_write != NULL)
@@ -384,7 +390,7 @@ void LDL_SX126X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
         case LDL_RADIO_MODE_TX:
         case LDL_RADIO_MODE_HOLD:
 
-            (void)ClearIrqStatus(self, 0xff);
+            (void)ClearIrqStatus(self, UINT16_MAX);
             (void)SetSleep(self, SLEEP_MODE_COLD);
             self->chip_set_mode(self->chip, LDL_CHIP_MODE_SLEEP);
             break;
@@ -410,8 +416,16 @@ void LDL_SX126X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
 
             (void)SetRegulatorMode(self, self->state.sx126x.regulator);
 
-            (void)SetDIO2AsRfSwitchCtrl(self, self->state.sx126x.txen);
-
+#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_SX1262)
+            switch(self->type){
+            case LDL_RADIO_SX1261:
+            case LDL_RADIO_SX1262:
+                (void)SetDIO2AsRfSwitchCtrl(self, self->state.sx126x.txen);
+                break;
+            default:
+                break;
+            }
+#endif
             if(self->xtal == LDL_RADIO_XTAL_TCXO){
 
                 /* keep xtal running after calibrate */
@@ -441,6 +455,8 @@ void LDL_SX126X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
 
         case LDL_RADIO_MODE_HOLD:
 
+            self->chip_set_mode(self->chip, LDL_CHIP_MODE_STANDBY);
+
             /* start the XTAL */
             (void)SetStandby(self, STDBY_XOSC);
             break;
@@ -458,7 +474,7 @@ void LDL_SX126X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
         case LDL_RADIO_MODE_RX:
         case LDL_RADIO_MODE_TX:
 
-            (void)ClearIrqStatus(self, 0xff);
+            (void)ClearIrqStatus(self, UINT16_MAX);
             (void)SetSleep(self, SLEEP_MODE_WARM);
 
             break;
@@ -479,10 +495,14 @@ void LDL_SX126X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
 void LDL_SX126X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len)
 {
     LDL_PEDANTIC(self != NULL)
-    LDL_PEDANTIC((self->type == LDL_RADIO_SX1261) || (self->type == LDL_RADIO_SX1262))
+    LDL_PEDANTIC((self->type == LDL_RADIO_SX1261) || (self->type == LDL_RADIO_SX1262) || (self->type == LDL_RADIO_WL55))
 
     bool ok;
+
+    /* note this is dbm x 100 */
     int16_t dbm = settings->dbm + self->tx_gain;
+
+    (void)ClearIrqStatus(self, UINT16_MAX);
 
     if(dbm > settings->max_eirp){
 
@@ -501,6 +521,10 @@ void LDL_SX126X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
 
             self->state.sx126x.image_calibration_pending = false;
         }
+
+        /* set power up here so that IO has time to settle */
+        ok = setPower(self, dbm);
+        if(!ok){ break; }
 
         ok = SetBufferBaseAddress(self, 0, 0);
         if(!ok){ break; }
@@ -543,22 +567,6 @@ void LDL_SX126X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
         ok = SetSyncWord(self, 0x3444);
         if(!ok){ break; }
 
-#ifdef LDL_ENABLE_SX1261
-        if(self->type == LDL_RADIO_SX1261){
-
-            ok = SX1261_setPower(self, dbm);
-            if(!ok){ break; }
-        }
-#endif
-
-#ifdef LDL_ENABLE_SX1262
-        if(self->type == LDL_RADIO_SX1262){
-
-            ok = SX1262_setPower(self, dbm);
-            if(!ok){ break; }
-        }
-#endif
-
         ok = SetTx(self, 0);
     }
     while(false);
@@ -572,10 +580,14 @@ void LDL_SX126X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
 void LDL_SX126X_receive(struct ldl_radio *self, const struct ldl_radio_rx_setting *settings)
 {
     LDL_PEDANTIC(self != NULL)
-    LDL_PEDANTIC((self->type == LDL_RADIO_SX1261) || (self->type == LDL_RADIO_SX1262))
+    LDL_PEDANTIC((self->type == LDL_RADIO_SX1261) || (self->type == LDL_RADIO_SX1262) || (self->type == LDL_RADIO_WL55))
 
     bool ok;
     uint8_t timeout = (settings->timeout > U16(UINT8_MAX)) ? U8(UINT8_MAX) : U8(settings->timeout);
+
+    (void)ClearIrqStatus(self, UINT16_MAX);
+
+    self->chip_set_mode(self->chip, LDL_CHIP_MODE_RX);
 
     do{
 
@@ -678,6 +690,10 @@ void LDL_SX126X_receiveEntropy(struct ldl_radio *self)
 {
     bool ok;
 
+    (void)ClearIrqStatus(self, UINT16_MAX);
+
+    self->chip_set_mode(self->chip, LDL_CHIP_MODE_RX);
+
     do{
 
         ok = SetPacketType(self, PACKET_TYPE_LORA);
@@ -726,6 +742,8 @@ void LDL_SX126X_getStatus(struct ldl_radio *self, struct ldl_radio_status *statu
     }
     else{
 
+        LDL_ERROR("GetIRQStatus")
+
         (void)memset(status, 0, sizeof(*status));
     }
 }
@@ -754,6 +772,7 @@ static void init_state(struct ldl_radio *self, enum ldl_radio_type type, const s
     self->tx_gain = arg->tx_gain;
     self->xtal = arg->xtal;
 
+    self->state.sx126x.pa = arg->pa;
     self->state.sx126x.regulator = arg->regulator;
     self->state.sx126x.voltage = arg->voltage;
     self->state.sx126x.txen = arg->txen;
@@ -763,93 +782,136 @@ static void init_state(struct ldl_radio *self, enum ldl_radio_type type, const s
     self->state.sx126x.xtb = arg->xtb;
 }
 
-#ifdef LDL_ENABLE_SX1261
-static bool SX1261_setPower(struct ldl_radio *self, int16_t dbm)
-{
-    bool retval = false;
-    uint8_t paDutyCycle;
-
-    dbm /= S16(100);
-
-    if(dbm > 14){
-
-        dbm = 14;
-    }
-    else if(dbm < -17){
-
-        dbm = -17;
-    }
-    else{
-
-        /* nothing */
-    }
-
-    if(dbm > 10){
-
-        paDutyCycle = 4;
-    }
-    else{
-
-        paDutyCycle = 1;
-    }
-
-    if(SX1261_SetPaConfig(self, paDutyCycle, 0)){
-
-        retval = SetTxParams(self, (int8_t)dbm, SET_RAMP_200U);
-    }
-
-    return retval;
-}
-#endif
-
-#ifdef LDL_ENABLE_SX1262
-static bool SX1262_setPower(struct ldl_radio *self, int16_t dbm)
+static bool setPower(struct ldl_radio *self, int16_t dbm)
 {
     bool retval = false;
     uint8_t paDutyCycle;
     uint8_t hpMax;
+    enum ldl_sx126x_pa pa = LDL_SX126X_PA_LP;
 
     dbm /= S16(100);
 
-    if(dbm > 22){
+    switch(self->type){
+    default:
+        break;
+#ifdef LDL_ENABLE_SX1261
+    case LDL_RADIO_SX1261:
+        pa = LDL_SX126X_PA_LP;
+        self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_RFO);
+        break;
+#endif
+#ifdef LDL_ENABLE_SX1262
+    case LDL_RADIO_SX1262:
+        pa = LDL_SX126X_PA_HP;
+        self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_BOOST);
+        break;
+#endif
+#ifdef LDL_ENABLE_WL55
+    case LDL_RADIO_WL55:
 
-        dbm = 22;
+        switch(self->state.sx126x.pa){
+        default:
+        case LDL_SX126X_PA_AUTO:
+            pa = (dbm > 15) ? LDL_SX126X_PA_HP : LDL_SX126X_PA_HP;
+            self->chip_set_mode(self->chip, (pa == LDL_SX126X_PA_HP) ? LDL_CHIP_MODE_TX_BOOST : LDL_CHIP_MODE_TX_RFO);
+            break;
+        case LDL_SX126X_PA_LP:
+            pa = self->state.sx126x.pa;
+            self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_RFO);
+            break;
+        case LDL_SX126X_PA_HP:
+            pa = self->state.sx126x.pa;
+            self->chip_set_mode(self->chip, LDL_CHIP_MODE_TX_BOOST);
+            break;
+        }
+        break;
+#endif
     }
-    else if(dbm < -9){
 
-        dbm = -9;
-    }
+    switch(pa){
+    default:
+        break;
+#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_WL55)
+    case LDL_SX126X_PA_LP:
 
-    /* you may want to adjust these values if fine tuning hardware */
-    if(dbm > 20){
+        hpMax = 0;
 
-        paDutyCycle = 4;    /* datasheet says never exceed this value */
-        hpMax = 7;          /* datasheet says never exceed this value */
-    }
-    else if(dbm > 17){
+        if(dbm > 14){
 
-        paDutyCycle = 3;
-        hpMax = 5;
-    }
-    else if(dbm > 14){
+            dbm = 14;
+        }
+        else if(dbm < -17){
 
-        paDutyCycle = 2;
-        hpMax = 3;
-    }
-    else{
+            dbm = -17;
+        }
+        else{
 
-        paDutyCycle = 2;
-        hpMax = 2;
-    }
+            /* nothing */
+        }
 
-    if(SX1262_SetPaConfig(self, paDutyCycle, hpMax)){
+        if(dbm > 10){
 
-        retval = SetTxParams(self, (int8_t)dbm, SET_RAMP_200U);
+            paDutyCycle = 4;
+        }
+        else{
+
+            paDutyCycle = 1;
+        }
+
+        if(SetPaConfig(self, paDutyCycle, hpMax, 1)){
+
+            retval = SetTxParams(self, (int8_t)dbm, SET_RAMP_200U);
+        }
+        break;
+#endif
+#if defined(LDL_ENABLE_SX1262) || defined(LDL_ENABLE_WL55)
+    case LDL_SX126X_PA_HP:
+
+        if(dbm > 22){
+
+            dbm = 22;
+        }
+        else if(dbm < -9){
+
+            dbm = -9;
+        }
+        else{
+
+            /* nothing */
+        }
+
+        /* you may want to adjust these values if fine tuning hardware */
+        if(dbm > 20){
+
+            paDutyCycle = 4;    /* datasheet says never exceed this value */
+            hpMax = 7;          /* datasheet says never exceed this value */
+        }
+        else if(dbm > 17){
+
+            paDutyCycle = 3;
+            hpMax = 5;
+        }
+        else if(dbm > 14){
+
+            paDutyCycle = 2;
+            hpMax = 3;
+        }
+        else{
+
+            paDutyCycle = 2;
+            hpMax = 2;
+        }
+
+        if(SetPaConfig(self, paDutyCycle, hpMax, 0)){
+
+            retval = SetTxParams(self, (int8_t)dbm, SET_RAMP_200U);
+        }
+        break;
+#endif
     }
 
     return retval;
 }
-#endif
 
 static bool SetSleep(struct ldl_radio *self, enum _sleep_mode mode)
 {
@@ -1028,35 +1090,18 @@ static bool CalibrateImage(struct ldl_radio *self, uint32_t freq)
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
 
-#ifdef LDL_ENABLE_SX1261
-static bool SX1261_SetPaConfig(struct ldl_radio *self, uint8_t paDutyCycle, uint8_t hpMax)
+static bool SetPaConfig(struct ldl_radio *self, uint8_t paDutyCycle, uint8_t hpMax, uint8_t pa)
 {
     uint8_t opcode[] = {
         OPCODE_SET_PA_CONFIG,
         paDutyCycle,
         hpMax,
-        1,
+        pa,
         1
     };
 
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
-#endif
-
-#ifdef LDL_ENABLE_SX1262
-static bool SX1262_SetPaConfig(struct ldl_radio *self, uint8_t paDutyCycle, uint8_t hpMax)
-{
-    uint8_t opcode[] = {
-        OPCODE_SET_PA_CONFIG,
-        paDutyCycle,
-        hpMax,
-        0,
-        1
-    };
-
-    return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
-}
-#endif
 
 static bool SetRxTxFallbackMode(struct ldl_radio *self, enum _rx_tx_fallback_mode value)
 {
@@ -1091,6 +1136,8 @@ static bool SetDioIrqParams(struct ldl_radio *self, uint16_t irq, uint16_t dio1,
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
 
+extern uint16_t last_status;
+
 static bool GetIrqStatus(struct ldl_radio *self, uint16_t *irq)
 {
     bool retval = false;
@@ -1108,6 +1155,9 @@ static bool GetIrqStatus(struct ldl_radio *self, uint16_t *irq)
         *irq <<= 8;
         *irq |= buffer[1];
 
+        LDL_INFO("status=0x%04X", *irq)
+        LDL_INFO("last_status=0x%04X", last_status)
+
         retval = true;
     }
 
@@ -1122,9 +1172,12 @@ static bool ClearIrqStatus(struct ldl_radio *self, uint16_t irq)
         U8(irq)
     };
 
+    LDL_INFO("%s", __FUNCTION__)
+
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
 
+#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_SX1262)
 static bool SetDIO2AsRfSwitchCtrl(struct ldl_radio *self, enum ldl_sx126x_txen setting)
 {
     uint8_t opcode[] = {
@@ -1134,6 +1187,7 @@ static bool SetDIO2AsRfSwitchCtrl(struct ldl_radio *self, enum ldl_sx126x_txen s
 
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
+#endif
 
 static bool SetDIO3AsTcxoCtrl(struct ldl_radio *self, enum ldl_sx126x_voltage setting, uint8_t ms)
 {

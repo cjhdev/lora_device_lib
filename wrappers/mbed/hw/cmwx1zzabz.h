@@ -56,11 +56,6 @@ namespace LDL {
                      * domain of the radio driver and not of the module */
                     switch(mode){
                     case LDL_CHIP_MODE_RESET:
-                        enable_rfi = 0;
-                        enable_rfo = 0;
-                        enable_boost = 0;
-                        enable_tcxo.input();
-                        break;
                     case LDL_CHIP_MODE_SLEEP:
                         enable_rfi = 0;
                         enable_rfo = 0;
@@ -83,7 +78,6 @@ namespace LDL {
                         enable_rfo = 0;
                         enable_boost = 1;
                         break;
-                    case LDL_CHIP_MODE_TX:
                     case LDL_CHIP_MODE_TX_RFO:
                         enable_rfi = 0;
                         enable_rfo = 1;

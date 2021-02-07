@@ -84,16 +84,17 @@ namespace LDL {
             /** create
              *
              * @param[in] tx_gain
-             * @param[in] regulator
-             * @param[in] voltage
-             * @param[in] xtal
+             * @param[in] pa            power amplifier to use
+             * @param[in] regulator     LDO or DCDC regulator option
+             * @param[in] voltage       voltage to supply to XTAL (ignored if using crystal type)
+             * @param[in] xtal          crystal or tcxo option
              * @param[in] chip_mode_cb
              *
              * */
             WL55(
                 int16_t tx_gain = 0,
+                enum ldl_sx126x_pa pa = LDL_SX126X_PA_AUTO,
                 enum ldl_sx126x_regulator regulator = LDL_SX126X_REGULATOR_LDO,
-                enum ldl_sx126x_txen txen = LDL_SX126X_TXEN_ENABLED,
                 enum ldl_sx126x_voltage voltage = LDL_SX126X_VOLTAGE_1V6,
                 enum ldl_radio_xtal xtal = LDL_RADIO_XTAL_CRYSTAL,
                 Callback<void(enum ldl_chip_mode)> chip_mode_cb = nullptr

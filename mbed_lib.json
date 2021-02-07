@@ -5,6 +5,7 @@
         "LDL_ENABLE_SX1276",
         "LDL_ENABLE_SX1261",
         "LDL_ENABLE_SX1262",
+        "LDL_ENABLE_WL55",
         "LDL_ENABLE_EU_863_870",
         "LDL_ENABLE_US_902_928",
         "LDL_ENABLE_AU_915_928",

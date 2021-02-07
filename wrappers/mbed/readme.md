@@ -20,7 +20,7 @@ This example requires a development kit with >20K RAM connected to a SX126XMB2XA
 The app:
 
 - activates over the air in LDL_EU_863_870 region
-- sends hello world as frequently as possible
+- sends hello world as often as possible
 - ignores any downlink frames
 
 ~~~ c++
@@ -53,7 +53,7 @@ int main()
 }
 ~~~
 
-This example and more are in [examples](../../examples).
+This example and more are in [examples/mbed](../../examples/mbed).
 
 ## FYI
 
@@ -93,6 +93,7 @@ reset the counter on the server side.
 ### LowPowerTimer and LowPowerTimeout
 
 The wrapper depends on LowPowerTimer and LowPowerTimer.
+There is an expectation that these are clocked by a crystal or TCXO.
 
 ### Logging
 

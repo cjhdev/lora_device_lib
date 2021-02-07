@@ -63,8 +63,8 @@ static void disable_irq()
 
 WL55::WL55(
     int16_t tx_gain,
+    enum ldl_sx126x_pa pa,
     enum ldl_sx126x_regulator regulator,
-    enum ldl_sx126x_txen txen,
     enum ldl_sx126x_voltage voltage,
     enum ldl_radio_xtal xtal,
     Callback<void(enum ldl_chip_mode)> chip_mode_cb
@@ -76,7 +76,7 @@ WL55::WL55(
 {
     timer.start();
 
-    internal_if = LDL_SX1262_getInterface();
+    internal_if = LDL_WL55_getInterface();
 
     struct ldl_sx126x_init_arg arg = {};
 
@@ -84,15 +84,15 @@ WL55::WL55(
     arg.tx_gain = tx_gain;
 
     arg.regulator = regulator;
-    arg.txen = txen;
     arg.voltage = voltage;
+    arg.pa = pa;
 
     arg.chip = this;
     arg.chip_write = &WL55::_chip_write;
     arg.chip_read = &WL55::_chip_read;
     arg.chip_set_mode = &WL55::_chip_set_mode;
 
-    LDL_SX1262_init(&radio, &arg);
+    LDL_WL55_init(&radio, &arg);
 
     LDL_Radio_setEventCallback(&radio, (struct ldl_mac *)this, &Radio::_interrupt_handler);
 
@@ -256,12 +256,11 @@ static void read_spi(void *data, size_t size)
 /* static protected ***************************************************/
 
 volatile uint16_t last_status = 0;
+volatile int nothing_interrupt = 0;
 
 void
 WL55::_handle_irq()
 {
-    uint8_t opcode[] = {0x12,0};
-
     if(instances){
 
         for(WL55 *ptr=instances; ptr; ptr = ptr->next_instance){
@@ -270,10 +269,10 @@ WL55::_handle_irq()
             HAL_Delay(100);
     #endif
 
-
+    #if 0
             last_status = 0;
+            uint8_t opcode[] = {0x12,0};
 
-    #if 1
             ptr->chip_select(true);
             ptr->chip_read(opcode, sizeof(opcode), (void *)&last_status, sizeof(last_status));
             ptr->chip_select(false);
@@ -289,13 +288,17 @@ WL55::_handle_irq()
                  * just to turn it off here and on later when required */
                 disable_irq();
             }
+            else{
+
+                nothing_interrupt++;
+            }
+    #else
+            LDL_Radio_handleInterrupt(&ptr->radio, 1);
     #endif
         }
     }
-    else{
 
-        disable_irq();
-    }
+    disable_irq();
 }
 
 bool
@@ -407,12 +410,13 @@ WL55::chip_select(bool state)
     }
 }
 
+volatile uint32_t write_wait = 0;
+volatile uint32_t read_wait = 0;
+
 bool
 WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_t size)
 {
     bool retval = false;
-
-    //uint32_t mask = LL_PWR_IsActiveFlag_RFBUSYMS();
 
     timer.reset();
 
@@ -434,6 +438,8 @@ WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_
         }
         else{
 
+            write_wait++;
+
             /* loop */
         }
     }
@@ -447,8 +453,6 @@ bool
 WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
 {
     bool retval = false;
-
-    //uint32_t mask = ;
 
     timer.reset();
 
@@ -469,6 +473,8 @@ WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
             break;
         }
         else{
+
+            read_wait++;
 
             /* loop */
         }
@@ -492,7 +498,6 @@ WL55::chip_set_mode(enum ldl_chip_mode mode)
     case LDL_CHIP_MODE_STANDBY:
         break;
     case LDL_CHIP_MODE_RX:
-    case LDL_CHIP_MODE_TX:
     case LDL_CHIP_MODE_TX_RFO:
     case LDL_CHIP_MODE_TX_BOOST:
         last_status = UINT16_MAX;
