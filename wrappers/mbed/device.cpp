@@ -30,7 +30,7 @@ using namespace LDL;
 
 Device::Device(Store &store, SM &sm, Radio &radio, osPriority prio) :
     mac(store, sm, radio),
-    worker_thread(prio, 1024),
+    worker_thread(prio, 2048),
     queue_semaphore(1),
     data_semaphore(1),
     radio(radio)

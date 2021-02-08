@@ -930,6 +930,7 @@ static void processRadioBoot(struct ldl_mac *self, enum ldl_mac_sme event)
         switch(self->op){
         case LDL_OP_ENTROPY:
 
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
             self->state = LDL_STATE_WAIT_ENTROPY;
             LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
             break;

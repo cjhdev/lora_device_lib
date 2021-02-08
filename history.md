@@ -15,6 +15,9 @@ updating.
 - added antenna gain defaults to MBED wrapper
 - changed the way tx_gain compensation so that a positive gain
   will subtract from the requested power setting (instead of adding to it)
+- fixed bug where radio driver was not being put into sleep before setting
+  RX mode for collecting entropy
+- doubled stack size for LDL::Device worker thread
 
 ## 0.5.2
 
