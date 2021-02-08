@@ -109,9 +109,7 @@ WL55::WL55(
 
     //LL_PWR_SetRadioIRQTrigger(LL_PWR_RADIO_IRQ_TRIGGER_WU_IT);
 
-
     core_util_critical_section_exit();
-
 }
 
 WL55::~WL55()
@@ -182,7 +180,7 @@ static void write_spi(const void *data, size_t size)
             }
         }
 
-        READ_REG(SUBGHZSPI->DR);
+        (void)READ_REG(SUBGHZSPI->DR);
     }
 }
 
@@ -316,7 +314,7 @@ WL55::chip_select(bool state)
 {
     if(state){
 
-        //lock.lock();
+        lock.lock();
 
         __HAL_RCC_SUBGHZSPI_CLK_ENABLE();
 
@@ -338,12 +336,9 @@ WL55::chip_select(bool state)
 
         __HAL_RCC_SUBGHZSPI_CLK_DISABLE();
 
-        //lock.unlock();
+        lock.unlock();
     }
 }
-
-volatile uint32_t write_wait = 0;
-volatile uint32_t read_wait = 0;
 
 bool
 WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_t size)
@@ -369,8 +364,6 @@ WL55::chip_write(const void *opcode, size_t opcode_size, const void *data, size_
             break;
         }
         else{
-
-            write_wait++;
 
             /* loop */
         }
@@ -405,8 +398,6 @@ WL55::chip_read(const void *opcode, size_t opcode_size, void *data, size_t size)
             break;
         }
         else{
-
-            read_wait++;
 
             /* loop */
         }

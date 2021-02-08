@@ -1,7 +1,3 @@
-# change the toolchain source for the container here
-TOOLCHAIN_NAME := gcc-arm-none-eabi-9-2020-q2-update
-TOOLCHAIN_URL := https://developer.arm.com/-/media/Files/downloads/gnu-rm/9-2020q2/gcc-arm-none-eabi-9-2020-q2-update-x86_64-linux.tar.bz2?revision=05382cca-1721-44e1-ae19-1e7c3dc96118&la=en&hash=D7C9D18FCA2DD9F894FD9F3C3DC9228498FA281A
-
 DIR_PROJECT_ROOT := $(shell cd ../..;pwd)
 DIR_MBED_OS := $(shell cd mbed-os;pwd)
 
@@ -19,37 +15,15 @@ GDB        ?= arm-none-eabi-gdb
 GDB_SERVER ?= JLinkGDBServer
 JLINK      ?= JLinkExe
 
+APP ?= rtos_wl55
+
+include targets/$(APP).mk
+
 DIR_BUILD = BUILD/$(DEVICE)/GCC_ARM-$(shell echo $(PROFILE) | tr a-z A-Z)
 
-APP ?= bare_metal
-
-ifeq ($(APP),bare_metal)
-
-DIR_APP := $(shell pwd)/bare_metal
-DEVICE := DISCO_L072CZ_LRWAN1
-JLINK_DEVICE := STM32L072CZ
-
-else
-ifeq  ($(APP),rtos)
-
-DIR_APP := $(shell pwd)/rtos
-DEVICE ?= NUCLEO_F429ZI
-JLINK_DEVICE ?= STM32F429ZI
-
-else
-ifeq  ($(APP),rtos_wl55)
-
-DIR_APP := $(shell pwd)/rtos_wl55
-DEVICE := NUCLEO_WL55JC
-JLINK_DEVICE := STM32WL55JC
-
-else
-
-$(error APP=$(APP) is unknown)
-
-endif
-endif
-endif
+# change the toolchain source for the container here
+TOOLCHAIN_NAME := gcc-arm-none-eabi-9-2020-q2-update
+TOOLCHAIN_URL := https://developer.arm.com/-/media/Files/downloads/gnu-rm/9-2020q2/gcc-arm-none-eabi-9-2020-q2-update-x86_64-linux.tar.bz2?revision=05382cca-1721-44e1-ae19-1e7c3dc96118&la=en&hash=D7C9D18FCA2DD9F894FD9F3C3DC9228498FA281A
 
 # container name and tag
 NAME := ldl_mbed
@@ -79,7 +53,7 @@ test_container:
 
 compile:
 	@ echo building $(APP)
-	cd $(DIR_APP) && $(DOCKER) $(VOLUMES) -v $(DIR_APP):/mbed:cached $(NAME):$(TAG) compile -m $(DEVICE) -t GCC_ARM --profile $(PROFILE)
+	cd $(DIR_APP) && $(DOCKER) $(VOLUMES) -v $(DIR_APP):/mbed:cached $(NAME):$(TAG) compile -m $(DEVICE) -t GCC_ARM --profile $(PROFILE) -DRADIO='$(RADIO)'
 	@ cd $(DIR_APP) && $(DOCKER) $(VOLUMES) -v $(DIR_APP):/mbed:cached --entrypoint arm-none-eabi-objcopy $(NAME):$(TAG) -O ihex $(DIR_BUILD)/mbed.elf $(DIR_BUILD)/mbed.hex
 
 flash: $(DIR_APP)/upload_flash.jlink compile
@@ -112,8 +86,7 @@ $(DIR_APP)/.gdbinit:
 	@ echo focus cmd                     >> $@
 
 clean:
-	rm -f $(DIR_BUILD)/.gdbinit $(DIR_BUILD)/upload_flash.jlink
-	rm -rf $(DIR_APP)/BUILD
+	rm -rf $(DIR_BUILD)
 	rm -rf $(DIR_APP)/mbed-os
 	rm -rf $(DIR_APP)/lora_device_lib
 

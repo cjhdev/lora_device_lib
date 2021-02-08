@@ -236,7 +236,7 @@ enum _sleep_mode {
 //static bool SetTxInfinitePreamble(struct ldl_radio *self);
 //static bool SetTxContinuousWave(struct ldl_radio *self);
 //static bool GetPacketType(struct ldl_radio *self, enum ldl_radio_sx126x_packet_type *type);
-//static bool GetStatus(struct ldl_radio *self, struct _status *value);
+//static bool SetRxTxFallbackMode(struct ldl_radio *self, enum _rx_tx_fallback_mode value);
 //static bool ReadReg(struct ldl_radio *self, uint16_t reg, uint8_t *data);
 //static bool WriteReg(struct ldl_radio *self, uint16_t reg, uint8_t data);
 //static void parseStatus(uint8_t in, struct _status *value);
@@ -249,7 +249,7 @@ static bool SetRx(struct ldl_radio *self, uint32_t timeout);
 static bool SetRegulatorMode(struct ldl_radio *self, enum ldl_sx126x_regulator value);
 static bool Calibrate(struct ldl_radio *self, uint8_t param);
 static bool CalibrateImage(struct ldl_radio *self, uint32_t freq);
-static bool SetRxTxFallbackMode(struct ldl_radio *self, enum _rx_tx_fallback_mode value);
+
 static bool SetDioIrqParams(struct ldl_radio *self, uint16_t irq, uint16_t dio1, uint16_t dio2, uint16_t dio3);
 static bool GetIrqStatus(struct ldl_radio *self, uint16_t *irq);
 static bool ClearIrqStatus(struct ldl_radio *self, uint16_t irq);
@@ -268,9 +268,10 @@ static bool GetRxBufferStatus(struct ldl_radio *self, uint8_t *PayloadLengthRx, 
 static bool GetPacketStatus(struct ldl_radio *self, union _packet_status *value);
 
 #ifdef LDL_ENABLE_RADIO_DEBUG
+static bool GetStatus(struct ldl_radio *self, uint8_t *value);
 static bool GetDeviceErrors(struct ldl_radio *self, struct _device_errors *value);
 //static bool ClearDeviceErrors(struct ldl_radio *self);
-//static void printStatus(struct ldl_radio *self);
+static void printStatus(struct ldl_radio *self, const char *label);
 static void printDeviceErrors(struct ldl_radio *self);
 //static void printPacketType(struct ldl_radio *self);
 #endif
@@ -428,9 +429,6 @@ void LDL_SX126X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
 #endif
             if(self->xtal == LDL_RADIO_XTAL_TCXO){
 
-                /* keep xtal running after calibrate */
-                (void)SetRxTxFallbackMode(self, FALLBACK_STDBY_XOSC);
-
                 /* subtract 3.5ms calibration time */
                 (void)SetDIO3AsTcxoCtrl(self, self->state.sx126x.voltage, U8(LDL_PARAM_XTAL_DELAY) - U8(4));
 
@@ -476,7 +474,6 @@ void LDL_SX126X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
 
             (void)ClearIrqStatus(self, UINT16_MAX);
             (void)SetSleep(self, SLEEP_MODE_WARM);
-
             break;
 
         default:
@@ -487,7 +484,8 @@ void LDL_SX126X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
         break;
     }
 
-    LDL_DEBUG("new_mode=%i cur_mode=%i", mode, self->mode)
+    /* printing here may cause RX windows to be missed */
+    LDL_TRACE("new_mode=%i cur_mode=%i", mode, self->mode)
 
     self->mode = mode;
 }
@@ -501,8 +499,6 @@ void LDL_SX126X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
 
     /* note this is dbm x 100 */
     int16_t dbm = settings->dbm - self->tx_gain;
-
-    (void)ClearIrqStatus(self, UINT16_MAX);
 
     if(dbm > settings->max_eirp){
 
@@ -585,11 +581,9 @@ void LDL_SX126X_receive(struct ldl_radio *self, const struct ldl_radio_rx_settin
     bool ok;
     uint8_t timeout = (settings->timeout > U16(UINT8_MAX)) ? U8(UINT8_MAX) : U8(settings->timeout);
 
-    (void)ClearIrqStatus(self, UINT16_MAX);
-
-    self->chip_set_mode(self->chip, LDL_CHIP_MODE_RX);
-
     do{
+
+        self->chip_set_mode(self->chip, LDL_CHIP_MODE_RX);
 
         ok = SetPacketType(self, PACKET_TYPE_LORA);
         if(!ok){ break; }
@@ -689,8 +683,6 @@ uint8_t LDL_SX126X_readBuffer(struct ldl_radio *self, struct ldl_radio_packet_me
 void LDL_SX126X_receiveEntropy(struct ldl_radio *self)
 {
     bool ok;
-
-    (void)ClearIrqStatus(self, UINT16_MAX);
 
     self->chip_set_mode(self->chip, LDL_CHIP_MODE_RX);
 
@@ -915,10 +907,9 @@ static bool SetPower(struct ldl_radio *self, int16_t dbm)
 
 static bool SetSleep(struct ldl_radio *self, enum _sleep_mode mode)
 {
-
     uint8_t opcode[] = {
         OPCODE_SET_SLEEP,
-        (mode == SLEEP_MODE_WARM) ? 41U : 1U
+        (mode == SLEEP_MODE_WARM) ? 4U : 0U
     };
 
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
@@ -961,7 +952,7 @@ static bool SetRx(struct ldl_radio *self, uint32_t timeout)
 #if 0
 static bool SetFs(struct ldl_radio *self)
 {
-    uint8_t opcode[] = {
+    static const uint8_t opcode[] = {
         OPCODE_SET_FS
     };
 
@@ -980,7 +971,7 @@ static bool StopTimerOnPreamble(struct ldl_radio *self, bool enable)
 
 static bool SetCAD(struct ldl_radio *self)
 {
-    uint8_t opcode[] = {
+    static const uint8_t opcode[] = {
         OPCODE_SET_CAD
     };
 
@@ -989,7 +980,7 @@ static bool SetCAD(struct ldl_radio *self)
 
 static bool SetTxInfinitePreamble(struct ldl_radio *self)
 {
-    uint8_t opcode[] = {
+    static const uint8_t opcode[] = {
         OPCODE_SET_TX_INFINITE_PREAMBLE
     };
 
@@ -1000,7 +991,7 @@ static bool GetRssiInst(struct ldl_radio *self, uint32_t *rssi)
 {
     bool retval = false;
 
-    uint8_t opcode[] = {
+    static const uint8_t opcode[] = {
         OPCODE_GET_RSSI_INST,
         0
     };
@@ -1021,11 +1012,57 @@ static bool GetRssiInst(struct ldl_radio *self, uint32_t *rssi)
 
 static bool SetTxContinuousWave(struct ldl_radio *self)
 {
-    uint8_t opcode[] = {
+    static const uint8_t opcode[] = {
         OPCODE_SET_TX_CONTINUOUS_WAVE
     };
 
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
+}
+
+static bool SetRxTxFallbackMode(struct ldl_radio *self, enum _rx_tx_fallback_mode value)
+{
+    static const uint8_t mode[] = {
+        0x40,
+        0x30,
+        0x20
+    };
+
+    uint8_t opcode[] = {
+        OPCODE_SET_RX_TX_FALLBACK_MODE,
+        mode[value]
+    };
+
+    return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
+}
+
+static bool GetPacketType(struct ldl_radio *self, enum ldl_radio_sx126x_packet_type *type)
+{
+    bool retval = false;
+
+    uint8_t buffer[1];
+
+    static const uint8_t opcode[] = {
+        OPCODE_GET_PACKET_TYPE,
+        0
+    };
+
+    if(self->chip_read(self->chip, opcode, sizeof(opcode), buffer, sizeof(buffer))){
+
+        retval = true;
+
+        switch(*buffer){
+        case U8(PACKET_TYPE_LORA):
+            *type = PACKET_TYPE_LORA;
+            break;
+        case U8(PACKET_TYPE_GFSK):
+            *type = PACKET_TYPE_GFSK;
+            break;
+        default:
+            retval = false;
+        }
+    }
+
+    return retval;
 }
 #endif
 
@@ -1103,22 +1140,6 @@ static bool SetPaConfig(struct ldl_radio *self, uint8_t paDutyCycle, uint8_t hpM
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
 
-static bool SetRxTxFallbackMode(struct ldl_radio *self, enum _rx_tx_fallback_mode value)
-{
-    static const uint8_t mode[] = {
-        0x40,
-        0x30,
-        0x20
-    };
-
-    uint8_t opcode[] = {
-        OPCODE_SET_RX_TX_FALLBACK_MODE,
-        mode[value]
-    };
-
-    return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
-}
-
 static bool SetDioIrqParams(struct ldl_radio *self, uint16_t irq, uint16_t dio1, uint16_t dio2, uint16_t dio3)
 {
     uint8_t opcode[] = {
@@ -1153,8 +1174,6 @@ static bool GetIrqStatus(struct ldl_radio *self, uint16_t *irq)
         *irq <<= 8;
         *irq |= buffer[1];
 
-        LDL_INFO("status=0x%04X", *irq)
-
         retval = true;
     }
 
@@ -1168,8 +1187,6 @@ static bool ClearIrqStatus(struct ldl_radio *self, uint16_t irq)
         U8(irq >> 8),
         U8(irq)
     };
-
-    LDL_INFO("%s", __FUNCTION__)
 
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
@@ -1227,38 +1244,6 @@ static bool SetPacketType(struct ldl_radio *self, enum ldl_radio_sx126x_packet_t
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
 
-#if 0
-static bool GetPacketType(struct ldl_radio *self, enum ldl_radio_sx126x_packet_type *type)
-{
-    bool retval = false;
-
-    uint8_t buffer[1];
-
-    uint8_t opcode[] = {
-        OPCODE_GET_PACKET_TYPE,
-        0
-    };
-
-    if(self->chip_read(self->chip, opcode, sizeof(opcode), buffer, sizeof(buffer))){
-
-        retval = true;
-
-        switch(*buffer){
-        case U8(PACKET_TYPE_LORA):
-            *type = PACKET_TYPE_LORA;
-            break;
-        case U8(PACKET_TYPE_GFSK):
-            *type = PACKET_TYPE_GFSK;
-            break;
-        default:
-            retval = false;
-        }
-    }
-
-    return retval;
-}
-#endif
-
 static bool SetTxParams(struct ldl_radio *self, int8_t power, enum _ramp_time ramp_time)
 {
     uint8_t opcode[] = {
@@ -1273,9 +1258,9 @@ static bool SetTxParams(struct ldl_radio *self, int8_t power, enum _ramp_time ra
 static bool SetModulationParams(struct ldl_radio *self, const struct _modulation_params *value)
 {
     static const uint8_t bw[] = {
-        4U,
-        5U,
-        6U
+        4,
+        5,
+        6
     };
 
     uint8_t opcode[] = {
@@ -1306,13 +1291,17 @@ static bool SetPacketParams(struct ldl_radio *self, const struct _packet_params 
 
 static bool SetBufferBaseAddress(struct ldl_radio *self, uint8_t tx_base_addr, uint8_t rx_base_addr)
 {
+    bool retval;
+
     uint8_t opcode[] = {
         OPCODE_SET_BUFFER_BASE_ADDRESS,
         tx_base_addr,
         rx_base_addr
     };
 
-    return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
+    retval = self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
+
+    return retval;
 }
 
 static bool SetLoRaSymbNumTimeout(struct ldl_radio *self, uint8_t SymbNum)
@@ -1324,76 +1313,6 @@ static bool SetLoRaSymbNumTimeout(struct ldl_radio *self, uint8_t SymbNum)
 
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
-
-#if 0
-static void parseStatus(uint8_t in, struct _status *value)
-{
-    switch((in >> 4) & 7U){
-    case U8(STATUS_MODE_UNUSED):
-        value->chip_mode = STATUS_MODE_UNUSED;
-        break;
-    case U8(STATUS_MODE_STBY_RC):
-        value->chip_mode = STATUS_MODE_STBY_RC;
-        break;
-    case U8(STATUS_MODE_STBY_XOSC):
-        value->chip_mode = STATUS_MODE_STBY_XOSC;
-        break;
-    case U8(STATUS_MODE_FS):
-        value->chip_mode = STATUS_MODE_FS;
-        break;
-    case U8(STATUS_MODE_RX):
-        value->chip_mode = STATUS_MODE_RX;
-        break;
-    case U8(STATUS_MODE_TX):
-        value->chip_mode = STATUS_MODE_TX;
-        break;
-    default:
-        value->chip_mode = STATUS_MODE_RFU;
-        break;
-    }
-
-    switch((in >> 1) & 7U){
-    case U8(STATUS_COMMAND_RESERVED):
-        value->command_status = STATUS_COMMAND_RESERVED;
-        break;
-    case U8(STATUS_COMMAND_DATA_AVAILABLE):
-        value->command_status = STATUS_COMMAND_DATA_AVAILABLE;
-        break;
-    case U8(STATUS_COMMAND_PROCESSING_ERROR):
-        value->command_status = STATUS_COMMAND_PROCESSING_ERROR;
-        break;
-    case U8(STATUS_COMMAND_EXECUTION_FAILURE):
-        value->command_status = STATUS_COMMAND_EXECUTION_FAILURE;
-        break;
-    case U8(STATUS_COMMAND_TX_DONE):
-        value->command_status = STATUS_COMMAND_TX_DONE;
-        break;
-    default:
-        value->command_status = STATUS_COMMAND_RFU;
-        break;
-    }
-}
-
-static bool GetStatus(struct ldl_radio *self, struct _status *value)
-{
-    bool retval = false;
-
-    uint8_t opcode[] = {
-        OPCODE_GET_STATUS
-    };
-
-    uint8_t buffer[1];
-
-    if(self->chip_read(self->chip, opcode, sizeof(opcode), buffer, sizeof(buffer))){
-
-        parseStatus(*buffer, value);
-
-        retval = true;
-    }
-
-    return retval;
-}
-#endif
 
 static bool GetRxBufferStatus(struct ldl_radio *self, uint8_t *PayloadLengthRx, uint8_t *RxStartBufferPointer)
 {
@@ -1475,7 +1394,6 @@ static bool GetDeviceErrors(struct ldl_radio *self, struct _device_errors *value
     return retval;
 }
 
-#if 0
 static bool ClearDeviceErrors(struct ldl_radio *self)
 {
     uint8_t opcode[] = {
@@ -1485,35 +1403,6 @@ static bool ClearDeviceErrors(struct ldl_radio *self)
 
     return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
-
-static void printStatus(struct ldl_radio *self)
-{
-    struct _status status;
-
-    if(GetStatus(self, &status)){
-
-        LDL_TRACE("status: chip_mode=%u comand_status=%i", status.chip_mode, status.command_status)
-    }
-    else{
-
-        LDL_ERROR("GetStatus()")
-    }
-}
-
-static void printPacketType(struct ldl_radio *self)
-{
-    enum ldl_radio_sx126x_packet_type type;
-
-    if(GetPacketType(self, &type)){
-
-        LDL_TRACE("packet_type: %u", type)
-    }
-    else{
-
-        LDL_ERROR("GetPacketType")
-    }
-}
-#endif
 
 static void printDeviceErrors(struct ldl_radio *self)
 {
@@ -1543,6 +1432,29 @@ static void printDeviceErrors(struct ldl_radio *self)
         LDL_ERROR("GetDeviceErrors()")
     }
 }
+
+static void printStatus(struct ldl_radio *self, const char *label)
+{
+    uint8_t status;
+
+    if(GetStatus(self, &status)){
+
+        LDL_TRACE("status@%s: chip_mode=%u comand_status=%u", label, (status >> 4) & 7U, (status >> 1) & 7U)
+    }
+    else{
+
+        LDL_ERROR("GetStatus()")
+    }
+}
+
+static bool GetStatus(struct ldl_radio *self, uint8_t *value)
+{
+    uint8_t opcode[] = {
+        OPCODE_GET_STATUS
+    };
+
+    return self->chip_read(self->chip, opcode, sizeof(opcode), value, sizeof(*value));
+}
 #endif
 
 
@@ -1567,7 +1479,7 @@ static bool WriteReg(struct ldl_radio *self, uint16_t reg, uint8_t data)
         U8(reg)
     };
 
-    return self->chip_write(self->chip, opcode, sizeof(opcode), &data, 1U);
+    return self->chip_write(self->chip, opcode, sizeof(opcode), &data, sizeof(data));
 }
 #endif
 
@@ -1602,7 +1514,7 @@ static bool SetSyncWord(struct ldl_radio *self, uint16_t value)
         U8(value)
     };
 
-    return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0);
+    return self->chip_write(self->chip, opcode, sizeof(opcode), NULL, 0U);
 }
 
 #endif

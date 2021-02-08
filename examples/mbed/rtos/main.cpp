@@ -1,7 +1,5 @@
 #include "mbed_ldl.h"
 
-#include "mbed_trace.h"
-
 const uint8_t app_key[] = MBED_CONF_APP_APP_KEY;
 const uint8_t nwk_key[] = MBED_CONF_APP_NWK_KEY;
 const uint8_t dev_eui[] = MBED_CONF_APP_DEV_EUI;
@@ -22,11 +20,18 @@ void handle_device_time(uint32_t seconds, uint8_t fractions)
 int main()
 {
     uint32_t entropy;
+    const char msg[] = "hello world";
 
     mbed_trace_init();
 
-    //static LDL::HW::SX1272MB2XAS radio;
-    static LDL::HW::SX126XMB2XAS radio;
+#ifndef RADIO
+    //#define RADIO LDL::HW::SX1272MB2XAS
+    //#define RADIO LDL::HW::SX126XMB2XAS
+    #define RADIO LDL::HW::NucleoWL55JC
+#endif
+
+    static RADIO radio;
+
     static LDL::DefaultSM sm(app_key, nwk_key);
     static LDL::DefaultStore store(dev_eui, join_eui);
     static LDL::Device device(store, sm, radio);
@@ -46,9 +51,6 @@ int main()
 
     for(;;){
 
-        const char msg[] = "hello world";
-
-        // will block until channel available
         device.unconfirmed(1, msg, strlen(msg));
 
         ThisThread::sleep_for(10s);

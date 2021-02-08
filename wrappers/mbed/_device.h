@@ -133,9 +133,10 @@ namespace LDL {
              * @param[in] store     responsible for handling non-secrets
              * @param[in] sm        responsible for handling secrets
              * @param[in] radio
+             * @param[in] prio      priority of the worker
              *
              * */
-            Device(Store& store, SM& sm, LDL::Radio& radio);
+            Device(Store& store, SM& sm, LDL::Radio& radio, osPriority prio = osPriorityNormal);
 
             /**
              * Device must be started in a specific region before

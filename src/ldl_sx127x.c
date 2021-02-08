@@ -358,8 +358,8 @@ void LDL_SX127X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
         break;
     }
 
-    LDL_DEBUG("new_mode=%i cur_mode=%i", mode, self->mode)
-
+    /* printing here may cause RX windows to be missed */
+    LDL_TRACE("new_mode=%i cur_mode=%i", mode, self->mode)
 #ifdef LDL_ENABLE_RADIO_DEBUG
     debugLogFlush(self, __FUNCTION__);
 #endif

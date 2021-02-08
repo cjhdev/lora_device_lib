@@ -32,9 +32,17 @@ int main()
     static LowPowerTicker ticker;
     static LowPowerTimeout timeout;
 
+#ifndef RADIO
+    //#define RADIO LDL::HW::SX1272MB2XAS
+    //#define RADIO LDL::HW::SX126XMB2XAS
+    //#define RADIO LDL::HW::NucleoWL55JC
+    #define RADIO LDL::HW::CMWX1ZZABZ
+#endif
+
+    static RADIO radio;
+
     static LDL::DefaultSM sm(app_key, nwk_key);
     static LDL::DefaultStore store(dev_eui, join_eui);
-    static LDL::HW::CMWX1ZZABZ radio;
     static LDL::MAC mac(store, sm, radio);
 
     mac.set_event_cb(callback(handle_mac_event));

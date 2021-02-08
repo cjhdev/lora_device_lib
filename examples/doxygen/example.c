@@ -54,7 +54,7 @@ int main(void)
         struct ldl_sx127x_init_arg arg = {0};
 
         arg.xtal = LDL_RADIO_XTAL_CRYSTAL;
-        arg.tx_gain = 0;
+        arg.tx_gain = 200;  /* 2dBi */
         arg.pa = LDL_SX127X_PA_RFO;
         arg.chip = chip_interface_pointer,
 
@@ -66,7 +66,6 @@ int main(void)
     }
 
     {
-        /* clearing the arg struct is recommended */
         struct ldl_mac_init_arg arg = {0};
 
         /* tell LDL the frequency of the clock source and compensate

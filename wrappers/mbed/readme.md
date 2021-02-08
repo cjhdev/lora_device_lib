@@ -177,5 +177,3 @@ enable trace level with extra messages from radio driver:
 Note that verbose logging has the potential to upset timing. If your
 app can't receive downlinks, try turning off logging.
 
-
-

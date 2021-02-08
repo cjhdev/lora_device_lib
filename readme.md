@@ -42,6 +42,8 @@ void main(void)
 
         arg.type = LDL_RADIO_SX1272;
 
+        arg.tx_gain = 200;  /* 2dBi */
+
         arg.chip_set_mode = chip_set_mode;
         arg.chip_write = chip_write;
         arg.chip_read = chip_read;
