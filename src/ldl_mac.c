@@ -1163,6 +1163,8 @@ static void processTX(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag
     uint32_t margin;
     struct ldl_radio_status status;
 
+    (void)memset(&status, 0, sizeof(status));
+
     if(event == LDL_SME_INTERRUPT){
 
         self->radio_interface->get_status(self->radio, &status);
@@ -1371,6 +1373,8 @@ static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
     uint32_t ms;
 
     struct ldl_radio_status status;
+
+    (void)memset(&status, 0, sizeof(status));
 
     if(event == LDL_SME_INTERRUPT){
 
