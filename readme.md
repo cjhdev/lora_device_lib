@@ -43,6 +43,8 @@ void main(void)
     {
         struct ldl_sx127x_init_arg arg = {0};
 
+        arg.tx_gain = 200;  /* 2dBi */
+
         arg.chip_set_mode = chip_set_mode;
         arg.chip_write = chip_write;
         arg.chip_read = chip_read;
@@ -136,6 +138,7 @@ and read [history.md](history.md) if updating from an older version.
     - SX1276
     - SX1261
     - SX1262
+    - STM32WL55
 - Linted to MISRA 2012
 - Examples
     - [readme example](examples/doxygen/example.c)

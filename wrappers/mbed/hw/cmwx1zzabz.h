@@ -29,14 +29,12 @@ namespace LDL {
     namespace HW {
 
         /**
-         * A module that aggregates:
+         * The CMWX1ZZABZ module aggregates:
          *
          * - SX1276
          * - TCXO with power switch
          * - switches for engaging RFI, RFO, and BOOST
          * - dedicated SPI peripheral
-         *
-         * Inherits radio so that it can be passed to the MAC.
          *
          * */
         class CMWX1ZZABZ : public Radio {
@@ -58,11 +56,6 @@ namespace LDL {
                      * domain of the radio driver and not of the module */
                     switch(mode){
                     case LDL_CHIP_MODE_RESET:
-                        enable_rfi = 0;
-                        enable_rfo = 0;
-                        enable_boost = 0;
-                        enable_tcxo.input();
-                        break;
                     case LDL_CHIP_MODE_SLEEP:
                         enable_rfi = 0;
                         enable_rfo = 0;
@@ -100,16 +93,21 @@ namespace LDL {
 
             public:
 
-                /* PA_12 is where the reference design puts the TCXO on/off
+                /** Create
+                 *
+                 * PA_12 is where the reference design puts the TCXO on/off
                  * control line, and also where you will find it on the LRWAN
                  * kit.
                  *
                  * If you want to use USB this needs to move to another pin.
                  *
+                 * @param[in] enable_tcxo   pin that switches on TCXO
+                 * @param[in] tx_gain       antenna gain (dB x 100)
+                 *
                  * */
                 CMWX1ZZABZ(
                     PinName enable_tcxo = PA_12,
-                    int16_t tx_gain = 0
+                    int16_t tx_gain = 200
                 )
                     :
                     Radio(),

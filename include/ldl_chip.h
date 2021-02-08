@@ -78,8 +78,14 @@ extern "C" {
 #include <stddef.h>
 #include <stdbool.h>
 
-/** chip mode tells the chip interface code what to do
+/** Chip mode tells the chip interface code what to do
  * with various IO lines.
+ *
+ * - WL55 and SX127X series have two PAs, one of which may need to be selected
+ * - SX1261 and SX1262 have one PA
+ * - TX_BOOST and TX_RFO are legacy names
+ *   - TX_BOOST means high power
+ *   - TX_RFO means low power
  *
  * */
 enum ldl_chip_mode {
@@ -88,8 +94,8 @@ enum ldl_chip_mode {
     LDL_CHIP_MODE_SLEEP,        /**< oscillator is off */
     LDL_CHIP_MODE_STANDBY,      /**< oscillator is on */
     LDL_CHIP_MODE_RX,           /**< receiving */
-    LDL_CHIP_MODE_TX_RFO,       /**< transmit using RFO PA */
-    LDL_CHIP_MODE_TX_BOOST      /**< transmit using BOOST PA */
+    LDL_CHIP_MODE_TX_RFO,       /**< transmit using low power PA */
+    LDL_CHIP_MODE_TX_BOOST      /**< transmit using high power PA */
 };
 
 /** Use this function to configure the transceiver and associated

@@ -33,6 +33,16 @@
 
 namespace LDL {
 
+    /**
+     * LDL::MAC is minimal C++ wrapper around #ldl_mac.
+     *
+     * The methods are not thread-safe. LDL::MAC is useful
+     * for resource constrained targets and/or targets compiling
+     * for the bare metal profile.
+     *
+     * Consider using LDL::Device if you require thread-safe interfaces.
+     *
+     * */
     class MAC {
 
         protected:
@@ -68,44 +78,207 @@ namespace LDL {
             /* called by radio in ISR */
             void handle_radio_event();
 
+            /**
+             * Create a MAC
+             *
+             * @param[in] store     responsible for handling non-secrets
+             * @param[in] sm        responsible for handling secrets
+             * @param[in] radio
+             *
+             * */
             MAC(Store& store, SM& sm, LDL::Radio& radio);
 
+            /**
+             * MAC must be started in a specific region before
+             * the methods work.
+             *
+             * @param[in] region #ldl_region
+             *
+             * @retval true     MAC started
+             * @retval false    MAC did not start
+             *
+             * */
             bool start(enum ldl_region region);
 
+            /**
+             * Send data using unconfirmed service
+             *
+             * @param[in] port
+             * @param[in] data
+             * @param[in] len
+             * @param[in] opts
+             *
+             * @return #ldl_mac_status
+             *
+             * */
             enum ldl_mac_status unconfirmed(uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts = NULL);
+
+            /**
+             * Send data using unconfirmed service
+             *
+             * @param[in] port
+             * @param[in] data
+             * @param[in] len
+             * @param[in] opts
+             *
+             * @return #ldl_mac_status
+             *
+             * */
             enum ldl_mac_status confirmed(uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts = NULL);
 
+            /**
+             * Initiate over the air activation
+             *
+             * This will continue to run forever until:
+             *
+             * - device is activated by server
+             * - application calls cancel()
+             * - application calls forget()
+             *
+             * @return #ldl_mac_status
+             *
+             * */
             enum ldl_mac_status otaa();
 
+            /**
+             * Forget the network and return to an inactive state
+             *
+             * */
             void forget();
+
+            /**
+             * Cancel the current operation
+             *
+             * */
             void cancel();
 
+            /**
+             * Initiate entropy operation
+             *
+             * @return #ldl_mac_status
+             *
+             * */
             enum ldl_mac_status entropy();
 
+            /**
+             * Set data rate
+             *
+             * @return #ldl_mac_status
+             *
+             * */
             enum ldl_mac_status set_rate(uint8_t value);
+
+            /**
+             * Get data rate
+             *
+             * @return rate
+             *
+             * */
             uint8_t get_rate();
 
+            /**
+             * Set transmit power
+             *
+             * @return @ldl_mac_status
+             *
+             * */
             enum ldl_mac_status set_power(uint8_t value);
+
+            /**
+             * Get transmit power
+             *
+             * @return power
+             *
+             * */
             uint8_t get_power();
 
+            /**
+             * Set ADR mode
+             *
+             * @param[in] value
+             *
+             * */
             void set_adr(bool value);
+
+            /**
+             * Get ADR mode
+             *
+             * @retval true     ADR is enabled
+             * @retval false    ADR is disabled
+             *
+             * */
             bool get_adr();
 
+            /**
+             * Get joined status
+             *
+             * @retval true MAC is joined to a network
+             * @retval false MAC is not joined
+             *
+             * */
             bool joined();
+
+            /**
+             * Get ready status
+             *
+             * @retval true MAC is ready to transmit
+             * @retval false MAC is not ready
+             *
+             * */
             bool ready();
 
+            /**
+             * Set maximum duty cycle
+             *
+             * @param[in] value
+             *
+             * */
             void set_max_dcycle(uint8_t value);
+
+            /**
+             * Get maximum duty cycle setting
+             *
+             * @return maximum duty cycle
+             *
+             * */
             uint8_t get_max_dcycle();
 
+            /**
+             * Get the number of ticks until the next scheduled event
+             *
+             * @return ticks
+             *
+             * */
             uint32_t ticks_until_next_event();
 
+            /**
+             * Call to process events
+             *
+             * */
             void process();
 
+            /**
+             * Set event callback
+             *
+             * @param[in] callback
+             *
+             * */
             void set_event_cb(Callback<void(enum ldl_mac_response_type, const union ldl_mac_response_arg *)> cb)
             {
                 event_cb = cb;
             }
 
+            /**
+             * Set wakeup callback
+             *
+             * This callback is called when that radio driver
+             * receives an interrupt and can be used to ensure
+             * the app wakes up from whatever it might be blocking
+             * on.
+             *
+             * @param[in] callback
+             *
+             * */
             void set_wakeup_cb(Callback<void(void)> cb)
             {
                 wakeup_cb = cb;

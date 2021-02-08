@@ -26,7 +26,8 @@
 
 namespace LDL {
 
-    /** A default Security Module suitable for demo apps.
+    /**
+     * A default Security Module suitable for demo apps.
      *
      * Uses the default LDL cryptographic implementation and takes
      * pointers to the root keys on construction.

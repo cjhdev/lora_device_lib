@@ -5,6 +5,20 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
+## 0.5.3
+
+This release changes the way tx_gain is applied. Check your code before
+updating.
+
+- added support for STM32WL55x
+- added MBED wrapper for Nucleo STM32WL55JC kit
+- added antenna gain defaults to MBED wrapper
+- changed the way tx_gain compensation so that a positive gain
+  will subtract from the requested power setting (instead of adding to it)
+- fixed bug in affecting CMWX1ZZABZ where TCXO was not being started before
+  collecting entropy
+- doubled size of stack for LDL::Device worker thread
+
 ## 0.5.2
 
 - added deep sleep locking to wrappers/mbed/device.cpp

@@ -28,6 +28,10 @@ namespace LDL {
 
     namespace HW {
 
+        /**
+         * SX1272MB2XAS shield
+         *
+         * */
         class SX1272MB2XAS : public Radio {
 
             protected:
@@ -42,8 +46,13 @@ namespace LDL {
 
             public:
 
+                /** Create
+                 *
+                 * @param[in] tx_gain       antenna gain (dB x 100)
+                 *
+                 * */
                 SX1272MB2XAS(
-                    int16_t tx_gain = 0
+                    int16_t tx_gain = 200
                 )
                     :
                     Radio(),

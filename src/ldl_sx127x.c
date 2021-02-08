@@ -336,6 +336,8 @@ void LDL_SX127X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
 
     case LDL_RADIO_MODE_HOLD:
 
+        self->chip_set_mode(self->chip, LDL_CHIP_MODE_STANDBY);
+
         switch(self->mode){
         case LDL_RADIO_MODE_RX:
         case LDL_RADIO_MODE_TX:
@@ -356,8 +358,8 @@ void LDL_SX127X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode)
         break;
     }
 
-    LDL_DEBUG("new_mode=%i cur_mode=%i", mode, self->mode)
-
+    /* printing here may cause RX windows to be missed */
+    LDL_TRACE("new_mode=%i cur_mode=%i", mode, self->mode)
 #ifdef LDL_ENABLE_RADIO_DEBUG
     debugLogFlush(self, __FUNCTION__);
 #endif
@@ -381,7 +383,7 @@ void LDL_SX127X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
         .crc = true
     };
 
-    int16_t dbm = settings->dbm + self->tx_gain;
+    int16_t dbm = settings->dbm - self->tx_gain;
 
 #ifdef LDL_ENABLE_RADIO_DEBUG
     debugLogReset(self);
@@ -417,7 +419,7 @@ void LDL_SX127X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
     writeReg(self, RegIrqFlagsMask, 0xf7U);             // unmask TX_DONE interrupt
     writeReg(self, RegFifoTxBaseAddr, 0U);              // set tx base
     writeReg(self, RegFifoAddrPtr, 0U);                 // set address pointer
-    writeReg(self, LoraRegPayloadLength, len);          // bytes to transmit (note. datasheet doesn't say we have to but in practice we do)
+    writeReg(self, LoraRegPayloadLength, len);          // bytes to transmit
     burstWrite(self, RegFifo, data, len);               // write buffer
 
     setFreq(self, settings->freq);                      // set carrier frequency

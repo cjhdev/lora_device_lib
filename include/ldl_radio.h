@@ -30,7 +30,7 @@
  * The application should initialise the radio with @ref ldl_mac in the following
  * order:
  *
- * -# LDL_SX1272_init()/LDL_SX1276_init()/LDL_SX1261_init()/LDL_SX1262_init()
+ * -# LDL_SX1272_init()/LDL_SX1276_init()/LDL_SX1261_init()/LDL_SX1262_init()/LDL_WL55_init()
  * -# LDL_MAC_init()
  * -# LDL_Radio_setEventCallback()
  *
@@ -64,14 +64,16 @@ extern "C" {
  * - #LDL_ENABLE_SX1276
  * - #LDL_ENABLE_SX1261
  * - #LDL_ENABLE_SX1262
+ * - #LDL_ENABLE_WL55
  *
  * */
 enum ldl_radio_type {
     LDL_RADIO_NONE,        /**< no radio */
     LDL_RADIO_SX1272,      /**< SX1272 */
     LDL_RADIO_SX1276,      /**< SX1276 */
-    LDL_RADIO_SX1261,      /**< SX1261 */
-    LDL_RADIO_SX1262       /**< SX1262 */
+    LDL_RADIO_SX1261,      /**< SX126X with only LP PA */
+    LDL_RADIO_SX1262,      /**< SX126X with only HP PA */
+    LDL_RADIO_WL55         /**< integrated SX126X with HP and LP PA */
 };
 
 /** This controls the radio
@@ -131,6 +133,13 @@ enum ldl_sx127x_pa {
     LDL_SX127X_PA_AUTO,  /**< driver decides which PA to use */
     LDL_SX127X_PA_RFO,   /**< use RFO */
     LDL_SX127X_PA_BOOST  /**< use BOOST */
+};
+
+/** SX126X power amplifier setting */
+enum ldl_sx126x_pa {
+    LDL_SX126X_PA_AUTO, /**< driver decides which PA to use */
+    LDL_SX126X_PA_LP,   /**< use low power */
+    LDL_SX126X_PA_HP    /**< use high power */
 };
 
 /** SX126X regulator setting
@@ -210,9 +219,10 @@ struct ldl_radio {
         } sx127x;
 #endif
 
-#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_SX1262)
+#if defined(LDL_ENABLE_SX1261) || defined(LDL_ENABLE_SX1262) || defined(LDL_ENABLE_WL55)
         struct {
 
+            enum ldl_sx126x_pa pa;
             enum ldl_sx126x_regulator regulator;
             enum ldl_sx126x_voltage voltage;
             enum ldl_sx126x_txen txen;

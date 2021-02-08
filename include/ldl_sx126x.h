@@ -57,8 +57,21 @@ struct ldl_sx126x_init_arg {
     /** choose tcxo voltage setting */
     enum ldl_sx126x_voltage voltage;
 
-    /** choose txen switch mode */
+    /** choose txen switch mode
+     *
+     * note. this setting is ignored by WL55 driver
+     *
+     *  */
     enum ldl_sx126x_txen txen;
+
+    /** The WL55 has HP and LP power amplifiers, this setting
+     * tells the driver which to use. Auto means the driver
+     * will select the PA according to requested power.
+     *
+     * note. this setting is ignored by SX1261 and SX1262 drivers.
+     *
+     * */
+    enum ldl_sx126x_pa pa;
 
     bool trim_xtal;     /**< set true to trim xtal with xta and xtb parameters */
     uint8_t xta;        /**< XTA trim value */
@@ -66,6 +79,8 @@ struct ldl_sx126x_init_arg {
 };
 
 /** Initialise SX1261 radio driver
+ *
+ * This is a SX126x with LP power amplifier.
  *
  * @param[in] self
  * @param[in] arg   #ldl_sx126x_init_arg
@@ -75,11 +90,26 @@ void LDL_SX1261_init(struct ldl_radio *self, const struct ldl_sx126x_init_arg *a
 
 /** Initialise SX1262 radio driver
  *
+ * This is a SX126x with HP power amplifier.
+ *
  * @param[in] self
  * @param[in] arg   #ldl_sx126x_init_arg
  *
  * */
 void LDL_SX1262_init(struct ldl_radio *self, const struct ldl_sx126x_init_arg *arg);
+
+/** Initialise WL55 radio driver
+ *
+ * This is a SX126x with:
+ *
+ * - HP and LP power amplifiers
+ * - dio2 switching disabled
+ *
+ * @param[in] self
+ * @param[in] arg   #ldl_sx126x_init_arg
+ *
+ * */
+void LDL_WL55_init(struct ldl_radio *self, const struct ldl_sx126x_init_arg *arg);
 
 /** Get radio interface
  *
@@ -94,6 +124,13 @@ const struct ldl_radio_interface *LDL_SX1261_getInterface(void);
  *
  * */
 const struct ldl_radio_interface *LDL_SX1262_getInterface(void);
+
+/** Get radio interface
+ *
+ * @return #ldl_radio_interface
+ *
+ * */
+const struct ldl_radio_interface *LDL_WL55_getInterface(void);
 
 void LDL_SX126X_setMode(struct ldl_radio *self, enum ldl_radio_mode mode);
 void LDL_SX126X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setting *settings, const void *data, uint8_t len);

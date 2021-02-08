@@ -41,7 +41,7 @@ void main(void)
         struct ldl_sx127x_init_arg arg = {0};
 
         arg.xtal = LDL_RADIO_XTAL_CRYSTAL;
-        arg.tx_gain = 0;
+        arg.tx_gain = 200;  /* 2dBi */
         arg.pa = LDL_SX127X_PA_BOOST;
 
         arg.chip_read = chip_read,

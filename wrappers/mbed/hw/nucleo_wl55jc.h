@@ -19,33 +19,60 @@
  *
  * */
 
-#ifndef MBED_LDL_HW_SX126XMB2XAS_H
-#define MBED_LDL_HW_SX126XMB2XAS_H
+#ifndef MBED_LDL_HW_NUCLEO_WL55JC_H
+#define MBED_LDL_HW_NUCLEO_WL55JC_H
 
-#include "sx126x.h"
+#ifdef STM32WL55xx
+
+#include "wl55.h"
 
 namespace LDL {
 
     namespace HW {
 
         /**
-         * SX126XMB2XAS series shields.
-         *
-         * This shield has IO lines that indicate:
-         *
-         * - SX1261 or SX1262
-         * - crystal or tcxo
+         * NUCLEO-WL55JC development kit in default configuration
          *
          * */
-        class SX126XMB2XAS : public Radio {
+        class NucleoWL55JC : public Radio {
 
-            protected:
+            private:
 
-                DigitalIn device_sel;
-                DigitalIn xtal_sel;
+                DigitalOut fe_ctrl1;
+                DigitalOut fe_ctrl2;
+                DigitalOut fe_ctrl3;
 
-                SPI spi;
-                SX126X radio;
+                WL55 radio;
+
+                void set_mode(enum ldl_chip_mode mode)
+                {
+                    switch(mode){
+                    default:
+                        break;
+                    case LDL_CHIP_MODE_RESET:
+                    case LDL_CHIP_MODE_SLEEP:
+                    case LDL_CHIP_MODE_STANDBY:
+                        fe_ctrl1 = 0;
+                        fe_ctrl2 = 0;
+                        fe_ctrl3 = 0;
+                        break;
+                    case LDL_CHIP_MODE_TX_BOOST:
+                        fe_ctrl1 = 0;
+                        fe_ctrl2 = 1;
+                        fe_ctrl3 = 1;
+                        break;
+                    case LDL_CHIP_MODE_TX_RFO:
+                        fe_ctrl1 = 1;
+                        fe_ctrl2 = 1;
+                        fe_ctrl3 = 1;
+                        break;
+                    case LDL_CHIP_MODE_RX:
+                        fe_ctrl1 = 1;
+                        fe_ctrl2 = 0;
+                        fe_ctrl3 = 1;
+                        break;
+                    }
+                }
 
                 void handle_event()
                 {
@@ -59,29 +86,25 @@ namespace LDL {
                  * @param[in] tx_gain       antenna gain (dB x 100)
                  *
                  * */
-                SX126XMB2XAS(
+                NucleoWL55JC(
                     int16_t tx_gain = 200
                 )
                     :
                     Radio(),
-                    device_sel(A2),
-                    xtal_sel(A3),
-                    spi(D11, D12, D13),
+                    fe_ctrl1(PC_4),
+                    fe_ctrl2(PC_5),
+                    fe_ctrl3(PC_3),
                     radio(
-                        (device_sel.read() == 1) ? LDL_RADIO_SX1261 : LDL_RADIO_SX1262,
-                        spi,
-                        D7,             // nss
-                        A0,             // reset
-                        D3,             // busy
-                        D5, NC, NC,     // DIO1, DIO2, DIO3
                         tx_gain,
+                        LDL_SX126X_PA_AUTO,  // select based on requested power
                         LDL_SX126X_REGULATOR_DCDC,
-                        LDL_SX126X_TXEN_ENABLED,
                         LDL_SX126X_VOLTAGE_1V7,
-                        (xtal_sel.read() == 1) ? LDL_RADIO_XTAL_CRYSTAL : LDL_RADIO_XTAL_TCXO
+                        LDL_RADIO_XTAL_TCXO,
+                        callback(this, &NucleoWL55JC::set_mode)
                     )
                 {
-                    radio.set_event_handler(callback(this, &SX126XMB2XAS::handle_event));
+                    /* ensure that radio events can make it out of the real driver */
+                    radio.set_event_handler(callback(this, &NucleoWL55JC::handle_event));
                 }
 
                 const struct ldl_radio_interface *get_interface()
@@ -96,5 +119,7 @@ namespace LDL {
         };
     };
 };
+
+#endif
 
 #endif

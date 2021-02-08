@@ -930,6 +930,7 @@ static void processRadioBoot(struct ldl_mac *self, enum ldl_mac_sme event)
         switch(self->op){
         case LDL_OP_ENTROPY:
 
+            self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
             self->state = LDL_STATE_WAIT_ENTROPY;
             LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
             break;
@@ -1162,6 +1163,8 @@ static void processTX(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag
     uint32_t margin;
     struct ldl_radio_status status;
 
+    (void)memset(&status, 0, sizeof(status));
+
     if(event == LDL_SME_INTERRUPT){
 
         self->radio_interface->get_status(self->radio, &status);
@@ -1177,13 +1180,15 @@ static void processTX(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag
         }
     }
 
-    if(
-        (event == LDL_SME_TIMER_A)
-        ||
-        ((event == LDL_SME_INTERRUPT) && !status.tx)
-    ){
+    if(event == LDL_SME_TIMER_A){
 
-        LDL_ERROR("radio did not respond as expected")
+        LDL_ERROR("interrupt fault")
+        LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
+        handleRadioError(self);
+    }
+    else if((event == LDL_SME_INTERRUPT) && !status.tx){
+
+        LDL_ERROR("unexpected status")
         LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
         handleRadioError(self);
     }
@@ -1369,18 +1374,25 @@ static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
 
     struct ldl_radio_status status;
 
+    (void)memset(&status, 0, sizeof(status));
+
     if(event == LDL_SME_INTERRUPT){
 
         self->radio_interface->get_status(self->radio, &status);
     }
 
-    if(
-        (event == LDL_SME_TIMER_A)
-        ||
-        ((event == LDL_SME_INTERRUPT) && !status.rx && !status.timeout)
-    ){
+    if(event == LDL_SME_TIMER_A){
 
-        LDL_ERROR("timeout waiting for rx_complete or rx_timeout")
+        LDL_ERROR("interrupt fault")
+        LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
+
+        self->radio_interface->get_status(self->radio, &status);
+
+        handleRadioError(self);
+    }
+    else if((event == LDL_SME_INTERRUPT) && !status.rx && !status.timeout){
+
+        LDL_ERROR("unexpected status")
         LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
 
         handleRadioError(self);

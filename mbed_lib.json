@@ -5,6 +5,7 @@
         "LDL_ENABLE_SX1276",
         "LDL_ENABLE_SX1261",
         "LDL_ENABLE_SX1262",
+        "LDL_ENABLE_WL55",
         "LDL_ENABLE_EU_863_870",
         "LDL_ENABLE_US_902_928",
         "LDL_ENABLE_AU_915_928",
@@ -28,7 +29,7 @@
         },
         "spi-frequency" : {
             "help" : "SPI frequency for transceiver",
-            "value" : 4000000,
+            "value" : 6000000,
             "value_max" : 10000000,
             "value_min" : 1000000
         },

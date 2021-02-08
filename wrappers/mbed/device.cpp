@@ -28,9 +28,9 @@ using namespace LDL;
 
 /* constructors *******************************************************/
 
-Device::Device(Store &store, SM &sm, Radio &radio) :
+Device::Device(Store &store, SM &sm, Radio &radio, osPriority prio) :
     mac(store, sm, radio),
-    worker_thread(1024),
+    worker_thread(prio, 2048),
     queue_semaphore(1),
     data_semaphore(1),
     radio(radio)

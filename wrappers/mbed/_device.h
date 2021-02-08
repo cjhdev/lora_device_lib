@@ -29,6 +29,17 @@
 
 namespace LDL {
 
+    /**
+     * LDL::Device is the thread-safe interface for the MBED LDL wrapper.
+     *
+     * A lot of the methods are named the same as with LDL::MAC, the
+     * main difference being the operation methods will block until
+     * they are complete.
+     *
+     * This class is not compiled if you are building for the bare metal
+     * profile.
+     *
+     * */
     class Device {
 
         protected:
@@ -116,35 +127,188 @@ namespace LDL {
 
         public:
 
-            Device(Store& store, SM& sm, LDL::Radio& radio);
+            /**
+             * Create a Device.
+             *
+             * @param[in] store     responsible for handling non-secrets
+             * @param[in] sm        responsible for handling secrets
+             * @param[in] radio
+             * @param[in] prio      priority of the worker
+             *
+             * */
+            Device(Store& store, SM& sm, LDL::Radio& radio, osPriority prio = osPriorityNormal);
 
+            /**
+             * Device must be started in a specific region before
+             * the methods work.
+             *
+             * @param[in] region #ldl_region
+             *
+             * @retval true     Device started
+             * @retval false    Device did not start
+             *
+             * */
             bool start(enum ldl_region region);
 
+            /**
+             * Initiate over the air activation
+             *
+             * This method block forever until:
+             *
+             * - device is activated by server
+             * - application calls cancel()
+             * - application calls forget()
+             *
+             * @return #ldl_mac_status
+             *
+             * */
             enum ldl_mac_status otaa(Kernel::Clock::duration timeout=Kernel::Clock::duration::max());
 
+            /**
+             * Send data using an unconfirmed service.
+             *
+             * This method will block until a radio band is available. Once
+             * a band becomes available it will continue to block until the
+             * service has completed the full tx-rx1-rx2 cycle.
+             *
+             * @param[in] port
+             * @param[in] data
+             * @param[in] len
+             * @param[in] opts
+             *
+             * @return #ldl_mac_status
+             *
+             * */
             enum ldl_mac_status unconfirmed(uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts = NULL);
+
+            /**
+             * Send data using a confirmed service.
+             *
+             * This method will block until a radio band is available. Once
+             * a band becomes available it will continue to block until the
+             * service has completed the full tx-rx1-rx2 cycle.
+             *
+             * @param[in] port
+             * @param[in] data
+             * @param[in] len
+             * @param[in] opts
+             *
+             * @return #ldl_mac_status
+             *
+             * */
             enum ldl_mac_status confirmed(uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts = NULL);
 
+            /**
+             * Forget the network
+             *
+             * */
             void forget();
+
+            /**
+             * Cancel the current operation
+             *
+             * */
             void cancel();
 
-            enum ldl_mac_status set_rate(uint8_t value);
-            uint8_t get_rate();
-
-            enum ldl_mac_status set_power(uint8_t value);
-            uint8_t get_power();
-
-            void set_adr(bool value);
-            bool get_adr();
-
-            bool joined();
-            bool ready();
-
-            void set_max_dcycle(uint8_t value);
-            uint8_t get_max_dcycle();
-
+            /**
+             * Get entropy from the radio
+             *
+             * @param[out] value    random number from radio
+             *
+             * @return #ldl_mac_status
+             *
+             * */
             enum ldl_mac_status entropy(uint32_t &value);
 
+            /**
+             * Set data rate
+             *
+             * @return #ldl_mac_status
+             *
+             * */
+            enum ldl_mac_status set_rate(uint8_t value);
+
+            /**
+             * Get data rate
+             *
+             * @return rate
+             *
+             * */
+            uint8_t get_rate();
+
+            /**
+             * Set transmit power
+             *
+             * @return @ldl_mac_status
+             *
+             * */
+            enum ldl_mac_status set_power(uint8_t value);
+
+            /**
+             * Get transmit power
+             *
+             * @return power
+             *
+             * */
+            uint8_t get_power();
+
+            /**
+             * Set ADR mode
+             *
+             * @param[in] value
+             *
+             * */
+            void set_adr(bool value);
+
+            /**
+             * Get ADR mode
+             *
+             * @retval true     ADR is enabled
+             * @retval false    ADR is disabled
+             *
+             * */
+            bool get_adr();
+
+            /**
+             * Get joined status
+             *
+             * @retval true MAC is joined to a network
+             * @retval false MAC is not joined
+             *
+             * */
+            bool joined();
+
+            /**
+             * Get ready status
+             *
+             * @retval true MAC is ready to transmit
+             * @retval false MAC is not ready
+             *
+             * */
+            bool ready();
+
+            /**
+             * Set maximum duty cycle
+             *
+             * @param[in] value
+             *
+             * */
+            void set_max_dcycle(uint8_t value);
+
+            /**
+             * Get maximum duty cycle setting
+             *
+             * @return maximum duty cycle
+             *
+             * */
+            uint8_t get_max_dcycle();
+
+            /**
+             * Set an event callback handler
+             *
+             * @param[in] cb
+             *
+             * */
             void set_event_cb(Callback<void(enum ldl_mac_response_type, const union ldl_mac_response_arg *)> cb)
             {
                 cb_mutex.lock();
@@ -154,6 +318,15 @@ namespace LDL {
                 cb_mutex.unlock();
             }
 
+            /**
+             * Set an downlink callback handler.
+             *
+             * This is how the application receives messages from server
+             * to device.
+             *
+             * @param[in] cb
+             *
+             * */
             void set_rx_cb(Callback<void(uint8_t, const void *, uint8_t)> cb)
             {
                 cb_mutex.lock();
@@ -163,6 +336,12 @@ namespace LDL {
                 cb_mutex.unlock();
             }
 
+            /**
+             * Set link status answer callback handler
+             *
+             * @param[in] cb
+             *
+             * */
             void set_link_status_cb(Callback<void(uint8_t, uint8_t)> cb)
             {
                 cb_mutex.lock();
@@ -172,6 +351,12 @@ namespace LDL {
                 cb_mutex.unlock();
             }
 
+            /**
+             * Set device time answer callback handler
+             *
+             * @param[in] cb
+             *
+             * */
             void set_device_time_cb(Callback<void(uint32_t, uint8_t)> cb)
             {
                 cb_mutex.lock();

@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdarg.h>
-#include "mbed_trace.h"
 #include "mbed.h"
 
 #include "mbed_ldl_port.h"

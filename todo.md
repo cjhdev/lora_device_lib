@@ -32,3 +32,6 @@ Todo
     - add adjustment for PA ramp time
     - add FSK mode
     - add continuous wave mode
+    - add support for LR1110
+    - MAC/Radio integration needs a calibration state to avoid blocking
+      on radio start at TX when TCXO is used
