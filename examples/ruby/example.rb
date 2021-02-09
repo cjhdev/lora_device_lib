@@ -8,10 +8,10 @@ logger.formatter = LDL::LOG_FORMATTER
 
 opts = {
   logger: logger,
-  dev_eui: "\x00\x00\x00\x00\x00\x00\x00\x03".force_encoding(Encoding::ASCII),
+  dev_eui: [0,0,0,0,0,0,0,3].pack("C*"),
   join_eui: SecureRandom.bytes(8),
-  nwk_key: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01".force_encoding(Encoding::ASCII),
-  gw_eui: "\x00\x00\x00\x00\x00\x00\x00\x01".force_encoding(Encoding::ASCII),
+  nwk_key: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1].pack("C*"),
+  gw_eui: [0,0,0,0,0,0,0,1].pack("C*"),
   host: 'localhost',
   port: 1700,
   otaa_dither: 0

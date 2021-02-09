@@ -46,6 +46,7 @@ Porting Guide
     - LDL_ENABLE_SX1276
     - LDL_ENABLE_SX1261
     - LDL_ENABLE_SX1262
+    - LDL_ENABLE_WL55
 
 7. Implement the chip interface to reach radio chip
 
@@ -64,7 +65,7 @@ Porting Guide
 
 ## Building Source
 
-- define preprocessor symbols as needed ([see build options](include/ldl_platform.h))
+- define preprocessor symbols as needed ([see build options](https://ldl.readthedocs.io/en/latest/group__ldl__build__options.html))
 - add `include` folder to include search path
 - build all sources in `src`
 
