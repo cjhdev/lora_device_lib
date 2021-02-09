@@ -13,10 +13,8 @@ updating.
 - added support for STM32WL55x
 - added MBED wrapper for Nucleo STM32WL55JC kit
 - added antenna gain defaults to MBED wrapper
-- changed the way tx_gain compensation so that a positive gain
-  will subtract from the requested power setting (instead of adding to it)
-- fixed bug in affecting CMWX1ZZABZ where TCXO was not being started before
-  collecting entropy
+- changed tx_gain from being added to requested power, to being subtracted from requested power
+- fixed bug affecting CMWX1ZZABZ where TCXO was not being started before collecting entropy
 - doubled size of stack for LDL::Device worker thread
 
 ## 0.5.2
