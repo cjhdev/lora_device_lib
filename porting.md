@@ -17,7 +17,7 @@ Porting Guide
     Define LDL_LL_VERSION as one of:
 
     - LDL_LL_VERSION_1_0_3
-    - LDL_LL_VERSION_1_0_4
+    - LDL_LL_VERSION_1_0_4 (recommended)
     - LDL_LL_VERSION_1_1
 
 2. Implement the following system functions
@@ -146,16 +146,17 @@ better suits the application:
 
 ### Managing Device Nonce (devNonce)
 
-LoRaWAN 1.1 redefined devNonce to be a 16 bit counter from zero where previously it had been
-a random number. The counter increments after each successful OTAA. A LoRaWAN 1.1 server
-will not accept a devNonce less than one it has seen before. LoRaWAN 1.1 implementations must therefore maintain this
-counter over the lifetime of the device if there is an expectation to enter join mode
-again before the root keys and/or joinEUI are refreshed.
+In LoRaWAN 1.0.3 and earlier, devNonce is randomly generated. Since this
+is a 16bit number collisions are likely, which means devices may fail
+to join again in future.
 
-LDL will push nextDevNonce to the application as an argument to the LDL_MAC_JOIN_COMPLETE event. A cached
-value can be restored by passing it as an argument to LDL_MAC_init().
+In LoRaWAN 1.0.4 and up, devNonce is a counter from zero. This counter
+is not stored with session since it is longer lived than session.
 
-LDL does not keep this counter with session state since it is longer lived than session state.
+Real devices will need a way to save and restore devNonce over resets.
+
+LDL will push 'nextDevNonce' to the application as argument to the LDL_MAC_JOIN_COMPLETE event.
+The application can restore this value as 'devNonce' argument to LDL_MAC_init().
 
 ### Managing Join Nonce (joinNonce)
 
@@ -210,7 +211,9 @@ Note that:
 - session state does not contain sensitive information
 - session state is best treated as opaque data
 - loading invalid/corrupt session state may result in undefined behaviour
-- LDL is able to detect and reset incompatible state moving between firmware versions
+
+LDL does not implement migration of session state between versions. This means if you update
+the firmware on a device, it is best practice to ensure old session state is discarded.
 
 ### Sleep Mode
 

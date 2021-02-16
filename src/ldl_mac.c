@@ -154,7 +154,7 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
     LDL_PEDANTIC(arg->joinEUI != NULL)
     LDL_PEDANTIC(arg->devEUI != NULL)
     LDL_PEDANTIC(arg->devEUI != NULL)
-    LDL_PEDANTIC(arg->ticks != NULL);
+    LDL_PEDANTIC(arg->ticks != NULL)
 
     LDL_PEDANTIC(arg->radio_interface != NULL);
     LDL_PEDANTIC(arg->sm_interface != NULL);
