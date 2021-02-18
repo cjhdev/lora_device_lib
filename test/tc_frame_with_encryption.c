@@ -36,6 +36,8 @@ static void init_mac(struct ldl_mac *mac, const void *key, enum ldl_mac_operatio
 
 static void encode_unconfirmed_up(void **user)
 {
+    (void)user;
+
     uint8_t retval;
     uint8_t buffer[UINT8_MAX];
     const uint8_t payload[] = "hello world";
@@ -61,6 +63,8 @@ static void encode_unconfirmed_up(void **user)
 
 static void encode_join_request(void **user)
 {
+    (void)user;
+
     uint8_t retval;
     uint8_t buffer[UINT8_MAX];
     const uint8_t key[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
@@ -87,6 +91,8 @@ static void encode_join_request(void **user)
 
 static void encode_croft_example(void **user)
 {
+    (void)user;
+
     uint8_t retval;
     uint8_t buffer[UINT8_MAX];
     const uint8_t payload[] = "{\"name\":\"Turiphro\",\"count\":13,\"water\":true}";
@@ -119,6 +125,8 @@ static void encode_croft_example(void **user)
 
 static void encode_random_internet_join_request_example(void **user)
 {
+    (void)user;
+
     uint8_t retval;
     uint8_t buffer[UINT8_MAX];
     const uint8_t key[] = {0xB6, 0xB5, 0x3F, 0x4A, 0x16, 0x8A, 0x7A, 0x88, 0xBD, 0xF7, 0xEA, 0x13, 0x5C, 0xE9, 0xCF, 0xCA};
@@ -146,6 +154,8 @@ static void encode_random_internet_join_request_example(void **user)
 
 static void decode_join_accept(void **user)
 {
+    (void)user;
+
     const uint8_t key[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
     uint8_t input[] = "\x20\xE3\xDE\x10\x87\x95\xF7\x76\xB8\x03\x76\x10\xEF\x78\x69\xB5\xB3";
     bool retval;
@@ -164,6 +174,8 @@ static void decode_join_accept(void **user)
 
 static void decode_join_accept_with_cf_list(void **user)
 {
+    (void)user;
+
     const uint8_t key[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
     uint8_t input[] = "\x20\x14\x0F\x0F\x10\x11\xB5\x22\x3D\x79\x58\x77\x17\xFF\xD9\xEC\x3A\xB6\x05\xA8\x02\xAC\x97\xDD\xE7\xAC\xF0\x5C\x87\xEF\xAC\x47\xAF";
     bool retval;
@@ -183,6 +195,8 @@ static void decode_join_accept_with_cf_list(void **user)
 /* generate by ttn */
 static void decode_unconfirmed_down(void **user)
 {
+    (void)user;
+
     const uint8_t nwkSKey[] = {0xB0,0x53,0x62,0xA0,0xD6,0x31,0xB1,0xCE,0x16,0xB1,0xE3,0x30,0x5A,0x9D,0xB4,0x92};
     uint8_t input[] = {0x60,0x9B,0x21,0x01,0x26,0xA5,0x00,0x00,0x03,0x51,0xFF,0x00,0x01,0xD6,0x60,0x97,0x9F};
     bool retval;

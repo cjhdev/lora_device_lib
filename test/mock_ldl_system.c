@@ -19,11 +19,15 @@ uint32_t system_time = 0U;
 
 uint32_t LDL_System_ticks(void *app)
 {
+    (void)app;
+
     return system_time;
 }
 
 uint32_t LDL_System_rand(void *app)
 {
+    (void)app;
+
     return mock();
 }
 

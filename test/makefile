@@ -25,7 +25,7 @@ DEBUG_DEFINES += -DLDL_ENABLE_AU_915_928
 DEBUG_DEFINES += -DLDL_ENABLE_EU_863_870
 DEBUG_DEFINES += -DLDL_ENABLE_EU_433
 
-CFLAGS := -O0 -Wall -ggdb -fprofile-arcs -ftest-coverage $(INCLUDES) $(CMOCKA_DEFINES) $(DEBUG_DEFINES)
+CFLAGS := -O0 -Wall -Wextra -Werror -ggdb -fprofile-arcs -ftest-coverage $(INCLUDES) $(CMOCKA_DEFINES) $(DEBUG_DEFINES)
 LDFLAGS := -fprofile-arcs -ggdb
 
 SRC := $(notdir $(wildcard $(DIR_ROOT)/src/*.c))
@@ -37,6 +37,7 @@ OBJ_CMOCKA := $(SRC_CMOCKA:.c=.o)
 TESTS += tc_aes
 TESTS += tc_cmac
 TESTS += tc_frame
+TESTS += tc_frame_le
 TESTS += tc_mac_commands
 TESTS += tc_timer
 TESTS += tc_frame_with_encryption
@@ -73,7 +74,7 @@ build_and_run:
 	exit $$FAIL
 
 $(DIR_BUILD)/%.o: %.c
-		@ echo building $@
+	@ echo building $@
 	@ $(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -108,6 +109,12 @@ $(DIR_BIN)/tc_cmac: $(addprefix $(DIR_BUILD)/, tc_cmac.o ldl_cmac.o ldl_aes.o $(
 
 # check frame codec
 $(DIR_BIN)/tc_frame: $(addprefix $(DIR_BUILD)/, tc_frame.o ldl_frame.o ldl_stream.o $(OBJ_CMOCKA))
+	@ echo linking $@
+	@ $(CC) $(LDFLAGS) $^ -o $@
+
+# check frame codec with little endian optimsation
+$(DIR_BIN)/tc_frame_le: CFLAGS += -DLDL_LITTLE_ENDIAN
+$(DIR_BIN)/tc_frame_le: $(addprefix $(DIR_BUILD)/, tc_frame.o ldl_frame.o ldl_stream.o $(OBJ_CMOCKA))
 	@ echo linking $@
 	@ $(CC) $(LDFLAGS) $^ -o $@
 

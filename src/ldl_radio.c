@@ -74,6 +74,8 @@ void LDL_Radio_handleInterrupt(struct ldl_radio *self, uint8_t n)
 {
     LDL_PEDANTIC(self != NULL)
 
+    (void)n;
+
     if(self->cb != NULL){
 
         self->cb(self->cb_ctx);

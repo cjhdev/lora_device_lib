@@ -8,6 +8,7 @@
 
 static void test_dummy(void **user)
 {
+    (void)user;
 }
 
 int main(void)

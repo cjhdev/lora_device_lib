@@ -8,18 +8,20 @@
 
 static void test_putLinkCheckReq(void **user)
 {
+    (void)user;
+
     uint8_t buffer[50U];
     struct ldl_stream s;
-    LDL_Stream_init(&s, buffer, sizeof(buffer));    
-    
+    LDL_Stream_init(&s, buffer, sizeof(buffer));
+
     uint8_t expected[] = "\x02";
-    
-    LDL_MAC_putLinkCheckReq(&s);    
-    
+
+    LDL_MAC_putLinkCheckReq(&s);
+
     assert_false(LDL_Stream_error(&s));
-    
+
     assert_int_equal(sizeof(expected)-1U, LDL_Stream_tell(&s));
-    assert_memory_equal(expected, buffer, LDL_Stream_tell(&s));    
+    assert_memory_equal(expected, buffer, LDL_Stream_tell(&s));
 }
 
 int main(void)

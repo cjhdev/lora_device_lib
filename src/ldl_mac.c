@@ -413,7 +413,7 @@ void LDL_MAC_process(struct ldl_mac *self)
     LDL_PEDANTIC(self != NULL)
 
     enum ldl_mac_sme event;
-    uint32_t lag;
+    uint32_t lag = 0;
     bool channel_ready;
 
     channel_ready = processBands(self);
@@ -998,6 +998,8 @@ static void processEntropy(struct ldl_mac *self, enum ldl_mac_sme event)
 static void processWaitOTAA(struct ldl_mac *self, enum ldl_mac_sme event)
 {
     uint32_t delay;
+
+    (void)event;
 
     if(self->band[LDL_BAND_GLOBAL] == 0U){
 

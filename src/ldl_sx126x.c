@@ -206,16 +206,16 @@ union _packet_status {
         bool pkt_received;
         bool pkt_sent;
 
-        uint8_t rssi_sync;
-        uint8_t rssi_avg;
+        int8_t rssi_sync;
+        int8_t rssi_avg;
 
     } fsk;
 
     struct {
 
-        uint8_t rssi_pkt;
-        uint8_t snr_pkt;
-        uint8_t signal_rssi_pkt;
+        int8_t rssi_pkt;
+        int8_t snr_pkt;
+        int8_t signal_rssi_pkt;
 
     } lora;
 
@@ -663,6 +663,9 @@ uint8_t LDL_SX126X_readBuffer(struct ldl_radio *self, struct ldl_radio_packet_me
 
         ok = GetPacketStatus(self, &status);
         if(!ok){ break; }
+
+        meta->rssi = (int16_t)status.lora.signal_rssi_pkt;
+        meta->snr = (int16_t)status.lora.snr_pkt;
 
         size = (size > max) ? max : size;
 
@@ -1349,9 +1352,9 @@ static bool GetPacketStatus(struct ldl_radio *self, union _packet_status *value)
 
     if(self->chip_read(self->chip, opcode, sizeof(opcode), buffer, sizeof(buffer))){
 
-        value->lora.rssi_pkt = buffer[0];
-        value->lora.snr_pkt = buffer[1];
-        value->lora.signal_rssi_pkt = buffer[2];
+        value->lora.rssi_pkt = -((int8_t)buffer[0])/2;
+        value->lora.snr_pkt = ((int8_t)buffer[1])/4;
+        value->lora.signal_rssi_pkt = ((int8_t)buffer[2])/2;
 
         retval = true;
     }

@@ -5,6 +5,16 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
+## 0.5.4
+
+- fixed bug affecting LDL_LITTLE_ENDIAN option. all decode functions were passing
+  pointer to pointer instead of pointer. No warning produced since expected type
+  is void pointer.
+- fixed LDL_SX126X_readBuffer() so that rssi and snr are now returned. LDL
+  doesn't depend on this information, you would only see it with logging turned on.
+- tests now compile with -Wextra and -Werror
+- fixed anything flagged by -Wextra
+
 ## 0.5.3
 
 This release changes the way tx_gain is applied. Check your code before

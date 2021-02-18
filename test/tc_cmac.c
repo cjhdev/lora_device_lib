@@ -11,6 +11,8 @@
 
 static void test_LDL_CMAC_mlen0(void **user)
 {
+    (void)user;
+
     struct ldl_aes_ctx aes_ctx;
     struct ldl_cmac_ctx cmac_ctx;
     static const uint8_t key[] = {0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c};
@@ -26,6 +28,8 @@ static void test_LDL_CMAC_mlen0(void **user)
 
 static void test_LDL_CMAC_mlen128(void **user)
 {
+    (void)user;
+
     struct ldl_aes_ctx aes_ctx;
     struct ldl_cmac_ctx cmac_ctx;
     static const uint8_t key[] = {0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c};
@@ -43,6 +47,8 @@ static void test_LDL_CMAC_mlen128(void **user)
 
 static void test_LDL_CMAC_mlen320(void **user)
 {
+    (void)user;
+
     struct ldl_aes_ctx aes_ctx;
     struct ldl_cmac_ctx cmac_ctx;
     static const uint8_t key[] = {0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c};
@@ -60,6 +66,8 @@ static void test_LDL_CMAC_mlen320(void **user)
 
 static void test_LDL_CMAC_mlen320_parts1(void **user)
 {
+    (void)user;
+
     struct ldl_aes_ctx aes_ctx;
     struct ldl_cmac_ctx cmac_ctx;
     static const uint8_t key[] = {0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c};
@@ -78,6 +86,8 @@ static void test_LDL_CMAC_mlen320_parts1(void **user)
 
 static void test_LDL_CMAC_mlen320_parts2(void **user)
 {
+    (void)user;
+
     struct ldl_aes_ctx aes_ctx;
     struct ldl_cmac_ctx cmac_ctx;
     static const uint8_t key[] = {0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c};
@@ -96,6 +106,8 @@ static void test_LDL_CMAC_mlen320_parts2(void **user)
 
 static void test_LDL_CMAC_mlen320_parts3(void **user)
 {
+    (void)user;
+
     struct ldl_aes_ctx aes_ctx;
     struct ldl_cmac_ctx cmac_ctx;
     static const uint8_t key[] = {0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c};
@@ -114,6 +126,8 @@ static void test_LDL_CMAC_mlen320_parts3(void **user)
 
 static void test_LDL_CMAC_mlen512(void **user)
 {
+    (void)user;
+
     struct ldl_aes_ctx aes_ctx;
     struct ldl_cmac_ctx cmac_ctx;
     static const uint8_t key[] = {0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c};
@@ -131,6 +145,8 @@ static void test_LDL_CMAC_mlen512(void **user)
 
 static void test_LDL_CMAC_mlen512_parts2(void **user)
 {
+    (void)user;
+
     struct ldl_aes_ctx aes_ctx;
     struct ldl_cmac_ctx cmac_ctx;
     static const uint8_t key[] = {0x2b,0x7e,0x15,0x16,0x28,0xae,0xd2,0xa6,0xab,0xf7,0x15,0x88,0x09,0xcf,0x4f,0x3c};

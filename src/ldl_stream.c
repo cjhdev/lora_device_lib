@@ -271,9 +271,9 @@ bool LDL_Stream_getU16(struct ldl_stream *self, uint16_t *value)
     bool retval;
 
 #ifdef LDL_LITTLE_ENDIAN
-    retval = LDL_Stream_read(self, &value, 2U);
+    retval = LDL_Stream_read(self, value, 2U);
 #else
-    uint8_t buf[2U];
+    uint8_t buf[2];
 
     retval = LDL_Stream_read(self, buf, U8(sizeof(buf)));
 
@@ -296,9 +296,9 @@ bool LDL_Stream_getU24(struct ldl_stream *self, uint32_t *value)
 
 #ifdef LDL_LITTLE_ENDIAN
     *value = 0U;
-    retval = LDL_Stream_read(self, &value, 3U);
+    retval = LDL_Stream_read(self, value, 3U);
 #else
-    uint8_t buf[3U];
+    uint8_t buf[3];
 
     retval = LDL_Stream_read(self, buf, U8(sizeof(buf)));
 
@@ -321,9 +321,9 @@ bool LDL_Stream_getU32(struct ldl_stream *self, uint32_t *value)
     bool retval;
 
 #ifdef LDL_LITTLE_ENDIAN
-    retval = LDL_Stream_read(self, &value, 4U);
+    retval = LDL_Stream_read(self, value, 4U);
 #else
-    uint8_t buf[4U];
+    uint8_t buf[4];
 
     retval = LDL_Stream_read(self, buf, U8(sizeof(buf)));
 
