@@ -151,9 +151,6 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
     LDL_PEDANTIC(self != NULL)
     LDL_PEDANTIC(arg != NULL)
 
-    LDL_PEDANTIC(arg->joinEUI != NULL)
-    LDL_PEDANTIC(arg->devEUI != NULL)
-    LDL_PEDANTIC(arg->devEUI != NULL)
     LDL_PEDANTIC(arg->ticks != NULL)
 
     LDL_PEDANTIC(arg->radio_interface != NULL);
@@ -198,8 +195,8 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
     self->devNonce = arg->devNonce;
     self->joinNonce = arg->joinNonce;
 
-    (void)memcpy(self->devEUI, arg->devEUI, sizeof(self->devEUI));
-    (void)memcpy(self->joinEUI, arg->joinEUI, sizeof(self->joinEUI));
+    (void)memcpy(self->devEUI, arg->devEUI, (arg->devEUI != NULL) ? sizeof(self->devEUI) : 0U);
+    (void)memcpy(self->joinEUI, arg->joinEUI, (arg->joinEUI != NULL) ? sizeof(self->joinEUI) : 0U);
 
     if((arg->session != NULL) && (arg->session->magic == sessionMagicNumber) && (arg->session->region == region)){
 
@@ -1089,7 +1086,7 @@ static void processStartRadioForTX(struct ldl_mac *self, enum ldl_mac_sme event)
 
         LDL_Region_convertRate(self->ctx.region, self->tx.rate, &tx_setting.sf, &tx_setting.bw, &mtu);
 
-        tx_setting.dbm = LDL_Region_getTXPower(self->ctx.region, self->tx.power);
+        tx_setting.eirp = LDL_Region_getTXPower(self->ctx.region, self->tx.power);
 
 #ifndef LDL_DISABLE_TX_PARAM_SETUP
         if(LDL_Region_txParamSetupImplemented(self->ctx.region)){
@@ -1113,15 +1110,16 @@ static void processStartRadioForTX(struct ldl_mac *self, enum ldl_mac_sme event)
                 36
             };
 
-            tx_setting.max_eirp = (int16_t)maxEIRP[self->ctx.tx_param_setup & 0xfU];
-            tx_setting.max_eirp *= 100;
-        }
-        else
-#endif
-        {
-            tx_setting.max_eirp = INT16_MAX;
-        }
+            int16_t max_eirp = (int16_t)maxEIRP[self->ctx.tx_param_setup & 0xfU];
 
+            max_eirp *= 100;
+
+            if(tx_setting.eirp > max_eirp){
+
+                tx_setting.eirp = max_eirp;
+            }
+        }
+#endif
         tx_setting.freq = self->tx.freq;
 
         ms = LDL_Radio_getAirTime(tx_setting.bw, tx_setting.sf, self->bufferLen, true);

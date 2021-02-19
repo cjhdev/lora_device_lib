@@ -20,16 +20,12 @@ static VALUE get_app_key(VALUE self);
 static VALUE get_nwk_key(VALUE self);
 
 static void updateSessionKey(struct ldl_sm *self, enum ldl_sm_key keyDesc, enum ldl_sm_key rootDesc, const void *iv);
-static void beginUpdateSessionKey(struct ldl_sm *self);
-static void endUpdateSessionKey(struct ldl_sm *self);
 static uint32_t mic(struct ldl_sm *self, enum ldl_sm_key desc, const void *hdr, uint8_t hdrLen, const void *data, uint8_t dataLen);
 static void ecb(struct ldl_sm *self, enum ldl_sm_key desc, void *b);
 static void ctr(struct ldl_sm *self, enum ldl_sm_key desc, const void *iv, void *data, uint8_t len);
 
 const struct ldl_sm_interface ext_sm_interface = {
     .update_session_key = updateSessionKey,
-    .begin_update_session_key = beginUpdateSessionKey,
-    .end_update_session_key = endUpdateSessionKey,
     .mic = mic,
     .ecb = ecb,
     .ctr = ctr
@@ -118,16 +114,6 @@ static void updateSessionKey(struct ldl_sm *self, enum ldl_sm_key keyDesc, enum 
     Data_Get_Struct((VALUE)self, struct ldl_sm, sm);
 
     LDL_SM_updateSessionKey(sm, keyDesc, rootDesc, iv);
-}
-
-static void beginUpdateSessionKey(struct ldl_sm *self)
-{
-    (void)self;
-}
-
-static void endUpdateSessionKey(struct ldl_sm *self)
-{
-    (void)self;
 }
 
 static uint32_t mic(struct ldl_sm *self, enum ldl_sm_key desc, const void *hdr, uint8_t hdrLen, const void *data, uint8_t dataLen)

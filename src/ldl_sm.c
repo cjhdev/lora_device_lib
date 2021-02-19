@@ -33,8 +33,6 @@ static void *getKey(struct ldl_sm *self, enum ldl_sm_key desc);
 
 static const struct ldl_sm_interface interface = {
     .update_session_key = LDL_SM_updateSessionKey,
-    .begin_update_session_key = LDL_SM_beginUpdateSessionKey,
-    .end_update_session_key = LDL_SM_endUpdateSessionKey,
     .mic = LDL_SM_mic,
     .ecb = LDL_SM_ecb,
     .ctr = LDL_SM_ctr
@@ -47,7 +45,7 @@ static const struct ldl_sm_interface interface = {
 void LDL_SM_init(struct ldl_sm *self, const void *appKey)
 {
     /* not a mistake, internally we call this LDL_SM_KEY_NWK */
-    (void)memcpy(getKey(self, LDL_SM_KEY_NWK), appKey, LDL_KEY_SIZE);
+    (void)memcpy(getKey(self, LDL_SM_KEY_NWK), appKey, (appKey != NULL) ? LDL_KEY_SIZE : 0U);
 }
 #endif
 
@@ -55,24 +53,14 @@ void LDL_SM_init(struct ldl_sm *self, const void *appKey)
 /* LoRaWAN 1.1 */
 void LDL_SM_init(struct ldl_sm *self, const void *appKey, const void *nwkKey)
 {
-    (void)memcpy(getKey(self, LDL_SM_KEY_APP), appKey, LDL_KEY_SIZE);
-    (void)memcpy(getKey(self, LDL_SM_KEY_NWK), nwkKey, LDL_KEY_SIZE);
+    (void)memcpy(getKey(self, LDL_SM_KEY_APP), appKey, (appKey != NULL) ? LDL_KEY_SIZE : 0U);
+    (void)memcpy(getKey(self, LDL_SM_KEY_NWK), nwkKey, (nwkKey != NULL) ? LDL_KEY_SIZE : 0U);
 }
 #endif
 
 const struct ldl_sm_interface *LDL_SM_getInterface(void)
 {
     return &interface;
-}
-
-void LDL_SM_beginUpdateSessionKey(struct ldl_sm *self)
-{
-    (void)self;
-}
-
-void LDL_SM_endUpdateSessionKey(struct ldl_sm *self)
-{
-    (void)self;
 }
 
 void LDL_SM_updateSessionKey(struct ldl_sm *self, enum ldl_sm_key keyDesc, enum ldl_sm_key rootDesc, const void *iv)

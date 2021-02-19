@@ -25,8 +25,6 @@ using namespace LDL;
 
 const struct ldl_sm_interface SM::interface = {
     .update_session_key = SM::_update_session_key,
-    .begin_update_session_key = SM::_begin_update_session_key,
-    .end_update_session_key = SM::_end_update_session_key,
     .mic = SM::_mic,
     .ecb = SM::_ecb,
     .ctr = SM::_ctr
@@ -40,18 +38,6 @@ SM *
 SM::to_obj(void *self)
 {
     return static_cast<SM *>(self);
-}
-
-void
-SM::_begin_update_session_key(struct ldl_sm *self)
-{
-    to_obj(self)->begin_update_session_key();
-}
-
-void
-SM::_end_update_session_key(struct ldl_sm *self)
-{
-    to_obj(self)->end_update_session_key();
 }
 
 void

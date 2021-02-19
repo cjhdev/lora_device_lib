@@ -61,8 +61,6 @@ enum ldl_sm_key {
 struct ldl_sm_interface {
 
     void (*update_session_key)(struct ldl_sm *self, enum ldl_sm_key key_desc, enum ldl_sm_key root_desc, const void *iv);
-    void (*begin_update_session_key)(struct ldl_sm *self);
-    void (*end_update_session_key)(struct ldl_sm *self);
     uint32_t (*mic)(struct ldl_sm *self, enum ldl_sm_key desc, const void *hdr, uint8_t hdrLen, const void *data, uint8_t dataLen);
     void (*ecb)(struct ldl_sm *self, enum ldl_sm_key desc, void *b);
     void (*ctr)(struct ldl_sm *self, enum ldl_sm_key desc, const void *iv, void *data, uint8_t len);
@@ -99,31 +97,6 @@ const struct ldl_sm_interface *LDL_SM_getInterface(void);
  *
  * */
 void LDL_SM_updateSessionKey(struct ldl_sm *self, enum ldl_sm_key keyDesc, enum ldl_sm_key rootDesc, const void *iv);
-
-/** Signal the beginning of session key update transaction
- *
- * SM implementations that perform batch updates can use
- * this signal to initialise a cache prior to receiving multiple
- * LDL_SM_updateSessionKey() calls.
- *
- * @param[in] self
- *
- * */
-void LDL_SM_beginUpdateSessionKey(struct ldl_sm *self);
-
-/** Signal the end session key update transaction
- *
- * Always follows a previous call to LDL_SM_beginUpdateSessionKey().
- *
- * SM implementations that perform batch updates can use
- * this signal to perform the actual update operation on the cached
- * key material.
- *
- * @param[in] self
- *
- *
- * */
-void LDL_SM_endUpdateSessionKey(struct ldl_sm *self);
 
 /** Lookup a key and use it to produce a MIC
  *

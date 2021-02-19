@@ -78,46 +78,42 @@ void LDL_OPS_deriveKeys(struct ldl_mac *self)
 
     (void)memset(&iv, 0, sizeof(iv));
 
-    self->sm_interface->begin_update_session_key(self->sm);
-    {
-        if(SESS_VERSION(self->ctx) == 0U){
+    if(SESS_VERSION(self->ctx) == 0U){
 
-            /* ptr[0] below */
-            pos = 1;
-            pos += putU24(&ptr[pos], self->ctx.joinNonce);
-            pos += putU24(&ptr[pos], self->ctx.netID);
-            (void)putU16(&ptr[pos], self->ctx.devNonce);
+        /* ptr[0] below */
+        pos = 1;
+        pos += putU24(&ptr[pos], self->ctx.joinNonce);
+        pos += putU24(&ptr[pos], self->ctx.netID);
+        (void)putU16(&ptr[pos], self->ctx.devNonce);
 
-            ptr[0] = 2;
-            self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_NWK, &iv);
+        ptr[0] = 2;
+        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_NWK, &iv);
 
-            ptr[0] = 1;
-            self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_FNWKSINT, LDL_SM_KEY_NWK, &iv);
-            self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_SNWKSINT, LDL_SM_KEY_NWK, &iv);
-            self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_NWKSENC, LDL_SM_KEY_NWK, &iv);
-        }
-        else{
-
-            /* ptr[0] below */
-            pos = 1;
-            pos += putU24(&ptr[pos], self->ctx.joinNonce);
-            pos += putEUI(&ptr[pos], self->joinEUI);
-            (void)putU16(&ptr[pos], self->ctx.devNonce);
-
-            ptr[0] = 1;
-            self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_FNWKSINT, LDL_SM_KEY_NWK, &iv);
-
-            ptr[0] = 2;
-            self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_APP, &iv);
-
-            ptr[0] = 3;
-            self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_SNWKSINT, LDL_SM_KEY_NWK, &iv);
-
-            ptr[0] = 4;
-            self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_NWKSENC, LDL_SM_KEY_NWK, &iv);
-        }
+        ptr[0] = 1;
+        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_FNWKSINT, LDL_SM_KEY_NWK, &iv);
+        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_SNWKSINT, LDL_SM_KEY_NWK, &iv);
+        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_NWKSENC, LDL_SM_KEY_NWK, &iv);
     }
-    self->sm_interface->end_update_session_key(self->sm);
+    else{
+
+        /* ptr[0] below */
+        pos = 1;
+        pos += putU24(&ptr[pos], self->ctx.joinNonce);
+        pos += putEUI(&ptr[pos], self->joinEUI);
+        (void)putU16(&ptr[pos], self->ctx.devNonce);
+
+        ptr[0] = 1;
+        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_FNWKSINT, LDL_SM_KEY_NWK, &iv);
+
+        ptr[0] = 2;
+        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_APP, &iv);
+
+        ptr[0] = 3;
+        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_SNWKSINT, LDL_SM_KEY_NWK, &iv);
+
+        ptr[0] = 4;
+        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_NWKSENC, LDL_SM_KEY_NWK, &iv);
+    }
 }
 
 #if defined(LDL_ENABLE_L2_1_1)
@@ -132,18 +128,14 @@ void LDL_OPS_deriveJoinKeys(struct ldl_mac *self)
 
     (void)memset(&iv, 0, sizeof(iv));
 
-    self->sm_interface->begin_update_session_key(self->sm);
-    {
-        /* ptr[0] below */
-        (void)putEUI(&ptr[1U], self->devEUI);
+    /* ptr[0] below */
+    (void)putEUI(&ptr[1U], self->devEUI);
 
-        ptr[0] = 5U;
-        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_JSENC, LDL_SM_KEY_NWK, &iv);
+    ptr[0] = 5U;
+    self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_JSENC, LDL_SM_KEY_NWK, &iv);
 
-        ptr[0] = 6U;
-        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_JSINT, LDL_SM_KEY_NWK, &iv);
-    }
-    self->sm_interface->end_update_session_key(self->sm);
+    ptr[0] = 6U;
+    self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_JSINT, LDL_SM_KEY_NWK, &iv);
 }
 #endif
 

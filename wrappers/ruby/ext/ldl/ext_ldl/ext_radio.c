@@ -60,7 +60,7 @@ static void transmit(struct ldl_radio *self, const struct ldl_radio_tx_setting *
     VALUE params = rb_hash_new();
 
     rb_hash_aset(params, ID2SYM(rb_intern("freq")), UINT2NUM(settings->freq));
-    rb_hash_aset(params, ID2SYM(rb_intern("dbm")), rb_float_new(settings->dbm / 100));
+    rb_hash_aset(params, ID2SYM(rb_intern("dbm")), rb_float_new(settings->eirp / 100));
     rb_hash_aset(params, ID2SYM(rb_intern("bw")), bw_to_number(settings->bw));
     rb_hash_aset(params, ID2SYM(rb_intern("sf")), sf_to_number(settings->sf));
 

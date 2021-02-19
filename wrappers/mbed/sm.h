@@ -47,15 +47,11 @@ namespace LDL {
 
             static SM *to_obj(void *self);
 
-            static void _begin_update_session_key(struct ldl_sm *self);
-            static void _end_update_session_key(struct ldl_sm *self);
             static void _update_session_key(struct ldl_sm *self, enum ldl_sm_key key_desc, enum ldl_sm_key root_desc, const void *iv);
             static uint32_t _mic(struct ldl_sm *self, enum ldl_sm_key desc, const void *hdr, uint8_t hdrLen, const void *data, uint8_t dataLen);
             static void _ecb(struct ldl_sm *self, enum ldl_sm_key desc, void *b);
             static void _ctr(struct ldl_sm *self, enum ldl_sm_key desc, const void *iv, void *data, uint8_t len);
 
-            virtual void begin_update_session_key() = 0;
-            virtual void end_update_session_key() = 0;
             virtual void update_session_key(enum ldl_sm_key key_desc, enum ldl_sm_key root_desc, const void *iv) = 0;
             virtual uint32_t mic(enum ldl_sm_key desc, const void *hdr, uint8_t hdrLen, const void *data, uint8_t dataLen) = 0;
             virtual void ecb(enum ldl_sm_key desc, void *b) = 0;

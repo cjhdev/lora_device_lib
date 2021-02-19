@@ -101,8 +101,7 @@ struct ldl_radio_tx_setting {
     uint32_t freq;
     enum ldl_signal_bandwidth bw;
     enum ldl_spreading_factor sf;
-    int16_t dbm;
-    int16_t max_eirp;
+    int16_t eirp;
 };
 
 struct ldl_radio_rx_setting {

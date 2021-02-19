@@ -383,16 +383,11 @@ void LDL_SX127X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
         .crc = true
     };
 
-    int16_t dbm = settings->dbm - self->tx_gain;
+    int16_t dbm = settings->eirp - self->tx_gain;
 
 #ifdef LDL_ENABLE_RADIO_DEBUG
     debugLogReset(self);
 #endif
-
-    if(dbm > settings->max_eirp){
-
-        dbm = settings->max_eirp;
-    }
 
 #ifdef LDL_ENABLE_SX1272
     if(self->type == LDL_RADIO_SX1272){

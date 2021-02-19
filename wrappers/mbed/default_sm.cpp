@@ -50,18 +50,6 @@ DefaultSM::DefaultSM(const void *app_key, const void *nwk_key)
 /* protected **********************************************************/
 
 void
-DefaultSM::begin_update_session_key()
-{
-    LDL_SM_beginUpdateSessionKey(&state);
-}
-
-void
-DefaultSM::end_update_session_key()
-{
-    LDL_SM_endUpdateSessionKey(&state);
-}
-
-void
 DefaultSM::update_session_key(enum ldl_sm_key key_desc, enum ldl_sm_key root_desc, const void *iv)
 {
     LDL_SM_updateSessionKey(&state, key_desc, root_desc, iv);

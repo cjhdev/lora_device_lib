@@ -39,8 +39,6 @@ namespace LDL {
 
             struct ldl_sm state;
 
-            void begin_update_session_key();
-            void end_update_session_key();
             void update_session_key(enum ldl_sm_key key_desc, enum ldl_sm_key root_desc, const void *iv);
             uint32_t mic(enum ldl_sm_key desc, const void *hdr, uint8_t hdrLen, const void *data, uint8_t dataLen);
             void ecb(enum ldl_sm_key desc, void *b);

@@ -498,12 +498,7 @@ void LDL_SX126X_transmit(struct ldl_radio *self, const struct ldl_radio_tx_setti
     bool ok;
 
     /* note this is dbm x 100 */
-    int16_t dbm = settings->dbm - self->tx_gain;
-
-    if(dbm > settings->max_eirp){
-
-        dbm = settings->max_eirp;
-    }
+    int16_t dbm = settings->eirp - self->tx_gain;
 
     do{
 
