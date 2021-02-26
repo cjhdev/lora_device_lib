@@ -2143,7 +2143,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
                         }
                     }
 
-                    /* ignore rate setting 16 */
+                    /* ignore rate setting 15, because that means keep the current value */
                     if(req->dataRate < 0xfU){
 
                         // todo: need to pin out of range to maximum
@@ -2157,7 +2157,7 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
                         }
                     }
 
-                    /* ignore power setting 16 */
+                    /* ignore power setting 15, because that means keep the current value */
                     if(req->txPower < 0xfU){
 
                         if(LDL_Region_validateTXPower(self->ctx.region, req->txPower)){
