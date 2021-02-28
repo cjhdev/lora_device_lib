@@ -751,8 +751,13 @@ enum ldl_mac_status LDL_MAC_unconfirmedData(struct ldl_mac *self, uint8_t port, 
 /** Send data with network confirmation
  *
  * Once initiated MAC will send at most nbTrans times until a confirmation is received.
- * NbTrans may be set per invocation by #ldl_mac_data_opts.nbTrans
- *
+ * NbTrans may be set per invocation by #ldl_mac_data_opts.nbTrans and has precedence over
+ * the value possibly received from network.
+ * As of LoRaWAN standard 1.0.4, the network ignores frames if it receives more than nbTrans 
+ * frames, whereby the nbTrans value is determined on the server. Overriding this value with 
+ * client options can therefore be helpful if the uplink transmission is lost, but no longer 
+ * has a positive effect if the acknowledgment downlink frame is lost. 
+ * 
  * The application can cancel the operation while it is in progress by calling LDL_MAC_cancel().
  *
  * The application shall be notified of completion via #ldl_mac_response_fn. One of the following events
