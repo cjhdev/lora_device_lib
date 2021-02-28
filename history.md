@@ -10,10 +10,11 @@ work in progress.
 - fixed bug affecting LDL_LITTLE_ENDIAN option. all decode functions were passing
   pointer to pointer instead of pointer. No warning produced since expected type
   is void pointer.
-- fixed LDL_SX126X_readBuffer() so that rssi and snr are now returned. LDL
-  doesn't depend on this information, you would only see it with logging turned on.
+- fixed LDL_SX126X_readBuffer() so that rssi and snr are now returned
 - tests now compile with -Wextra and -Werror
 - fixed anything flagged by -Wextra
+- changed LDL_DEVICE_TIME callback to compensate time value for better time sync
+- fixed DevStatusAns so that SNR is returned instead of link margin
 
 ## 0.5.3
 

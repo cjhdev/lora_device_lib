@@ -89,8 +89,8 @@ static uint8_t read_buffer(struct ldl_radio *self, struct ldl_radio_packet_metad
 
     result = rb_funcall((VALUE)self, rb_intern("read_buffer"), 0);
 
-    meta->rssi = NUM2UINT(rb_hash_aref(result, ID2SYM(rb_intern("rssi"))));
-    meta->snr = NUM2UINT(rb_hash_aref(result, ID2SYM(rb_intern("lsnr"))));
+    meta->rssi = NUM2INT(rb_hash_aref(result, ID2SYM(rb_intern("rssi"))));
+    meta->snr = NUM2INT(rb_hash_aref(result, ID2SYM(rb_intern("lsnr"))));
 
     buffer = rb_hash_aref(result, ID2SYM(rb_intern("data")));
 

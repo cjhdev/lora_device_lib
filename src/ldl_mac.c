@@ -1192,7 +1192,7 @@ static void processTX(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag
         LDL_DEBUG("ticks=%" PRIu32 "", self->ticks(self->app))
         handleRadioError(self);
     }
-    else if((event == LDL_SME_INTERRUPT) && (status.tx)){
+    else if((event == LDL_SME_INTERRUPT) && status.tx){
 
         self->pendingACK = false;
 
@@ -1202,6 +1202,9 @@ static void processTX(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag
         /* the ideal interval measured in ticks */
         waitTicks = waitSeconds * GET_TPS();
 
+#ifndef LDL_DISABLE_DEVICE_TIME
+        self->ticks_at_tx = self->ticks(self->app) - lag;
+#endif
         advance = GET_ADVANCE() + lag + msToTicks(self, LDL_PARAM_XTAL_DELAY);
 
         /* RX1 */
@@ -1304,8 +1307,6 @@ static void processStartRadioForRX1(struct ldl_mac *self, enum ldl_mac_sme event
         /* use waitA as a guard (timeout after ~4 seconds) */
         LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (GET_TPS() + GET_A()) << 2U);
 
-        self->snr_min = LDL_Radio_getMinSNR(radio_setting.sf);
-
         LDL_INFO("rx1 slot")
         LDL_DEBUG("ticks=%" PRIu32 " timeout=%" PRIu16 " lag=%" PRIu32 " freq=%" PRIu32 " bw=%" PRIu32 " sf=%u",
             self->ticks(self->app),
@@ -1339,8 +1340,6 @@ static void processStartRadioForRX2(struct ldl_mac *self, enum ldl_mac_sme event
 
         /* use waitA as a guard */
         LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (GET_TPS() + GET_A()) * 4U);
-
-        self->snr_min = LDL_Radio_getMinSNR(radio_setting.sf);
 
         LDL_INFO("rx2 slot")
         LDL_DEBUG("ticks=%" PRIu32 " timeout=%" PRIu16 " lag=%" PRIu32 " freq=%" PRIu32 " bw=%" PRIu32 " sf=%u",
@@ -1406,13 +1405,12 @@ static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
 
         self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_SLEEP);
 
-        self->margin = meta.snr - self->snr_min;
+        self->rx_snr = meta.snr;
 
-        LDL_DEBUG("downlink: ticks=%" PRIu32 " rssi=%d snr=%d snr_margin=%d size=%u",
+        LDL_DEBUG("downlink: ticks=%" PRIu32 " rssi=%d snr=%d size=%u",
             self->ticks(self->app),
             meta.rssi,
             meta.snr,
-            self->margin,
             len
         )
 
@@ -2239,19 +2237,17 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
 
             self->ctx.dev_status_ans.battery = self->get_battery_level(self->app);
 
-            self->ctx.dev_status_ans.margin = (int8_t)(self->margin / 100);
-
-            if(self->ctx.dev_status_ans.margin > 31){
+            if(self->rx_snr > 31){
 
                 self->ctx.dev_status_ans.margin = 31;
             }
-            else if(self->ctx.dev_status_ans.margin < -32){
+            else if(self->rx_snr < -32){
 
                 self->ctx.dev_status_ans.margin = -32;
             }
             else{
 
-                /* do nothing */
+                self->ctx.dev_status_ans.margin = (int8_t)self->rx_snr;
             }
 
             setPendingCommand(self, LDL_CMD_DEV_STATUS);
@@ -2345,9 +2341,18 @@ static void processCommands(struct ldl_mac *self, const uint8_t *in, uint8_t len
         case LDL_CMD_DEVICE_TIME:
         {
             union ldl_mac_response_arg arg;
+            uint32_t lag;
 
-            arg.device_time.seconds = cmd.fields.deviceTime.seconds;
-            arg.device_time.fractions = cmd.fields.deviceTime.fractions;
+            arg.device_time.time = U64(cmd.fields.deviceTime.seconds);
+            arg.device_time.time <<= 8;
+            arg.device_time.time |= U64(cmd.fields.deviceTime.fractions);
+
+            lag = timerDelta(self->ticks_at_tx, self->ticks(self->app));
+
+            arg.device_time.time += (U64(lag) * U64(timeTPS) / U64(GET_TPS()));
+
+            arg.device_time.seconds = U32(arg.device_time.time >> 8);
+            arg.device_time.fractions = U8(arg.device_time.time);
 
             LDL_DEBUG("device_time_ans: seconds=%" PRIu32 " fractions=%u",
                 arg.device_time.seconds,
@@ -3094,7 +3099,6 @@ static uint32_t msToTicks(const struct ldl_mac *self, uint32_t ms)
 
     return (t / U32(1000)) + (((t % U32(1000)) > 0U) ? U32(1) : U32(0));
 }
-
 
 static uint32_t timeUntilNextChannel(const struct ldl_mac *self)
 {

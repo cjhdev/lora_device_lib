@@ -253,6 +253,7 @@ union ldl_mac_response_arg {
     /** #LDL_MAC_DEVICE_TIME argument */
     struct {
 
+        uint64_t time;      /**< seconds|fractions */
         uint32_t seconds;   /**< seconds since jan 5 1980 */
         uint8_t fractions;  /**< 1/255 of a second */
 
@@ -425,8 +426,7 @@ struct ldl_mac {
     uint16_t devNonce;
     uint32_t joinNonce;
 
-    int16_t snr_min;    /* could be optimised: used to keep the snr min for the last rx settings */
-    int16_t margin;     /* margin calculated for last DevStatusReq */
+    int16_t rx_snr;
 
     /* the settings currently being used to TX */
     struct ldl_mac_tx tx;
@@ -451,6 +451,11 @@ struct ldl_mac {
     bool adrAckReq;
 
     struct ldl_mac_time time;
+
+#ifndef LDL_DISABLE_DEVICE_TIME
+    /* used to provide precise time sync */
+    uint32_t ticks_at_tx;
+#endif
 
     /* number of join/data trials */
     uint32_t trials;

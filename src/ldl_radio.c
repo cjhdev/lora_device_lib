@@ -57,6 +57,11 @@ const struct ldl_radio_interface *LDL_Radio_getInterface(const struct ldl_radio 
         retval = LDL_SX1262_getInterface();
         break;
 #endif
+#ifdef LDL_ENABLE_WL55
+    case LDL_RADIO_WL55:
+        retval = LDL_WL55_getInterface();
+        break;
+#endif
     }
 
     return retval;

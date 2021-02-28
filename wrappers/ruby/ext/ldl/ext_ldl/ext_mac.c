@@ -606,6 +606,7 @@ static void response(void *receiver, enum ldl_mac_response_type type, const unio
         break;
     case LDL_MAC_DEVICE_TIME:
         event = ID2SYM(rb_intern("device_time"));
+        rb_hash_aset(param, ID2SYM(rb_intern("time")), UINT2NUM(arg->device_time.time));
         rb_hash_aset(param, ID2SYM(rb_intern("seconds")), UINT2NUM(arg->device_time.seconds));
         rb_hash_aset(param, ID2SYM(rb_intern("fractions")), UINT2NUM(arg->device_time.fractions));
         break;

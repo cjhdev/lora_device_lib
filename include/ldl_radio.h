@@ -366,7 +366,7 @@ void LDL_Radio_setEventCallback(struct ldl_radio *self, struct ldl_mac *ctx, ldl
 /** Get minimum SNR for a given spreading factor
  *
  * @param[in] sf spreading factor
- * @return dbm
+ * @return dB x 100
  *
  * */
 int16_t LDL_Radio_getMinSNR(enum ldl_spreading_factor sf);
