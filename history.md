@@ -15,6 +15,8 @@ work in progress.
 - fixed anything flagged by -Wextra
 - changed LDL_DEVICE_TIME callback to compensate time value for better time sync
 - fixed DevStatusAns so that SNR is returned instead of link margin
+- changed LDL_MAC_unconfirmedData() and LDL_MAC_confirmedData() so that
+  LDL_STATUS_SIZE is returned when message is too large to send
 
 ## 0.5.3
 
