@@ -1068,9 +1068,6 @@ static void processWait(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t l
 #endif
         break;
 
-    case LDL_SME_BAND:
-        break;
-
     default:
         break;
     }
@@ -1650,6 +1647,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
     struct ldl_frame_data f;
     struct ldl_stream s;
     uint8_t macs[30U]; // large enough for all possible MAC commands
+    size_t desired_len = len + (size_t)LDL_Frame_dataOverhead();
 
     if(self->ctx.joined){
 
@@ -1666,21 +1664,21 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
 #else
                     self->tx.rate = LDL_Region_applyUplinkDwell(self->ctx.region, uplinkDwell(self->ctx.tx_param_setup), self->ctx.rate);
 #endif
-
                     if(selectChannel(self, self->ctx.rate, 0U, &self->tx)){
 
                         LDL_Region_convertRate(self->ctx.region, self->ctx.rate, &sf, &bw, &maxPayload);
 
-                        (void)memset(&self->opts, 0, sizeof(self->opts));
+                        if(desired_len <= (size_t)maxPayload){
 
-                        if(opts != NULL){
+                            (void)memset(&self->opts, 0, sizeof(self->opts));
 
-                            (void)memcpy(&self->opts, opts, sizeof(self->opts));
-                        }
+                            if(opts != NULL){
 
-                        self->opts.nbTrans = self->opts.nbTrans & 0xfU;
+                                (void)memcpy(&self->opts, opts, sizeof(self->opts));
+                            }
 
-                        {
+                            self->opts.nbTrans = self->opts.nbTrans & 0xfU;
+
                             self->trials = 0U;
 
                             (void)memset(&f, 0, sizeof(f));
@@ -1698,7 +1696,6 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                              * responding to a confirmed downlink */
                             f.ack = self->pendingACK;
 
-
                             /* 1.1 has to awkwardly re-calculate the MIC when a frame is retried on a
                              * different channel and the counter is a parameter */
                             self->tx.counter = self->ctx.up;
@@ -1706,137 +1703,135 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                             self->ctx.up++;
 
                             /* serialise pending MAC commands */
-                            {
-                                LDL_Stream_init(&s, macs, U8(sizeof(macs)));
 
-                                LDL_DEBUG("preparing data frame")
+                            LDL_Stream_init(&s, macs, U8(sizeof(macs)));
 
-                                /* sticky commands */
+                            LDL_DEBUG("preparing data frame")
+
+                            /* sticky commands */
 #if defined(LDL_ENABLE_L2_1_1)
-                                if(commandIsPending(self, LDL_CMD_REKEY)){
+                            if(commandIsPending(self, LDL_CMD_REKEY)){
 
-                                    struct ldl_rekey_ind ind = {
-                                        .version = self->ctx.version
-                                    };
+                                struct ldl_rekey_ind ind = {
+                                    .version = self->ctx.version
+                                };
 
-                                    LDL_MAC_putRekeyInd(&s, &ind);
+                                LDL_MAC_putRekeyInd(&s, &ind);
 
-                                    LDL_DEBUG("adding rekey_ind: version=%u", self->ctx.version)
-                                }
+                                LDL_DEBUG("adding rekey_ind: version=%u", self->ctx.version)
+                            }
 #endif
-                                if(commandIsPending(self, LDL_CMD_RX_PARAM_SETUP)){
+                            if(commandIsPending(self, LDL_CMD_RX_PARAM_SETUP)){
 
-                                    LDL_MAC_putRXParamSetupAns(&s, &self->ctx.rx_param_setup_ans);
+                                LDL_MAC_putRXParamSetupAns(&s, &self->ctx.rx_param_setup_ans);
 
-                                    LDL_DEBUG("adding rx_param_setup_ans: rx1DROffsetOK=%s rx2DataRate=%s rx2Freq=%s",
-                                        self->ctx.rx_param_setup_ans.rx1DROffsetOK ? "true" : "false",
-                                        self->ctx.rx_param_setup_ans.rx2DataRateOK ? "true" : "false",
-                                        self->ctx.rx_param_setup_ans.channelOK ? "true" : "false"
-                                    )
-                                }
-
-                                if(commandIsPending(self, LDL_CMD_DL_CHANNEL)){
-
-                                    LDL_MAC_putDLChannelAns(&s, &self->ctx.dl_channel_ans);
-
-                                    LDL_DEBUG("adding dl_channel_ans: uplinkFreqOK=%s channelFreqOK=%s",
-                                        self->ctx.dl_channel_ans.uplinkFreqOK ? "true" : "false",
-                                        self->ctx.dl_channel_ans.channelFreqOK ? "true" : "false"
-                                    )
-                                }
-
-                                if(commandIsPending(self, LDL_CMD_RX_TIMING_SETUP)){
-
-                                    LDL_MAC_putRXTimingSetupAns(&s);
-                                    LDL_DEBUG("adding rx_timing_setup_ans")
-                                }
-
-                                /* single shot commands */
-
-                                if(commandIsPending(self, LDL_CMD_LINK_ADR)){
-
-                                    LDL_MAC_putLinkADRAns(&s, &self->ctx.link_adr_ans);
-                                    clearPendingCommand(self, LDL_CMD_LINK_ADR);
-
-                                    LDL_DEBUG("adding link_adr_ans: powerOK=%s dataRateOK=%s channelMaskOK=%s",
-                                        self->ctx.link_adr_ans.dataRateOK ? "true" : "false",
-                                        self->ctx.link_adr_ans.powerOK ? "true" : "false",
-                                        self->ctx.link_adr_ans.channelMaskOK ? "true" : "false"
-                                    )
-                                }
-
-                                if(commandIsPending(self, LDL_CMD_DEV_STATUS)){
-
-                                    LDL_MAC_putDevStatusAns(&s, &self->ctx.dev_status_ans);
-                                    clearPendingCommand(self, LDL_CMD_DEV_STATUS);
-
-                                    LDL_DEBUG("adding dev_status_ans: battery=%u margin=%i",
-                                        self->ctx.dev_status_ans.battery,
-                                        self->ctx.dev_status_ans.margin
-                                    )
-                                }
-
-                                if(commandIsPending(self, LDL_CMD_NEW_CHANNEL)){
-
-                                    LDL_MAC_putNewChannelAns(&s, &self->ctx.new_channel_ans);
-                                    clearPendingCommand(self, LDL_CMD_NEW_CHANNEL);
-
-                                    LDL_DEBUG("adding new_channel_ans: dataRateRangeOK=%s channelFreqOK=%s",
-                                        self->ctx.new_channel_ans.dataRateRangeOK ? "true" : "false",
-                                        self->ctx.new_channel_ans.channelFreqOK ? "true" : "false"
-                                    )
-                                }
-#if defined(LDL_ENABLE_L2_1_1)
-                                if(commandIsPending(self, LDL_CMD_REJOIN_PARAM_SETUP)){
-
-                                    LDL_MAC_putRejoinParamSetupAns(&s, &self->ctx.rejoin_param_setup_ans);
-                                    clearPendingCommand(self, LDL_CMD_REJOIN_PARAM_SETUP);
-
-                                    LDL_DEBUG("adding rejoin_param_setup_ans: timeOK=%s",
-                                        self->ctx.rejoin_param_setup_ans.timeOK ? "true" : "false"
-                                    )
-                                }
-
-                                if(commandIsPending(self, LDL_CMD_ADR_PARAM_SETUP)){
-
-                                    LDL_MAC_putADRParamSetupAns(&s);
-                                    clearPendingCommand(self, LDL_CMD_ADR_PARAM_SETUP);
-
-                                    LDL_DEBUG("adding adr_param_setup_ans")
-                                }
-#endif
-#ifndef LDL_DISABLE_TX_PARAM_SETUP
-                                if(commandIsPending(self, LDL_CMD_TX_PARAM_SETUP)){
-
-                                    LDL_MAC_putTXParamSetupAns(&s);
-                                    clearPendingCommand(self, LDL_CMD_TX_PARAM_SETUP);
-
-                                    LDL_DEBUG("adding tx_param_setup_ans")
-                                }
-#endif
-                                if(commandIsPending(self, LDL_CMD_DUTY_CYCLE)){
-
-                                    LDL_MAC_putDutyCycleAns(&s);
-                                    clearPendingCommand(self, LDL_CMD_DUTY_CYCLE);
-
-                                    LDL_DEBUG("adding duty_cycle_ans")
-                                }
-#ifndef LDL_DISABLE_LINK_CHECK
-                                if(self->opts.check){
-
-                                    LDL_MAC_putLinkCheckReq(&s);
-                                    LDL_DEBUG("adding link_check_req")
-                                }
-#endif
-#ifndef LDL_DISABLE_DEVICE_TIME
-                                if(self->opts.getTime){
-
-                                    LDL_MAC_putDeviceTimeReq(&s);
-                                    LDL_DEBUG("adding device_time_req")
-                                }
-#endif
+                                LDL_DEBUG("adding rx_param_setup_ans: rx1DROffsetOK=%s rx2DataRate=%s rx2Freq=%s",
+                                    self->ctx.rx_param_setup_ans.rx1DROffsetOK ? "true" : "false",
+                                    self->ctx.rx_param_setup_ans.rx2DataRateOK ? "true" : "false",
+                                    self->ctx.rx_param_setup_ans.channelOK ? "true" : "false"
+                                )
                             }
 
+                            if(commandIsPending(self, LDL_CMD_DL_CHANNEL)){
+
+                                LDL_MAC_putDLChannelAns(&s, &self->ctx.dl_channel_ans);
+
+                                LDL_DEBUG("adding dl_channel_ans: uplinkFreqOK=%s channelFreqOK=%s",
+                                    self->ctx.dl_channel_ans.uplinkFreqOK ? "true" : "false",
+                                    self->ctx.dl_channel_ans.channelFreqOK ? "true" : "false"
+                                )
+                            }
+
+                            if(commandIsPending(self, LDL_CMD_RX_TIMING_SETUP)){
+
+                                LDL_MAC_putRXTimingSetupAns(&s);
+                                LDL_DEBUG("adding rx_timing_setup_ans")
+                            }
+
+                            /* single shot commands */
+
+                            if(commandIsPending(self, LDL_CMD_LINK_ADR)){
+
+                                LDL_MAC_putLinkADRAns(&s, &self->ctx.link_adr_ans);
+                                clearPendingCommand(self, LDL_CMD_LINK_ADR);
+
+                                LDL_DEBUG("adding link_adr_ans: powerOK=%s dataRateOK=%s channelMaskOK=%s",
+                                    self->ctx.link_adr_ans.dataRateOK ? "true" : "false",
+                                    self->ctx.link_adr_ans.powerOK ? "true" : "false",
+                                    self->ctx.link_adr_ans.channelMaskOK ? "true" : "false"
+                                )
+                            }
+
+                            if(commandIsPending(self, LDL_CMD_DEV_STATUS)){
+
+                                LDL_MAC_putDevStatusAns(&s, &self->ctx.dev_status_ans);
+                                clearPendingCommand(self, LDL_CMD_DEV_STATUS);
+
+                                LDL_DEBUG("adding dev_status_ans: battery=%u margin=%i",
+                                    self->ctx.dev_status_ans.battery,
+                                    self->ctx.dev_status_ans.margin
+                                )
+                            }
+
+                            if(commandIsPending(self, LDL_CMD_NEW_CHANNEL)){
+
+                                LDL_MAC_putNewChannelAns(&s, &self->ctx.new_channel_ans);
+                                clearPendingCommand(self, LDL_CMD_NEW_CHANNEL);
+
+                                LDL_DEBUG("adding new_channel_ans: dataRateRangeOK=%s channelFreqOK=%s",
+                                    self->ctx.new_channel_ans.dataRateRangeOK ? "true" : "false",
+                                    self->ctx.new_channel_ans.channelFreqOK ? "true" : "false"
+                                )
+                            }
+#if defined(LDL_ENABLE_L2_1_1)
+                            if(commandIsPending(self, LDL_CMD_REJOIN_PARAM_SETUP)){
+
+                                LDL_MAC_putRejoinParamSetupAns(&s, &self->ctx.rejoin_param_setup_ans);
+                                clearPendingCommand(self, LDL_CMD_REJOIN_PARAM_SETUP);
+
+                                LDL_DEBUG("adding rejoin_param_setup_ans: timeOK=%s",
+                                    self->ctx.rejoin_param_setup_ans.timeOK ? "true" : "false"
+                                )
+                            }
+
+                            if(commandIsPending(self, LDL_CMD_ADR_PARAM_SETUP)){
+
+                                LDL_MAC_putADRParamSetupAns(&s);
+                                clearPendingCommand(self, LDL_CMD_ADR_PARAM_SETUP);
+
+                                LDL_DEBUG("adding adr_param_setup_ans")
+                            }
+#endif
+#ifndef LDL_DISABLE_TX_PARAM_SETUP
+                            if(commandIsPending(self, LDL_CMD_TX_PARAM_SETUP)){
+
+                                LDL_MAC_putTXParamSetupAns(&s);
+                                clearPendingCommand(self, LDL_CMD_TX_PARAM_SETUP);
+
+                                LDL_DEBUG("adding tx_param_setup_ans")
+                            }
+#endif
+                            if(commandIsPending(self, LDL_CMD_DUTY_CYCLE)){
+
+                                LDL_MAC_putDutyCycleAns(&s);
+                                clearPendingCommand(self, LDL_CMD_DUTY_CYCLE);
+
+                                LDL_DEBUG("adding duty_cycle_ans")
+                            }
+#ifndef LDL_DISABLE_LINK_CHECK
+                            if(self->opts.check){
+
+                                LDL_MAC_putLinkCheckReq(&s);
+                                LDL_DEBUG("adding link_check_req")
+                            }
+#endif
+#ifndef LDL_DISABLE_DEVICE_TIME
+                            if(self->opts.getTime){
+
+                                LDL_MAC_putDeviceTimeReq(&s);
+                                LDL_DEBUG("adding device_time_req")
+                            }
+#endif
                             /* create port 0 message and ignore application */
                             if(LDL_Stream_tell(&s) > 15U){
 
@@ -1853,7 +1848,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                 retval = LDL_STATUS_MACPRIORITY;
                             }
                             /* ignore application */
-                            else if((LDL_Frame_dataOverhead() + len + LDL_Stream_tell(&s)) > maxPayload){
+                            else if((desired_len + (size_t)LDL_Stream_tell(&s)) > (size_t)maxPayload){
 
                                 LDL_DEBUG("mac data has been prioritised")
 
@@ -1882,17 +1877,21 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                             self->bufferLen = LDL_OPS_prepareData(self, &f, self->buffer, U8(sizeof(self->buffer)));
 
                             LDL_OPS_micDataFrame(self, self->buffer, self->bufferLen);
+
+                            if(self->state == LDL_STATE_IDLE){
+
+                                self->state = LDL_STATE_WAIT_TX;
+                                LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0U);
+                            }
+
+                            LDL_DEBUG("initiate data: ticks=%" PRIu32,
+                                self->ticks(self->app)
+                            )
                         }
+                        else{
 
-                        if(self->state == LDL_STATE_IDLE){
-
-                            self->state = LDL_STATE_WAIT_TX;
-                            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0U);
+                            retval = LDL_STATUS_SIZE;
                         }
-
-                        LDL_DEBUG("initiate data: ticks=%" PRIu32,
-                            self->ticks(self->app)
-                        )
                     }
                     else{
 

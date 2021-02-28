@@ -978,13 +978,14 @@ uint8_t LDL_Region_getJoinRate(enum ldl_region region, uint32_t trial)
 
 uint8_t LDL_Region_getJoinIndex(enum ldl_region region, uint32_t trial, uint32_t random)
 {
-    uint8_t retval = 0;
+    uint8_t retval;
 
     (void)trial;
     (void)random;
 
     switch(region){
     default:
+        retval = 0;
         break;
 #ifdef LDL_ENABLE_US_902_928
     case LDL_US_902_928:
@@ -1070,7 +1071,7 @@ const char *LDL_Region_enumToString(enum ldl_region region)
 
 bool LDL_Region_txParamSetupImplemented(enum ldl_region region)
 {
-    bool retval = false;
+    bool retval;
 
     switch(region){
 #ifdef LDL_ENABLE_AU_915_928
@@ -1079,6 +1080,7 @@ bool LDL_Region_txParamSetupImplemented(enum ldl_region region)
         break;
 #endif
     default:
+        retval = false;
         break;
     }
 
@@ -1087,23 +1089,20 @@ bool LDL_Region_txParamSetupImplemented(enum ldl_region region)
 
 uint8_t LDL_Region_applyUplinkDwell(enum ldl_region region, bool dwell, uint8_t rate)
 {
-    uint8_t retval = rate;
+    uint8_t retval;
 
     (void)dwell;
 
     switch(region){
 #ifdef LDL_ENABLE_AU_915_928
     case LDL_AU_915_928:
-        if(dwell){
 
-            if(retval < 2U){
-
-                retval = 2U;
-            }
-        }
+        retval = (dwell && (rate < 2U)) ? 2U : rate;
         break;
 #endif
     default:
+
+        retval = rate;
         break;
     }
 

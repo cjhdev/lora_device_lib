@@ -31,7 +31,7 @@ module LDL
   class Errno < StandardError; end
 
   class ErrNoChannel < Errno; end
-  class ErrTooLarge < Errno; end
+  class ErrSize < Errno; end
   class ErrRate < Errno; end
   class ErrPort < Errno; end
   class ErrBusy < Errno; end

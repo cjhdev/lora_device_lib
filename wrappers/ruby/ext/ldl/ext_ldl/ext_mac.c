@@ -16,7 +16,7 @@ static VALUE cLoggerMethods;
 static VALUE cSecureRandom;
 
 static VALUE cErrNoChannel;
-static VALUE cErrTooLarge;
+static VALUE cErrSize;
 static VALUE cErrRate;
 static VALUE cErrPort;
 static VALUE cErrBusy;
@@ -129,7 +129,7 @@ void ext_mac_init(void)
     cError = rb_const_get(cLDL, rb_intern("Error"));
 
     cErrNoChannel = rb_const_get(cLDL, rb_intern("ErrNoChannel"));
-    cErrTooLarge = rb_const_get(cLDL, rb_intern("ErrTooLarge"));
+    cErrSize = rb_const_get(cLDL, rb_intern("ErrSize"));
     cErrRate = rb_const_get(cLDL, rb_intern("ErrRate"));
     cErrPort = rb_const_get(cLDL, rb_intern("ErrPort"));
     cErrBusy = rb_const_get(cLDL, rb_intern("ErrBusy"));
@@ -387,7 +387,7 @@ static void statusToException(enum ldl_mac_status status)
         rb_raise(cErrNoChannel, "no channel available");
         break;
     case LDL_STATUS_SIZE:
-        rb_raise(cErrTooLarge, "message is too large");
+        rb_raise(cErrSize, "message is too large");
         break;
     case LDL_STATUS_RATE:
         rb_raise(cErrRate, "invalid rate setting");
