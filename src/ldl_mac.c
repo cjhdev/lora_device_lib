@@ -1463,11 +1463,12 @@ static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
                 self->joinNonce++;
                 self->devNonce++;
 
-                LDL_INFO("join accept: joinNonce=%" PRIu32 " nextDevNonce=%" PRIu16 " netID=%" PRIu32 " devAddr=%" PRIu32 "",
+                LDL_INFO("join accept: joinNonce=%" PRIu32 " nextDevNonce=%" PRIu16 " netID=%" PRIu32 " devAddr=%" PRIu32 " rx1Delay=%u",
                     self->joinNonce,
                     self->devNonce,
                     self->ctx.netID,
-                    self->ctx.devAddr
+                    self->ctx.devAddr,
+                    self->ctx.rx1Delay
                 )
 
                 arg.join_complete.joinNonce = self->joinNonce;
