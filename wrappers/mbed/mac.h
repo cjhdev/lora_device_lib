@@ -134,6 +134,7 @@ namespace LDL {
              * - device is activated by server
              * - application calls cancel()
              * - application calls forget()
+             * - devNonce has incremented to UINT16_MAX
              *
              * @return #ldl_mac_status
              *

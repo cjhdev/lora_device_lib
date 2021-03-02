@@ -104,14 +104,20 @@ enum ldl_mac_response_type {
 
     /** Join request was answered and MAC is now joined
      *
-     * Receipt of this event also means:
-     *
-     * - devNonce has been updated. The next devNonce
-     *   is pushed with this event and should be cached so that
-     *   it can be restored the next time LDL_MAC_init() is called.
-     *
      * */
     LDL_MAC_JOIN_COMPLETE,
+
+    /** DevNonce has been incremented
+     *
+     *
+     * */
+    LDL_MAC_DEV_NONCE_UPDATED,
+
+    /** OTAA failed because DevNonce has incremented more than
+     * 65535 times.
+     *
+     * */
+    LDL_MAC_JOIN_EXHAUSTED,
 
     /** data request (confirmed or unconfirmed) completed successfully */
     LDL_MAC_DATA_COMPLETE,
@@ -200,6 +206,7 @@ enum ldl_mac_status {
     LDL_STATUS_POWER,       /**< invalid power setting for region */
     LDL_STATUS_MACPRIORITY, /**< data request failed due to MAC command(s) being prioritised */
     LDL_STATUS_JOINED,      /**< cannot join because already joined */
+    LDL_STATUS_DEVNONCE,    /**< cannot join because DevNonce is exhausted */
 
     /* the following status codes are available for
      * use by wrappers with blocking interfaces */
@@ -264,14 +271,23 @@ union ldl_mac_response_arg {
 
         /** the most up to date joinNonce */
         uint32_t joinNonce;
-        /** the next devNonce to use in OTAA */
-        uint16_t nextDevNonce;
         /** netID */
         uint32_t netID;
         /** devAddr */
         uint32_t devAddr;
 
     } join_complete;
+
+    /** The next devNonce
+     *
+     * This can be saved and restored (at LDL_MAC_init()).
+     *
+     *  */
+    struct {
+
+        uint32_t nextDevNonce;
+
+    } dev_nonce_updated;
 };
 
 /** LDL calls this function pointer to notify application of events
@@ -423,7 +439,8 @@ struct ldl_mac {
      * */
     uint32_t day;
 
-    uint16_t devNonce;
+    /* 32bit to detect 16bit overflow */
+    uint32_t devNonce;
     uint32_t joinNonce;
 
     int16_t rx_snr;
@@ -528,7 +545,7 @@ struct ldl_mac_init_arg {
 
     /** the next devNonce to use in OTAA
      *
-     * @see #LDL_MAC_JOIN_COMPLETE
+     * @see #LDL_MAC_DEV_NONCE_UDPATED
      *
      * */
     uint16_t devNonce;
@@ -684,11 +701,17 @@ enum ldl_mac_status LDL_MAC_entropy(struct ldl_mac *self);
  * The application can cancel the service while it is in progress by
  * calling LDL_MAC_cancel().
  *
+ * OTAA will fail permanently if more than 65535 join requests are
+ * made using the same join EUI. This will be indicated by the #LDL_MAC_JOIN_EXHAUSTED
+ * event and any future calls to LDL_MAC_otaa() will return #LDL_STATUS_DEVNONCE.
+ * Join EUI is changed at LDL_MAC_init().
+ *
  * The application shall be notified of completion via #ldl_mac_response_fn.
  * One of the following events can be expected:
  *
  * - #LDL_MAC_JOIN_COMPLETE
  * - #LDL_MAC_OP_CANCELLED
+ * - #LDL_MAC_JOIN_EXHAUSTED
  *
  * Unlike data services, OTAA will continue even if radio errors
  * are detected.
@@ -700,6 +723,7 @@ enum ldl_mac_status LDL_MAC_entropy(struct ldl_mac *self);
  * @retval #LDL_STATUS_OK
  * @retval #LDL_STATUS_BUSY
  * @retval #LDL_STATUS_JOINED
+ * @retval #LDL_STATUS_DEVNONCE
  *
  * */
 enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self);
@@ -758,11 +782,11 @@ enum ldl_mac_status LDL_MAC_unconfirmedData(struct ldl_mac *self, uint8_t port, 
  * Once initiated MAC will send at most nbTrans times until a confirmation is received.
  * NbTrans may be set per invocation by #ldl_mac_data_opts.nbTrans and has precedence over
  * the value possibly received from network.
- * As of LoRaWAN standard 1.0.4, the network ignores frames if it receives more than nbTrans 
- * frames, whereby the nbTrans value is determined on the server. Overriding this value with 
- * client options can therefore be helpful if the uplink transmission is lost, but no longer 
- * has a positive effect if the acknowledgment downlink frame is lost. 
- * 
+ * As of LoRaWAN standard 1.0.4, the network ignores frames if it receives more than nbTrans
+ * frames, whereby the nbTrans value is determined on the server. Overriding this value with
+ * client options can therefore be helpful if the uplink transmission is lost, but no longer
+ * has a positive effect if the acknowledgment downlink frame is lost.
+ *
  * The application can cancel the operation while it is in progress by calling LDL_MAC_cancel().
  *
  * The application shall be notified of completion via #ldl_mac_response_fn. One of the following events

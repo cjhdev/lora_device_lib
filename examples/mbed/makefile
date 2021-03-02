@@ -86,7 +86,7 @@ $(DIR_APP)/.gdbinit:
 	@ echo focus cmd                     >> $@
 
 clean:
-	rm -rf $(DIR_BUILD)
+	rm -rf $(DIR_APP)/$(DIR_BUILD)
 	rm -rf $(DIR_APP)/mbed-os
 	rm -rf $(DIR_APP)/lora_device_lib
 

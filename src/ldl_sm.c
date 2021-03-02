@@ -44,8 +44,13 @@ static const struct ldl_sm_interface interface = {
 /* LoRaWAN 1.0.x */
 void LDL_SM_init(struct ldl_sm *self, const void *appKey)
 {
-    /* not a mistake, internally we call this LDL_SM_KEY_NWK */
-    (void)memcpy(getKey(self, LDL_SM_KEY_NWK), appKey, (appKey != NULL) ? LDL_KEY_SIZE : 0U);
+    (void)memset(self, 0, sizeof(*self));
+
+    if(appKey != NULL){
+
+        /* not a mistake, internally we call this LDL_SM_KEY_NWK */
+        (void)memcpy(getKey(self, LDL_SM_KEY_NWK), appKey, LDL_KEY_SIZE);
+    }
 }
 #endif
 
@@ -53,8 +58,17 @@ void LDL_SM_init(struct ldl_sm *self, const void *appKey)
 /* LoRaWAN 1.1 */
 void LDL_SM_init(struct ldl_sm *self, const void *appKey, const void *nwkKey)
 {
-    (void)memcpy(getKey(self, LDL_SM_KEY_APP), appKey, (appKey != NULL) ? LDL_KEY_SIZE : 0U);
-    (void)memcpy(getKey(self, LDL_SM_KEY_NWK), nwkKey, (nwkKey != NULL) ? LDL_KEY_SIZE : 0U);
+    (void)memset(self, 0, sizeof(*self));
+
+    if(appKey != NULL){
+
+        (void)memcpy(getKey(self, LDL_SM_KEY_APP), appKey, LDL_KEY_SIZE);
+    }
+
+    if(nwkKey != NULL){
+
+        (void)memcpy(getKey(self, LDL_SM_KEY_NWK), nwkKey, LDL_KEY_SIZE);
+    }
 }
 #endif
 

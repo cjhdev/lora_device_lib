@@ -6,7 +6,7 @@ module LDL
 
     include LoggerMethods
 
-    attr_reader :ext, :net_id, :join_nonce, :dev_addr
+    attr_reader :ext, :net_id, :join_nonce, :dev_addr, :next_dev_nonce
 
     def running?
       @running
@@ -34,6 +34,8 @@ module LDL
 
       evstruct = Struct.new(:event, :param)
 
+      @next_dev_nonce = 0
+
       @rx = nil
       @device_time = nil
       @link_status = nil
@@ -42,7 +44,7 @@ module LDL
 
         case ev
         # the following go back to the request
-        when :join_complete, :data_complete, :data_timeout, :op_error, :op_cancelled, :entropy
+        when :join_complete, :data_complete, :data_timeout, :op_error, :op_cancelled, :entropy, :join_exhausted
 
           if @job_handler
             handler = @job_handler
@@ -63,6 +65,10 @@ module LDL
           end
 
         when :session_updated
+        when :dev_nonce_updated
+
+          @dev_nonce = params[:next_dev_nonce]
+
         when :device_time
 
           if @device_time
@@ -227,8 +233,8 @@ module LDL
 
             nil
 
-          when :op_error
-            raise OpError
+          when :join_exhausted
+            raise ErrDevNonce
           when :op_cancelled
             raise OpCancelled
           else

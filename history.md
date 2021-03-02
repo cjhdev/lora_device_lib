@@ -5,6 +5,19 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
+## 0.5.5
+
+- fixed bug where DevNonce was not being incremented for each join request frame sent.
+  DevNonce is now incremented for each join request until exausted after 65535 increments.
+- added LDL_MAC_DEV_NONCE_UPDATED event for saving the next DevNonce every time it changes
+- added LDL_MAC_JOIN_EXHAUSTED event to indicate OTAA failure after 65535 increments
+- added LDL_STATUS_DEVNONCE code to be returned by LDL_MAC_otaa() to indicate
+  when OTAA is not possible because DevNonce is greater than 65535
+- removed nextDevNonce member from LDL_MAC_JOIN_COMPLETE argument since LDL_MAC_DEV_NONCE_UPDATED now exists
+- updated MBED and Ruby wrappers
+- updated porting notes
+- updated examples
+
 ## 0.5.4
 
 - fixed bug affecting LDL_LITTLE_ENDIAN option. all decode functions were passing

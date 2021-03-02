@@ -146,33 +146,26 @@ better suits the application:
 
 ### Managing Device Nonce (devNonce)
 
-In LoRaWAN 1.0.3 and earlier, devNonce is randomly generated. Since this
-is a 16bit number collisions are likely, which means devices may fail
-to join again in future.
-
-In LoRaWAN 1.0.4 and up, devNonce is a counter from zero. This counter
-is not stored with session since it is longer lived than session.
-
-Real devices will need a way to save and restore devNonce over resets.
-
-LDL will push 'nextDevNonce' to the application as argument to the LDL_MAC_JOIN_COMPLETE event.
+LDL will push 'nextDevNonce' to the application as argument to the LDL_MAC_DEV_NONCE_UPDATED event.
 The application can restore this value as 'devNonce' argument to LDL_MAC_init().
+
+DevNonce is incremented for each join request frame sent during OTAA. The
+server will ignore frames containing DevNonce values it has seen before.
+
+LDL cannot restore DevNonce from session state since it is longer lived
+than session state.
 
 ### Managing Join Nonce (joinNonce)
 
-LoRaWAN 1.1 renamed appNonce to joinNonce and declared it to be a counter of the number of successful joins maintained
-by the server.
 
-When the joinAccept indicates that LoRaWAN 1.1 is in use, LDL will only accept the joinAccept if joinNonce is
-greater than the last cached joinNonce.
+LDL will push 'joinNonce' to the application as argument to the LDL_MAC_JOIN_COMPLETE event.
+The applciation can restore this value as 'joinNonce' argument to LDL_MAC_init().
 
-LDL will push the updated value to the application as an argument to the LDL_MAC_JOIN_COMPLETE event. A cached
-value can be restored by passing it as an argument to LDL_MAC_init().
+LDL will reject join accept messages that have a joinNonce field less than the joinNonce
+stored in memory.
 
-LDL does not keep this counter with session state since it is longer lived than session state.
-
-Caching/restoring this value is optional since resetting it to zero at LDL_MAC_init() will not
-stop joinAccept from being accepted, but it will leave LDL open to replay attacks during OTAA.
+LDL cannot restore JoinNonce from session state since it is longer lived than session
+state.
 
 ### Modifying the Security Module
 

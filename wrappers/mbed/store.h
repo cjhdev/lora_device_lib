@@ -64,13 +64,19 @@ namespace LDL {
              * */
             virtual size_t get_session(void *data, size_t max);
 
-            /** These values will be needed the next time an OTAA occurs
+            /** This value will be needed to restore MAC
              *
-             * @param[in] join_nonce
              * @param[in] next_dev_nonce
              *
              * */
-            virtual void save_join_accept(uint32_t join_nonce, uint16_t next_dev_nonce);
+            virtual void save_next_dev_nonce(uint16_t next_dev_nonce);
+
+            /** These values will be needed to restore MAC
+             *
+             * @param[in] join_nonce
+             *
+             * */
+            virtual void save_join_accept(uint32_t join_nonce);
 
             /** Save session data
              *

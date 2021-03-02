@@ -69,8 +69,11 @@ MAC::app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
     MAC *self = to_obj(app);
 
     switch(type){
+    case LDL_MAC_DEV_NONCE_UPDATED:
+        self->store.save_next_dev_nonce(arg->dev_nonce_updated.nextDevNonce);
+        break;
     case LDL_MAC_JOIN_COMPLETE:
-        self->store.save_join_accept(arg->join_complete.joinNonce, arg->join_complete.nextDevNonce);
+        self->store.save_join_accept(arg->join_complete.joinNonce);
         break;
     case LDL_MAC_SESSION_UPDATED:
         self->store.save_session(arg->session_updated.session, sizeof(*arg->session_updated.session));

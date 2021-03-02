@@ -12,10 +12,6 @@ module LDL
   class DataTimeout < StandardError
   end
 
-  # network didn't acknowlege confirmed send
-  class DataNack < StandardError
-  end
-
   # requested operation failed for radio error
   class OpError < StandardError
   end
@@ -38,5 +34,6 @@ module LDL
   class ErrNotJoined < Errno; end
   class ErrPower < Errno; end
   class ErrMACPriority < Errno; end
+  class ErrDevNonce < Errno; end
 
 end

@@ -147,6 +147,7 @@ bool LDL_Frame_decode(struct ldl_frame_down *f, void *in, uint8_t len)
             case FRAME_TYPE_JOIN_REQ:
             case FRAME_TYPE_DATA_UNCONFIRMED_UP:
             case FRAME_TYPE_DATA_CONFIRMED_UP:
+                /* not required for device */
                 break;
 
             case FRAME_TYPE_JOIN_ACCEPT:

@@ -158,6 +158,7 @@ namespace LDL {
              * - device is activated by server
              * - application calls cancel()
              * - application calls forget()
+             * - more than 65535 join request messages have been sent
              *
              * @return #ldl_mac_status
              *

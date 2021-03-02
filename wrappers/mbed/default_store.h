@@ -65,10 +65,14 @@ namespace LDL {
                 return 0U;
             }
 
-            void save_join_accept(uint32_t join_nonce, uint16_t next_dev_nonce)
+            void save_next_dev_nonce(uint16_t next_dev_nonce)
+            {
+                this->next_dev_nonce = next_dev_nonce;
+            }
+
+            void save_join_accept(uint32_t join_nonce)
             {
                 this->join_nonce = join_nonce;
-                this->next_dev_nonce = next_dev_nonce;
             }
 
             void save_session(const void *data, size_t size)

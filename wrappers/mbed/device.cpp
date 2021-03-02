@@ -284,6 +284,7 @@ Device::handle_mac_event(enum ldl_mac_response_type type, const union ldl_mac_re
     case LDL_MAC_JOIN_COMPLETE:
     case LDL_MAC_DATA_COMPLETE:
     case LDL_MAC_DATA_TIMEOUT:
+    case LDL_MAC_JOIN_EXHAUSTED:
         op_flags.set(1 << type);
         break;
     }
@@ -473,7 +474,8 @@ Device::otaa(Kernel::Clock::duration timeout)
 
         flags = op_flags.wait_any_until(0U
             | (1 << LDL_MAC_JOIN_COMPLETE)
-            | (1 << LDL_MAC_OP_CANCELLED),
+            | (1 << LDL_MAC_OP_CANCELLED)
+            | (1 << LDL_MAC_JOIN_EXHAUSTED),
             ready_before
         );
 
@@ -482,6 +484,9 @@ Device::otaa(Kernel::Clock::duration timeout)
             break;
         case (1 << LDL_MAC_OP_CANCELLED):
             retval = LDL_STATUS_CANCELLED;
+            break;
+        case (1 << LDL_MAC_JOIN_EXHAUSTED):
+            retval = LDL_STATUS_DEVNONCE;
             break;
         default:
             forget();

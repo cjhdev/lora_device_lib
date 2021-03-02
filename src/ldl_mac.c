@@ -131,6 +131,7 @@ static void handleRadioError(struct ldl_mac *self);
 #ifndef LDL_DISABLE_TX_PARAM_SETUP
 static bool uplinkDwell(uint8_t tx_param_setup);
 #endif
+static void fillJoinBuffer(struct ldl_mac *self, uint16_t devNonce);
 
 static uint32_t msToTime(uint32_t ms);
 static uint32_t msToTicks(const struct ldl_mac *self, uint32_t ms);
@@ -150,9 +151,7 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
 {
     LDL_PEDANTIC(self != NULL)
     LDL_PEDANTIC(arg != NULL)
-
     LDL_PEDANTIC(arg->ticks != NULL)
-
     LDL_PEDANTIC(arg->radio_interface != NULL);
     LDL_PEDANTIC(arg->sm_interface != NULL);
 
@@ -195,8 +194,15 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
     self->devNonce = arg->devNonce;
     self->joinNonce = arg->joinNonce;
 
-    (void)memcpy(self->devEUI, arg->devEUI, (arg->devEUI != NULL) ? sizeof(self->devEUI) : 0U);
-    (void)memcpy(self->joinEUI, arg->joinEUI, (arg->joinEUI != NULL) ? sizeof(self->joinEUI) : 0U);
+    if(arg->devEUI != NULL){
+
+        (void)memcpy(self->devEUI, arg->devEUI, sizeof(self->devEUI));
+    }
+
+    if(arg->joinEUI != NULL){
+
+        (void)memcpy(self->joinEUI, arg->joinEUI, sizeof(self->joinEUI));
+    }
 
     if((arg->session != NULL) && (arg->session->magic == sessionMagicNumber) && (arg->session->region == region)){
 
@@ -278,8 +284,8 @@ enum ldl_mac_status LDL_MAC_confirmedData(struct ldl_mac *self, uint8_t port, co
 
 enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self)
 {
-    struct ldl_frame_join_request f;
     enum ldl_mac_status retval;
+    union ldl_mac_response_arg arg;
 
     LDL_PEDANTIC(self != NULL)
 
@@ -289,39 +295,44 @@ enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self)
     }
     else if(self->op == LDL_OP_NONE){
 
-        self->trials = 0;
-        self->day = U32(60) * U32(60) * U32(24) * timeTPS;
+        if(self->devNonce <= U32(UINT16_MAX)){
 
-        f.joinEUI = self->joinEUI;
-        f.devEUI = self->devEUI;
+            forgetNetwork(self);
 
-#if defined(LDL_ENABLE_L2_1_0_3)
-        self->devNonce = self->rand(self->app);
-#endif
+            self->trials = 0;
+
+            self->day = U32(60) * U32(60) * U32(24) * timeTPS;
 
 #if defined(LDL_ENABLE_L2_1_1)
-        LDL_OPS_deriveJoinKeys(self);
+            LDL_OPS_deriveJoinKeys(self);
 #endif
+            fillJoinBuffer(self, U16(self->devNonce));
 
-        f.devNonce = self->devNonce;
+            self->devNonce++;
 
-        self->bufferLen = LDL_OPS_prepareJoinRequest(self, &f, self->buffer, U8(sizeof(self->buffer)));
+            arg.dev_nonce_updated.nextDevNonce = self->devNonce;
 
-        self->tx.power = 0;
+            self->handler(self->app, LDL_MAC_DEV_NONCE_UPDATED, &arg);
 
-        selectJoinChannelAndRate(self, &self->tx);
+            self->tx.power = 0;
 
-        self->op = LDL_OP_JOINING;
+            self->op = LDL_OP_JOINING;
 
-        if(self->state == LDL_STATE_IDLE){
+            if(self->state == LDL_STATE_IDLE){
 
-            self->state = LDL_STATE_WAIT_OTAA;
-            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
+                self->state = LDL_STATE_WAIT_OTAA;
+                LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
+            }
+
+            retval = LDL_STATUS_OK;
+
+            LDL_DEBUG("OTAA is pending")
         }
+        else{
 
-        retval = LDL_STATUS_OK;
-
-        LDL_DEBUG("OTAA is pending")
+            /* need to re-init with a different JoinEUI */
+            return LDL_STATUS_DEVNONCE;
+        }
     }
     else{
 
@@ -1069,6 +1080,7 @@ static void processWait(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t l
         break;
 
     default:
+        /* nothing */
         break;
     }
 }
@@ -1417,15 +1429,10 @@ static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
             default:
             case FRAME_TYPE_JOIN_ACCEPT:
 
-                forgetNetwork(self);
-
                 self->ctx.joined = true;
 
-                if(self->ctx.adr){
-
-                    /* keep the joining rate */
-                    self->ctx.rate = LDL_Region_getJoinRate(self->ctx.region, self->trials);
-                }
+                /* keep the joining rate */
+                self->ctx.rate = self->ctx.adr ? LDL_Region_getJoinRate(self->ctx.region, self->trials) : self->ctx.rate;
 
                 self->ctx.rx1DROffset = frame.rx1DataRateOffset;
                 self->ctx.rx2DataRate = frame.rx2DataRate;
@@ -1449,32 +1456,30 @@ static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
                 /* cache this so that the session keys can be re-derived */
                 self->ctx.netID = frame.netID;
                 self->ctx.joinNonce = frame.joinNonce;
-                self->ctx.devNonce = self->devNonce;
+                /* self->ctx.devNonce is already set */
 
                 self->joinNonce = frame.joinNonce;
 
                 LDL_OPS_deriveKeys(self);
 
                 self->joinNonce++;
-                self->devNonce++;
 
-                LDL_INFO("join accept: joinNonce=%" PRIu32 " nextDevNonce=%" PRIu16 " netID=%" PRIu32 " devAddr=%" PRIu32 " rx1Delay=%u",
-                    self->joinNonce,
-                    self->devNonce,
+                LDL_INFO("join accept: joinNonce=%" PRIu32 " devNonce=%" PRIu16 " netID=%" PRIu32 " devAddr=%" PRIu32 " rx1Delay=%u",
+                    self->ctx.joinNonce,
+                    self->ctx.devNonce,
                     self->ctx.netID,
                     self->ctx.devAddr,
                     self->ctx.rx1Delay
                 )
 
-                arg.join_complete.joinNonce = self->joinNonce;
-                arg.join_complete.nextDevNonce = self->devNonce;
-                arg.join_complete.netID = self->ctx.netID;
-                arg.join_complete.devAddr = self->ctx.devAddr;
-
                 self->band[LDL_BAND_GLOBAL] = 0;
                 self->day = 0;
                 self->state = LDL_STATE_IDLE;
                 self->op = LDL_OP_NONE;
+
+                arg.join_complete.joinNonce = self->joinNonce;
+                arg.join_complete.netID = self->ctx.netID;
+                arg.join_complete.devAddr = self->ctx.devAddr;
 
                 self->handler(self->app, LDL_MAC_JOIN_COMPLETE, &arg);
                 break;
@@ -1631,7 +1636,7 @@ static void handleRadioError(struct ldl_mac *self)
     self->radio_interface->set_mode(self->radio, LDL_RADIO_MODE_RESET);
 
     /* >100us */
-    LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (GET_TPS()/1024U));
+    LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (GET_TPS()/U32(1024)));
 
 
     LDL_DEBUG("radio fault detected, initiating radio reset")
@@ -1646,7 +1651,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
     enum ldl_spreading_factor sf;
     struct ldl_frame_data f;
     struct ldl_stream s;
-    uint8_t macs[30U]; // large enough for all possible MAC commands
+    uint8_t macs[30]; // large enough for all possible MAC commands
     size_t desired_len = len + (size_t)LDL_Frame_dataOverhead();
 
     if(self->ctx.joined){
@@ -1679,7 +1684,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
 
                             self->opts.nbTrans = self->opts.nbTrans & 0xfU;
 
-                            self->trials = 0U;
+                            self->trials = 0;
 
                             (void)memset(&f, 0, sizeof(f));
 
@@ -3015,6 +3020,7 @@ static void setNextBandEvent(struct ldl_mac *self)
 static void downlinkMissingHandler(struct ldl_mac *self)
 {
     uint8_t nbTrans;
+    union ldl_mac_response_arg arg;
 
     if(self->opts.nbTrans > 0U){
 
@@ -3074,11 +3080,28 @@ static void downlinkMissingHandler(struct ldl_mac *self)
 
     case LDL_OP_JOINING:
 
-        selectJoinChannelAndRate(self, &self->tx);
+        /* OTAA needs to return an error if we run out of DevNonce */
+        if(self->devNonce <= U32(UINT16_MAX)){
 
-        LDL_DEBUG("waiting to retry OTAA")
-        self->state = LDL_STATE_WAIT_OTAA;
-        LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
+            fillJoinBuffer(self, U16(self->devNonce));
+
+            self->devNonce++;
+
+            arg.dev_nonce_updated.nextDevNonce = self->devNonce;
+            self->handler(self->app, LDL_MAC_DEV_NONCE_UPDATED, &arg);
+
+            LDL_DEBUG("waiting to retry OTAA")
+
+            self->state = LDL_STATE_WAIT_OTAA;
+            LDL_MAC_timerSet(self, LDL_TIMER_WAITA, 0);
+        }
+        else{
+
+            self->handler(self->app, LDL_MAC_JOIN_EXHAUSTED, NULL);
+
+            self->state = LDL_STATE_IDLE;
+            self->op = LDL_OP_NONE;
+        }
         break;
     }
 }
@@ -3273,3 +3296,25 @@ static bool inputPending(const struct ldl_mac *self)
 {
     return self->inputs.state;
 }
+
+
+static void fillJoinBuffer(struct ldl_mac *self, uint16_t devNonce)
+{
+    struct ldl_frame_join_request f;
+
+    f.joinEUI = self->joinEUI;
+    f.devEUI = self->devEUI;
+
+#if defined(LDL_ENABLE_L2_1_0_3)
+    (void)devNonce;
+    self->ctx.devNonce = self->rand(self->app);
+#else
+    self->ctx.devNonce = devNonce;
+#endif
+    f.devNonce = self->ctx.devNonce;
+
+    self->bufferLen = LDL_OPS_prepareJoinRequest(self, &f, self->buffer, U8(sizeof(self->buffer)));
+
+    selectJoinChannelAndRate(self, &self->tx);
+}
+

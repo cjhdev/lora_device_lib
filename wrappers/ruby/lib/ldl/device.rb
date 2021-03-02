@@ -40,7 +40,8 @@ module LDL
       :on_link_status,
       :dev_addr,
       :net_id,
-      :join_nonce
+      :join_nonce,
+      :next_dev_nonce
 
     def_delegators :@sm,
       :nwk_key,

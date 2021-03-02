@@ -100,7 +100,9 @@ int main(void)
         LDL_Radio_setEventCallback(&radio, &mac, LDL_MAC_radioEvent);
     }
 
-    /* Ensure a maximum aggregated duty cycle of ~1%
+    /* Optional:
+     *
+     * Ensure a maximum aggregated duty cycle of ~1%
      *
      * EU_863_870 already includes duty cycle limits. This is to safeguard
      * the example if the region is changed to US_902_928 or AU_915_928.
@@ -135,7 +137,7 @@ int main(void)
         {
             uint32_t ticks_until_next_event = LDL_MAC_ticksUntilNextEvent(&mac);
 
-            if(ticks_until_next_event > 0UL){
+            if(ticks_until_next_event > 0U){
 
                 wakeup_after(ticks_until_next_event);
                 sleep();
@@ -170,19 +172,14 @@ void app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
         (void)arg->session_updated.session;
         break;
 
-    /* an opportunity for the application to:
-     *
-     * - cache the joinNonce
-     * - cache the next devNonce
-     * - cache session keys
-     * - view join parameters (which are stored as part of session state)
-     *
-     * */
+    /* an opportunity for application to cache joinNonce */
     case LDL_MAC_JOIN_COMPLETE:
-        (void)arg->join_complete.nextDevNonce;
         (void)arg->join_complete.joinNonce;
-        (void)arg->join_complete.netID;
-        (void)arg->join_complete.devAddr;
+        break;
+
+    /* an opportunity for application to cache nextDevNonce */
+    case LDL_MAC_DEV_NONCE_UPDATED:
+        (void)arg->dev_nonce_updated.nextDevNonce;
         break;
 
     case LDL_MAC_CHANNEL_READY:
@@ -192,6 +189,7 @@ void app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac
     case LDL_MAC_DATA_TIMEOUT:
     case LDL_MAC_LINK_STATUS:
     case LDL_MAC_DEVICE_TIME:
+    case LDL_MAC_JOIN_EXHAUSTED:
     default:
         break;
     }

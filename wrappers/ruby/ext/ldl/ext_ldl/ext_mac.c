@@ -23,6 +23,7 @@ static VALUE cErrBusy;
 static VALUE cErrNotJoined;
 static VALUE cErrPower;
 static VALUE cErrMACPriority;
+static VALUE cErrDevNonce;
 
 static const uint32_t TPS = LDL_PARAM_TPS;
 
@@ -136,6 +137,7 @@ void ext_mac_init(void)
     cErrNotJoined = rb_const_get(cLDL, rb_intern("ErrNotJoined"));
     cErrPower = rb_const_get(cLDL, rb_intern("ErrPower"));
     cErrMACPriority = rb_const_get(cLDL, rb_intern("ErrMACPriority"));
+    cErrDevNonce = rb_const_get(cLDL, rb_intern("ErrDevNonce"));
 }
 
 void LDL_System_enterCriticalSection(void *app)
@@ -410,6 +412,9 @@ static void statusToException(enum ldl_mac_status status)
     case LDL_STATUS_MACPRIORITY:
         rb_raise(cErrMACPriority, "MAC commands prioritised (try again)");
         break;
+    case LDL_STATUS_DEVNONCE:
+        rb_raise(cErrDevNonce, "DevNonce has been exhausted");
+        break;
     }
 }
 
@@ -573,7 +578,6 @@ static void response(void *receiver, enum ldl_mac_response_type type, const unio
         rb_hash_aset(param, ID2SYM(rb_intern("dev_addr")), UINT2NUM(arg->join_complete.devAddr));
         rb_hash_aset(param, ID2SYM(rb_intern("join_nonce")), UINT2NUM(arg->join_complete.joinNonce));
         rb_hash_aset(param, ID2SYM(rb_intern("net_id")), UINT2NUM(arg->join_complete.netID));
-        rb_hash_aset(param, ID2SYM(rb_intern("next_dev_nonce")), UINT2NUM(arg->join_complete.nextDevNonce));
         break;
     case LDL_MAC_DATA_COMPLETE:
         event = ID2SYM(rb_intern("data_complete"));
@@ -609,6 +613,13 @@ static void response(void *receiver, enum ldl_mac_response_type type, const unio
         rb_hash_aset(param, ID2SYM(rb_intern("time")), UINT2NUM(arg->device_time.time));
         rb_hash_aset(param, ID2SYM(rb_intern("seconds")), UINT2NUM(arg->device_time.seconds));
         rb_hash_aset(param, ID2SYM(rb_intern("fractions")), UINT2NUM(arg->device_time.fractions));
+        break;
+    case LDL_MAC_JOIN_EXHAUSTED:
+        event = ID2SYM(rb_intern("join_exhausted"));
+        break;
+    case LDL_MAC_DEV_NONCE_UPDATED:
+        event = ID2SYM(rb_intern("dev_nonce_updated"));
+        rb_hash_aset(param, ID2SYM(rb_intern("next_dev_nonce")), UINT2NUM(arg->dev_nonce_updated.nextDevNonce));
         break;
     default:
         rb_raise(rb_eException, "unhandled event");

@@ -267,7 +267,7 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                             }
 
                             pos += putEUI(&hdr.value[pos], self->joinEUI);
-                            pos += putU16(&hdr.value[pos], self->devNonce);
+                            pos += putU16(&hdr.value[pos], self->ctx.devNonce);
 
                             mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_JSINT, &hdr, pos, in, len - U8(sizeof(mic)));
 
