@@ -1289,7 +1289,7 @@ static void processTX(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag
 
 static void processStartRadioForRX1(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag)
 {
-    struct ldl_radio_rx_setting radio_setting;
+    struct ldl_radio_rx_setting setting;
     uint32_t freq;
     uint8_t rate;
 
@@ -1300,18 +1300,18 @@ static void processStartRadioForRX1(struct ldl_mac *self, enum ldl_mac_sme event
         LDL_Region_getRX1DataRate(self->ctx.region, self->tx.rate, self->ctx.rx1DROffset, &rate);
         LDL_Region_getRX1Freq(self->ctx.region, self->tx.freq, self->tx.chIndex, &freq);
 
-        LDL_Region_convertRate(self->ctx.region, rate, &radio_setting.sf, &radio_setting.bw, &radio_setting.max);
+        LDL_Region_convertRate(self->ctx.region, rate, &setting.sf, &setting.bw, &setting.max);
 
-        radio_setting.max += LDL_Frame_phyOverhead();
+        setting.max += LDL_Frame_phyOverhead();
 
         self->state = LDL_STATE_RX1;
 
-        radio_setting.freq = freq;
-        radio_setting.timeout = self->rx1_symbols;
+        setting.freq = freq;
+        setting.timeout = self->rx1_symbols;
 
         inputArm(self);
 
-        self->radio_interface->receive(self->radio, &radio_setting);
+        self->radio_interface->receive(self->radio, &setting);
 
         /* use waitA as a guard (timeout after ~4 seconds) */
         LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (GET_TPS() + GET_A()) << 2U);
@@ -1322,30 +1322,30 @@ static void processStartRadioForRX1(struct ldl_mac *self, enum ldl_mac_sme event
             self->rx1_symbols,
             lag,
             freq,
-            LDL_Radio_bwToNumber(radio_setting.bw),
-            U8(radio_setting.sf)
+            LDL_Radio_bwToNumber(setting.bw),
+            U8(setting.sf)
         )
     }
 }
 
 static void processStartRadioForRX2(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t lag)
 {
-    struct ldl_radio_rx_setting radio_setting;
+    struct ldl_radio_rx_setting setting;
 
     if(event == LDL_SME_TIMER_B){
 
-        LDL_Region_convertRate(self->ctx.region, self->ctx.rx2DataRate, &radio_setting.sf, &radio_setting.bw, &radio_setting.max);
+        LDL_Region_convertRate(self->ctx.region, self->ctx.rx2DataRate, &setting.sf, &setting.bw, &setting.max);
 
-        radio_setting.max += LDL_Frame_phyOverhead();
+        setting.max += LDL_Frame_phyOverhead();
 
         self->state = LDL_STATE_RX2;
 
-        radio_setting.freq = self->ctx.rx2Freq;
-        radio_setting.timeout = self->rx2_symbols;
+        setting.freq = self->ctx.rx2Freq;
+        setting.timeout = self->rx2_symbols;
 
         inputArm(self);
 
-        self->radio_interface->receive(self->radio, &radio_setting);
+        self->radio_interface->receive(self->radio, &setting);
 
         /* use waitA as a guard */
         LDL_MAC_timerSet(self, LDL_TIMER_WAITA, (GET_TPS() + GET_A()) * 4U);
@@ -1356,8 +1356,8 @@ static void processStartRadioForRX2(struct ldl_mac *self, enum ldl_mac_sme event
             self->rx2_symbols,
             lag,
             self->ctx.rx2Freq,
-            LDL_Radio_bwToNumber(radio_setting.bw),
-            U8(radio_setting.sf)
+            LDL_Radio_bwToNumber(setting.bw),
+            U8(setting.sf)
         )
     }
 }
@@ -1372,8 +1372,6 @@ static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
 #endif
     uint8_t len;
     struct ldl_radio_packet_metadata meta;
-    const uint8_t *fopts;
-    uint8_t foptsLen;
     uint8_t mtu;
     enum ldl_spreading_factor sf;
     enum ldl_signal_bandwidth bw;
@@ -1498,15 +1496,16 @@ static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
                 self->adrAckCounter = 0;
                 self->adrAckReq = false;
 
-                fopts = frame.opts;
-                foptsLen = frame.optsLen;
+                if(frame.opts != NULL){
+
+                    processCommands(self, frame.opts, frame.optsLen);
+                }
 
                 if(frame.data != NULL){
 
                     if(frame.port == 0U){
 
-                        fopts = frame.data;
-                        foptsLen = frame.dataLen;
+                        processCommands(self, frame.data, frame.dataLen);
                     }
                     else{
 
@@ -1517,8 +1516,6 @@ static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
                         self->handler(self->app, LDL_MAC_RX, &arg);
                     }
                 }
-
-                processCommands(self, fopts, foptsLen);
 
                 switch(self->op){
                 default:
