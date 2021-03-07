@@ -285,11 +285,16 @@ bool LDL_MAC_getDownCommand(struct ldl_stream *s, struct ldl_downstream_cmd *cmd
                 break;
 
             case LDL_CMD_RX_PARAM_SETUP:
+            {
+                uint8_t DLsettings;
 
-                (void)LDL_Stream_getU8(s, &cmd->fields.rxParamSetup.rx1DROffset);
+                (void)LDL_Stream_getU8(s, &DLsettings);
+                cmd->fields.rxParamSetup.rx1DROffset = (DLsettings >> 4) & 0x7U;
+                cmd->fields.rxParamSetup.rx2DataRate = (DLsettings)      & 0xfU;
                 (void)LDL_Stream_getU24(s, &cmd->fields.rxParamSetup.freq);
 
                 cmd->fields.rxParamSetup.freq *= U32(100);
+            }
                 break;
 
             case LDL_CMD_DEV_STATUS:
