@@ -222,6 +222,13 @@ Device::do_get_max_dcycle(uint8_t *retval)
 }
 
 void
+Device::do_get_fpending(bool *retval)
+{
+    *retval = mac.get_fpending();
+    status_semaphore.release();
+}
+
+void
 Device::do_entropy(enum ldl_mac_status *retval)
 {
     *retval = mac.entropy();
@@ -671,6 +678,16 @@ void
 Device::cancel()
 {
     accessor(callback(this, &Device::do_cancel));
+}
+
+bool
+Device::get_fpending()
+{
+    bool retval;
+
+    accessor(callback(this, &Device::do_get_fpending), &retval);
+
+    return retval;
 }
 
 #endif

@@ -246,10 +246,17 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
 
                 if(LDL_Frame_decode(f, in, len)){
 
-#if defined(LDL_ENABLE_L2_1_1)
-                    if(f->optNeg){
+#if defined(LDL_ENABLE_L2_1_1) || defined(LDL_ENABLE_L2_1_0_4)
+                    if(f->joinNonce < self->joinNonce){
 
-                        if(f->joinNonce >= self->joinNonce){
+                        /* invalid joinNonce */
+                        LDL_DEBUG("invalid joinNonce")
+                    }
+                    else
+#endif
+                    {
+#if defined(LDL_ENABLE_L2_1_1)
+                        if(f->optNeg){
 
                             struct ldl_block hdr;
                             uint8_t pos;
@@ -281,27 +288,27 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
                                 LDL_DEBUG("joinAccept MIC failed")
                             }
                         }
-                        else{
-
-                            /* invalid joinNonce */
-                            LDL_DEBUG("invalid joinNonce")
-                        }
-                    }
-                    else
+                        else
 #endif
                         {
-                        mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_NWK, NULL, 0U, in, len - U8(sizeof(mic)));
+                            mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_NWK, NULL, 0U, in, len - U8(sizeof(mic)));
 
-                        if(f->mic == mic){
+                            if(f->mic == mic){
 
-                            retval = true;
-                        }
-                        else{
+                                retval = true;
+                            }
+                            else{
 
-                            /* MIC failed */
-                            LDL_DEBUG("joinAccept MIC failed")
+                                /* MIC failed */
+                                LDL_DEBUG("joinAccept MIC failed")
+                            }
                         }
                     }
+                }
+                else{
+
+                    /* shouldn't happen */
+                    LDL_DEBUG("LDL_Frame_decode() (JoinAccept after decrypt)")
                 }
             }
             else{

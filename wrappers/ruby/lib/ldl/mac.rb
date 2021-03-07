@@ -5,12 +5,23 @@ module LDL
   class MAC
 
     include LoggerMethods
+    extend Forwardable
 
-    attr_reader :ext, :net_id, :join_nonce, :dev_addr, :next_dev_nonce
+    attr_reader :ext
 
     def running?
       @running
     end
+
+    def_delegators :ext,
+      :dev_eui,
+      :join_eui,
+      :name,
+      :region,
+      :next_dev_nonce,
+      :join_nonce,
+      :net_id,
+      :dev_addr
 
     def initialize(broker, clock, sm, radio, **opts)
 
@@ -33,8 +44,6 @@ module LDL
       @tick_ev = nil
 
       evstruct = Struct.new(:event, :param)
-
-      @next_dev_nonce = 0
 
       @rx = nil
       @device_time = nil
@@ -66,9 +75,6 @@ module LDL
 
         when :session_updated
         when :dev_nonce_updated
-
-          @dev_nonce = params[:next_dev_nonce]
-
         when :device_time
 
           if @device_time
@@ -226,13 +232,7 @@ module LDL
 
           case retval.event
           when :join_complete
-
-            @dev_addr = retval.param[:dev_addr]
-            @net_id = retval.param[:net_id]
-            @join_nonce = retval.param[:join_nonce]
-
             nil
-
           when :join_exhausted
             raise ErrDevNonce
           when :op_cancelled
@@ -420,9 +420,6 @@ module LDL
 
     def forget
       do_get(__method__)
-      @dev_addr = nil
-      @net_id = nil
-      @join_nonce = nil
     end
 
     def adr=(value)
@@ -445,21 +442,7 @@ module LDL
       do_set(__method__, value)
     end
 
-    def dev_eui
-      ext.dev_eui
-    end
 
-    def join_eui
-      ext.join_eui
-    end
-
-    def name
-      ext.name
-    end
-
-    def region
-      ext.region
-    end
 
     def with_mutex
       @mutex.synchronize do

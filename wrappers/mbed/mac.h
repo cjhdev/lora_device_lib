@@ -284,6 +284,8 @@ namespace LDL {
             {
                 wakeup_cb = cb;
             }
+
+            bool get_fpending();
     };
 
 };

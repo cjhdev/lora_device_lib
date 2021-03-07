@@ -14,9 +14,12 @@ work in progress.
 - added LDL_STATUS_DEVNONCE code to be returned by LDL_MAC_otaa() to indicate
   when OTAA is not possible because DevNonce is greater than 65535
 - removed nextDevNonce member from LDL_MAC_JOIN_COMPLETE argument since LDL_MAC_DEV_NONCE_UPDATED now exists
+- fixed bug where invalid JoinNonce was not rejecting JoinAccept messages when LDL_L2_VERSION_1_0_4
+- fixed bug where RXParamSetupAns RX1DRoffset and RX2DataRate were not being decoded correctly
 - updated MBED and Ruby wrappers
 - updated porting notes
 - updated examples
+- added LDL_MAC_getFPending() to find out if the network has more data to send to device
 
 ## 0.5.4
 

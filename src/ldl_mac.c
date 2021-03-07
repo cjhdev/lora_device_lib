@@ -331,7 +331,7 @@ enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self)
         else{
 
             /* need to re-init with a different JoinEUI */
-            return LDL_STATUS_DEVNONCE;
+            retval = LDL_STATUS_DEVNONCE;
         }
     }
     else{
@@ -898,6 +898,13 @@ void LDL_MAC_setUnlimitedDutyCycle(struct ldl_mac *self, bool value)
     self->unlimitedDutyCycle = value;
 }
 #endif
+
+bool LDL_MAC_getFPending(const struct ldl_mac *self)
+{
+    LDL_PEDANTIC(self != NULL)
+
+    return self->fPending;
+}
 
 /* static functions ***************************************************/
 
@@ -1484,6 +1491,9 @@ static void processRX(struct ldl_mac *self, enum ldl_mac_sme event)
 
             case FRAME_TYPE_DATA_CONFIRMED_DOWN:
             case FRAME_TYPE_DATA_UNCONFIRMED_DOWN:
+
+                /* if set it means network has more data to send */
+                self->fPending = frame.pending;
 
                 self->pendingACK = (frame.type == FRAME_TYPE_DATA_CONFIRMED_DOWN);
 
@@ -2687,6 +2697,8 @@ static void forgetNetwork(struct ldl_mac *self)
     uint8_t rate = self->ctx.rate;
     uint8_t power = self->ctx.power;
     bool adr = self->ctx.adr;
+
+    self->fPending = false;
 
     (void)memset(&self->ctx, 0, sizeof(self->ctx));
 

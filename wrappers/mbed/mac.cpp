@@ -257,4 +257,10 @@ MAC::cancel()
     LDL_MAC_cancel(&mac);
 }
 
+bool
+MAC::get_fpending()
+{
+    return LDL_MAC_getFPending(&mac);
+}
+
 

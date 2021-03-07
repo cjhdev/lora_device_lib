@@ -485,6 +485,8 @@ struct ldl_mac {
     ldl_system_ticks_fn ticks;
     ldl_system_get_battery_level_fn get_battery_level;
 
+    bool fPending;
+
 #ifndef LDL_PARAM_TPS
     uint32_t tps;
 #endif
@@ -548,7 +550,7 @@ struct ldl_mac_init_arg {
      * @see #LDL_MAC_DEV_NONCE_UDPATED
      *
      * */
-    uint16_t devNonce;
+    uint32_t devNonce;
 
     /** the most up to date joinNonce
      *
@@ -1070,6 +1072,22 @@ uint32_t LDL_MAC_getTicks(struct ldl_mac *self);
  *
  * */
 void LDL_MAC_setUnlimitedDutyCycle(struct ldl_mac *self, bool value);
+
+/** Returns fpending status set by the last data downlink frame.
+ *
+ * Sometimes data will be queued on the network waiting to be sent
+ * in the next downlink slot that follows an uplink. An application may
+ * choose to react to this status immediately or wait until the next
+ * scheduled uplink.
+ *
+ * @param[in] self #ldl_mac
+ *
+ * @retval true     network has more data to send to device
+ * @retval false
+ *
+ *
+ * */
+bool LDL_MAC_getFPending(const struct ldl_mac *self);
 
 #ifdef __cplusplus
 }

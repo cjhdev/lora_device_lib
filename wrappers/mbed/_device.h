@@ -104,6 +104,7 @@ namespace LDL {
             void do_get_max_dcycle(uint8_t *retval);
             void do_entropy(enum ldl_mac_status *retval);
             void do_cancel();
+            void do_get_fpending(bool *retval);
 
             /* used to release work_semaphore in future */
             void do_work();
@@ -366,6 +367,8 @@ namespace LDL {
                 }
                 cb_mutex.unlock();
             }
+
+            bool get_fpending();
     };
 
 };

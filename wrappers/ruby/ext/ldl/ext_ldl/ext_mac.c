@@ -63,6 +63,11 @@ static VALUE get_dev_eui(VALUE self);
 static VALUE get_join_eui(VALUE self);
 static VALUE get_name(VALUE self);
 
+static VALUE get_join_nonce(VALUE self);
+static VALUE get_next_dev_nonce(VALUE self);
+static VALUE get_dev_addr(VALUE self);
+static VALUE get_net_id(VALUE self);
+
 static uint32_t system_ticks(void *app);
 static uint32_t system_rand(void *app);
 static void response(void *receiver, enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg);
@@ -111,6 +116,10 @@ void ext_mac_init(void)
     rb_define_method(cExtMAC, "dev_eui", get_dev_eui, 0);
     rb_define_method(cExtMAC, "join_eui", get_join_eui, 0);
     rb_define_method(cExtMAC, "name", get_name, 0);
+    rb_define_method(cExtMAC, "next_dev_nonce", get_next_dev_nonce, 0);
+    rb_define_method(cExtMAC, "join_nonce", get_join_nonce, 0);
+    rb_define_method(cExtMAC, "net_id", get_net_id, 0);
+    rb_define_method(cExtMAC, "dev_addr", get_dev_addr, 0);
 
     rb_define_method(cExtMAC, "entropy", entropy, 0);
     rb_define_method(cExtMAC, "otaa", otaa, 0);
@@ -188,6 +197,7 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
     VALUE otaa_dither;
     VALUE logger;
     VALUE clock;
+    VALUE join_nonce;
 
     Data_Get_Struct(self, struct ldl_mac, mac);
 
@@ -204,6 +214,9 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
 
     dev_nonce = rb_hash_aref(options, ID2SYM(rb_intern("dev_nonce")));
     dev_nonce = (dev_nonce == Qnil) ? UINT2NUM(0U) : dev_nonce;
+
+    join_nonce = rb_hash_aref(options, ID2SYM(rb_intern("join_nonce")));
+    join_nonce = (join_nonce == Qnil) ? UINT2NUM(0U) : join_nonce;
 
     if(join_eui == Qnil){
 
@@ -247,7 +260,8 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
     rb_iv_set(self, "@clock", clock);
     rb_iv_set(self, "@join_eui", join_eui);
     rb_iv_set(self, "@dev_eui", dev_eui);
-    rb_iv_set(self, "@dev_nonce", dev_nonce);
+    rb_iv_set(self, "@next_dev_nonce", dev_nonce);
+    rb_iv_set(self, "@join_nonce", join_nonce);
     rb_iv_set(self, "@mutex", rb_mutex_new());
     rb_iv_set(self, "@events", events);
     rb_iv_set(self, "@name", name);
@@ -268,8 +282,8 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
 
     arg.joinEUI = RSTRING_PTR(join_eui);
     arg.devEUI = RSTRING_PTR(dev_eui);
-    arg.devNonce = (uint16_t)NUM2UINT(dev_nonce);
-
+    arg.devNonce = (uint32_t)NUM2UINT(dev_nonce);
+    arg.joinNonce = (uint32_t)NUM2UINT(join_nonce);
 
     if(otaa_dither != Qnil){
 
@@ -383,6 +397,8 @@ static void statusToException(enum ldl_mac_status status)
 {
     switch(status){
     default:
+        rb_raise(rb_eException, "unknown status");
+        break;
     case LDL_STATUS_OK:
         break;
     case LDL_STATUS_NOCHANNEL:
@@ -450,6 +466,9 @@ static VALUE forget(VALUE self)
     Data_Get_Struct(self, struct ldl_mac, this);
 
     LDL_MAC_forget(this);
+
+    rb_iv_set(self, "@net_id", Qnil);
+    rb_iv_set(self, "@dev_addr", Qnil);
 
     return self;
 }
@@ -578,7 +597,12 @@ static void response(void *receiver, enum ldl_mac_response_type type, const unio
         rb_hash_aset(param, ID2SYM(rb_intern("dev_addr")), UINT2NUM(arg->join_complete.devAddr));
         rb_hash_aset(param, ID2SYM(rb_intern("join_nonce")), UINT2NUM(arg->join_complete.joinNonce));
         rb_hash_aset(param, ID2SYM(rb_intern("net_id")), UINT2NUM(arg->join_complete.netID));
+
+        rb_iv_set(self, "@dev_addr", UINT2NUM(arg->join_complete.devAddr));
+        rb_iv_set(self, "@join_nonce", UINT2NUM(arg->join_complete.joinNonce));
+        rb_iv_set(self, "@net_id", UINT2NUM(arg->join_complete.netID));
         break;
+
     case LDL_MAC_DATA_COMPLETE:
         event = ID2SYM(rb_intern("data_complete"));
         break;
@@ -620,6 +644,7 @@ static void response(void *receiver, enum ldl_mac_response_type type, const unio
     case LDL_MAC_DEV_NONCE_UPDATED:
         event = ID2SYM(rb_intern("dev_nonce_updated"));
         rb_hash_aset(param, ID2SYM(rb_intern("next_dev_nonce")), UINT2NUM(arg->dev_nonce_updated.nextDevNonce));
+        rb_iv_set(self, "@next_dev_nonce", UINT2NUM(arg->dev_nonce_updated.nextDevNonce));
         break;
     default:
         rb_raise(rb_eException, "unhandled event");
@@ -770,4 +795,24 @@ static VALUE setUnlimitedDutyCycle(VALUE self, VALUE value)
     LDL_MAC_setUnlimitedDutyCycle(this, (value != Qfalse));
 
     return self;
+}
+
+static VALUE get_next_dev_nonce(VALUE self)
+{
+    return rb_iv_get(self, "@next_dev_nonce");
+}
+
+static VALUE get_join_nonce(VALUE self)
+{
+    return rb_iv_get(self, "@join_nonce");
+}
+
+static VALUE get_dev_addr(VALUE self)
+{
+    return rb_iv_get(self, "@dev_addr");
+}
+
+static VALUE get_net_id(VALUE self)
+{
+    return rb_iv_get(self, "@net_id");
 }
