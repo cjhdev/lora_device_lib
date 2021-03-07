@@ -273,6 +273,15 @@
      #define LDL_DISABLE_SF12
      #undef LDL_DISABLE_SF12
 
+    /**
+     *
+     * Define to enable ABP
+     *
+     * */
+     #define LDL_ENABLE_ABP
+     #undef  LDL_ENABLE_ABP
+
+
 #endif
 
 #ifdef LDL_TARGET_INCLUDE

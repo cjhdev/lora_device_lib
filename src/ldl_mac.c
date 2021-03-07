@@ -342,6 +342,38 @@ enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self)
     return retval;
 }
 
+#ifdef LDL_ENABLE_ABP
+enum ldl_mac_status LDL_MAC_abp(struct ldl_mac *self, uint32_t devAddr)
+{
+    enum ldl_mac_status retval;
+
+    LDL_PEDANTIC(self != NULL)
+
+    if(self->ctx.joined){
+
+        retval = LDL_STATUS_JOINED;
+    }
+    else if(self->op == LDL_OP_NONE){
+
+        forgetNetwork(self);
+
+        self->ctx.joined = true;
+        self->ctx.devAddr = devAddr;
+
+        self->band[LDL_BAND_GLOBAL] = 0;
+        self->day = 0;
+
+        retval = LDL_STATUS_OK;
+    }
+    else{
+
+        retval = LDL_STATUS_BUSY;
+    }
+
+    return retval;
+}
+#endif
+
 bool LDL_MAC_joined(const struct ldl_mac *self)
 {
     return self->ctx.joined;
@@ -904,6 +936,13 @@ bool LDL_MAC_getFPending(const struct ldl_mac *self)
     LDL_PEDANTIC(self != NULL)
 
     return self->fPending;
+}
+
+bool LDL_MAC_getAckPending(const struct ldl_mac *self)
+{
+    LDL_PEDANTIC(self != NULL)
+
+    return self->pendingACK;
 }
 
 /* static functions ***************************************************/
@@ -2699,6 +2738,7 @@ static void forgetNetwork(struct ldl_mac *self)
     bool adr = self->ctx.adr;
 
     self->fPending = false;
+    self->pendingACK = false;
 
     (void)memset(&self->ctx, 0, sizeof(self->ctx));
 

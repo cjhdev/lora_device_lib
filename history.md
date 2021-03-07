@@ -20,6 +20,8 @@ work in progress.
 - updated porting notes
 - updated examples
 - added LDL_MAC_getFPending() to find out if the network has more data to send to device
+- added LDL_MAC_getAckPending() to find out if the network is expecting acknowledgement
+- added ABP mode (disabled by default)
 
 ## 0.5.4
 

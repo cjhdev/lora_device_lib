@@ -137,6 +137,15 @@ Device::do_otaa(enum ldl_mac_status *retval)
     status_semaphore.release();
 }
 
+#ifdef LDL_ENABLE_ABP
+void
+Device::do_abp(enum ldl_mac_status *retval, uint32_t devAddr)
+{
+    *retval = mac.abp(devAddr);
+    status_semaphore.release();
+}
+#endif
+
 void
 Device::do_forget()
 {
@@ -222,9 +231,16 @@ Device::do_get_max_dcycle(uint8_t *retval)
 }
 
 void
-Device::do_get_fpending(bool *retval)
+Device::do_get_f_pending(bool *retval)
 {
-    *retval = mac.get_fpending();
+    *retval = mac.get_f_pending();
+    status_semaphore.release();
+}
+
+void
+Device::do_get_ack_pending(bool *retval)
+{
+    *retval = mac.get_ack_pending();
     status_semaphore.release();
 }
 
@@ -505,6 +521,18 @@ Device::otaa(Kernel::Clock::duration timeout)
     return retval;
 }
 
+#ifdef LDL_ENABLE_ABP
+enum ldl_mac_status
+Device::abp(uint32_t devAddr)
+{
+    enum ldl_mac_status retval;
+
+    accessor(callback(this, &Device::do_abp), &retval, devAddr);
+
+    return retval;
+}
+#endif
+
 enum ldl_mac_status
 Device::unconfirmed(uint8_t port, const void *data, uint8_t len, const struct ldl_mac_data_opts *opts)
 {
@@ -681,11 +709,21 @@ Device::cancel()
 }
 
 bool
-Device::get_fpending()
+Device::get_f_pending()
 {
     bool retval;
 
-    accessor(callback(this, &Device::do_get_fpending), &retval);
+    accessor(callback(this, &Device::do_get_f_pending), &retval);
+
+    return retval;
+}
+
+bool
+Device::get_ack_pending()
+{
+    bool retval;
+
+    accessor(callback(this, &Device::do_get_ack_pending), &retval);
 
     return retval;
 }

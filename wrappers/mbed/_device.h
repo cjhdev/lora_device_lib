@@ -91,6 +91,9 @@ namespace LDL {
             /* executed from the event queue */
             void do_data(enum ldl_mac_status *retval, const struct data_arg *arg);
             void do_otaa(enum ldl_mac_status *retval);
+#ifdef LDL_ENABLE_ABP
+            void do_abp(enum ldl_mac_status *retval, uint32_t devAddr);
+#endif
             void do_forget();
             void do_set_rate(enum ldl_mac_status *retval, uint8_t value);
             void do_get_rate(uint8_t *retval);
@@ -104,7 +107,8 @@ namespace LDL {
             void do_get_max_dcycle(uint8_t *retval);
             void do_entropy(enum ldl_mac_status *retval);
             void do_cancel();
-            void do_get_fpending(bool *retval);
+            void do_get_f_pending(bool *retval);
+            void do_get_ack_pending(bool *retval);
 
             /* used to release work_semaphore in future */
             void do_work();
@@ -165,6 +169,10 @@ namespace LDL {
              *
              * */
             enum ldl_mac_status otaa(Kernel::Clock::duration timeout=Kernel::Clock::duration::max());
+
+#ifdef LDL_ENABLE_ABP
+            enum ldl_mac_status abp(uint32_t devAddr);
+#endif
 
             /**
              * Send data using an unconfirmed service.
@@ -368,7 +376,8 @@ namespace LDL {
                 cb_mutex.unlock();
             }
 
-            bool get_fpending();
+            bool get_f_pending();
+            bool get_ack_pending();
     };
 
 };

@@ -167,6 +167,14 @@ MAC::otaa()
     return LDL_MAC_otaa(&mac);
 }
 
+#ifdef LDL_ENABLE_ABP
+enum ldl_mac_status
+MAC::abp(uint32_t devAddr)
+{
+    return LDL_MAC_abp(&mac, devAddr);
+}
+#endif
+
 void
 MAC::forget()
 {
@@ -258,9 +266,15 @@ MAC::cancel()
 }
 
 bool
-MAC::get_fpending()
+MAC::get_f_pending()
 {
     return LDL_MAC_getFPending(&mac);
+}
+
+bool
+MAC::get_ack_pending()
+{
+    return LDL_MAC_getAckPending(&mac);
 }
 
 

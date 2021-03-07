@@ -141,6 +141,10 @@ namespace LDL {
              * */
             enum ldl_mac_status otaa();
 
+#ifdef LDL_ENABLE_ABP
+            enum ldl_mac_status abp(uint32_t devAddr);
+#endif
+
             /**
              * Forget the network and return to an inactive state
              *
@@ -285,7 +289,8 @@ namespace LDL {
                 wakeup_cb = cb;
             }
 
-            bool get_fpending();
+            bool get_f_pending();
+            bool get_ack_pending();
     };
 
 };

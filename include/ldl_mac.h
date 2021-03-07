@@ -730,6 +730,8 @@ enum ldl_mac_status LDL_MAC_entropy(struct ldl_mac *self);
  * */
 enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self);
 
+enum ldl_mac_status LDL_MAC_abp(struct ldl_mac *self, uint32_t devAddr);
+
 /** Send data without network confirmation
  *
  * Once initiated MAC will send at most nbTrans times or until a valid downlink is received. NbTrans may be set:
@@ -1088,6 +1090,22 @@ void LDL_MAC_setUnlimitedDutyCycle(struct ldl_mac *self, bool value);
  *
  * */
 bool LDL_MAC_getFPending(const struct ldl_mac *self);
+
+/** Returns ack pending status set by the last data downlink frame.
+ *
+ * This status is set by confirmed downlinks. The next uplink will
+ * acknowledge receipt of the confirmed downlink. An application may
+ * choose to react to this status immediately or wait until the next
+ * scheduled uplink.
+ *
+ * @param[in] self #ldl_mac
+ *
+ * @retval true     network is expecting acknowledgement
+ * @retval false
+ *
+ *
+ * */
+bool LDL_MAC_getAckPending(const struct ldl_mac *self);
 
 #ifdef __cplusplus
 }
