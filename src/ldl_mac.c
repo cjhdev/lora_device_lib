@@ -1133,15 +1133,15 @@ static void processWait(struct ldl_mac *self, enum ldl_mac_sme event, uint32_t l
 
 static void processStartRadioForTX(struct ldl_mac *self, enum ldl_mac_sme event)
 {
-    struct ldl_radio_tx_setting tx_setting;
+    struct ldl_radio_tx_setting setting;
     uint8_t mtu;
     uint32_t ms;
 
     if(event == LDL_SME_TIMER_A){
 
-        LDL_Region_convertRate(self->ctx.region, self->tx.rate, &tx_setting.sf, &tx_setting.bw, &mtu);
+        LDL_Region_convertRate(self->ctx.region, self->tx.rate, &setting.sf, &setting.bw, &mtu);
 
-        tx_setting.eirp = LDL_Region_getTXPower(self->ctx.region, self->tx.power);
+        setting.eirp = LDL_Region_getTXPower(self->ctx.region, self->tx.power);
 
 #ifndef LDL_DISABLE_TX_PARAM_SETUP
         if(LDL_Region_txParamSetupImplemented(self->ctx.region)){
@@ -1169,21 +1169,21 @@ static void processStartRadioForTX(struct ldl_mac *self, enum ldl_mac_sme event)
 
             max_eirp *= 100;
 
-            if(tx_setting.eirp > max_eirp){
+            if(setting.eirp > max_eirp){
 
-                tx_setting.eirp = max_eirp;
+                setting.eirp = max_eirp;
             }
         }
 #endif
-        tx_setting.freq = self->tx.freq;
+        setting.freq = self->tx.freq;
 
-        ms = LDL_Radio_getAirTime(tx_setting.bw, tx_setting.sf, self->bufferLen, true);
+        ms = LDL_Radio_getAirTime(setting.bw, setting.sf, self->bufferLen, true);
 
         self->tx.airTime = msToTime(ms);
 
         inputArm(self);
 
-        self->radio_interface->transmit(self->radio, &tx_setting, self->buffer, self->bufferLen);
+        self->radio_interface->transmit(self->radio, &setting, self->buffer, self->bufferLen);
 
         self->state = LDL_STATE_TX;
 
@@ -1195,8 +1195,8 @@ static void processStartRadioForTX(struct ldl_mac *self, enum ldl_mac_sme event)
             self->ticks(self->app),
             self->tx.freq,
             self->tx.power,
-            LDL_Radio_bwToNumber(tx_setting.bw),
-            U8(tx_setting.sf),
+            LDL_Radio_bwToNumber(setting.bw),
+            U8(setting.sf),
             self->bufferLen
         )
     }
