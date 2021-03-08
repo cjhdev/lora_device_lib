@@ -16,12 +16,17 @@ work in progress.
 - removed nextDevNonce member from LDL_MAC_JOIN_COMPLETE argument since LDL_MAC_DEV_NONCE_UPDATED now exists
 - fixed bug where invalid JoinNonce was not rejecting JoinAccept messages when LDL_L2_VERSION_1_0_4
 - fixed bug where RXParamSetupAns RX1DRoffset and RX2DataRate were not being decoded correctly
-- updated MBED and Ruby wrappers
+- updated wrappers
 - updated porting notes
 - updated examples
 - added LDL_MAC_getFPending() to find out if the network has more data to send to device
 - added LDL_MAC_getAckPending() to find out if the network is expecting acknowledgement
 - added ABP mode (disabled by default)
+
+The following changes were made to MBED wrapper:
+
+- fixed bug in LDL::DefaultStore() where dev_nonce and join_nonce were not being initialised to zero
+- fixed bug in LDL::DefaultSM() where app_key was used instead of nwk_key
 
 ## 0.5.4
 
