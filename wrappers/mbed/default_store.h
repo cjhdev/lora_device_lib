@@ -47,9 +47,10 @@ namespace LDL {
                 :
                 Store(),
                 dev_eui(dev_eui),
-                join_eui(join_eui)
+                join_eui(join_eui),
+                next_dev_nonce(0),
+                join_nonce(0)
             {
-                next_dev_nonce = 0xffff;
             }
 
             void get_init_params(struct init_params *params)
