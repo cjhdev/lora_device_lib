@@ -26,11 +26,12 @@
 #include "ldl_frame.h"
 #include "ldl_debug.h"
 #include "ldl_internal.h"
+#include "ldl_stream.h"
 #include <string.h>
 
 struct ldl_block {
 
-    uint8_t value[16U];
+    uint8_t value[16];
 };
 
 /* static function prototypes *****************************************/
@@ -39,12 +40,6 @@ static void initA(struct ldl_block *a, uint32_t c, uint32_t devAddr, bool up, ui
 static void initB(struct ldl_block *b, uint16_t confirmCounter, uint8_t rate, uint8_t chIndex, bool up, uint32_t devAddr, uint32_t upCounter, uint8_t len);
 
 static uint32_t deriveDownCounter(struct ldl_mac *self, uint8_t port, uint16_t counter);
-
-static uint8_t putU8(uint8_t *buf, uint8_t value);
-static uint8_t putU16(uint8_t *buf, uint16_t value);
-static uint8_t putU24(uint8_t *buf, uint32_t value);
-static uint8_t putU32(uint8_t *buf, uint32_t value);
-static uint8_t putEUI(uint8_t *buf, const uint8_t *value);
 
 /* functions **********************************************************/
 
@@ -70,48 +65,46 @@ void LDL_OPS_deriveKeys(struct ldl_mac *self)
 {
     LDL_PEDANTIC(self != NULL)
 
-    struct ldl_block iv;
-    uint8_t *ptr;
-    uint8_t pos;
+    struct ldl_block iv = {0};
+    struct ldl_stream s;
 
-    ptr = iv.value;
-
-    (void)memset(&iv, 0, sizeof(iv));
+    LDL_Stream_init(&s, &iv, sizeof(iv));
 
     if(SESS_VERSION(self->ctx) == 0U){
 
-        /* ptr[0] below */
-        pos = 1;
-        pos += putU24(&ptr[pos], self->ctx.joinNonce);
-        pos += putU24(&ptr[pos], self->ctx.netID);
-        (void)putU16(&ptr[pos], self->ctx.devNonce);
+        (void)LDL_Stream_putU8(&s, 1);
+        (void)LDL_Stream_putU24(&s, self->ctx.joinNonce);
+        (void)LDL_Stream_putU24(&s, self->ctx.netID);
+        (void)LDL_Stream_putU16(&s, self->ctx.devNonce);
 
-        ptr[0] = 2;
-        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_NWK, &iv);
-
-        ptr[0] = 1;
         self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_FNWKSINT, LDL_SM_KEY_NWK, &iv);
         self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_SNWKSINT, LDL_SM_KEY_NWK, &iv);
         self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_NWKSENC, LDL_SM_KEY_NWK, &iv);
+
+        LDL_Stream_rewind(&s);
+        (void)LDL_Stream_putU8(&s, 2);
+        self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_NWK, &iv);
+
     }
     else{
 
-        /* ptr[0] below */
-        pos = 1;
-        pos += putU24(&ptr[pos], self->ctx.joinNonce);
-        pos += putEUI(&ptr[pos], self->joinEUI);
-        (void)putU16(&ptr[pos], self->ctx.devNonce);
+        (void)LDL_Stream_putU8(&s, 1);
+        (void)LDL_Stream_putU24(&s, self->ctx.joinNonce);
+        (void)LDL_Stream_putEUI(&s, self->joinEUI);
+        (void)LDL_Stream_putU16(&s, self->ctx.devNonce);
 
-        ptr[0] = 1;
         self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_FNWKSINT, LDL_SM_KEY_NWK, &iv);
 
-        ptr[0] = 2;
+        LDL_Stream_rewind(&s);
+        (void)LDL_Stream_putU8(&s, 2);
         self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_APPS, LDL_SM_KEY_APP, &iv);
 
-        ptr[0] = 3;
+        LDL_Stream_rewind(&s);
+        (void)LDL_Stream_putU8(&s, 3);
         self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_SNWKSINT, LDL_SM_KEY_NWK, &iv);
 
-        ptr[0] = 4;
+        LDL_Stream_rewind(&s);
+        (void)LDL_Stream_putU8(&s, 4);
         self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_NWKSENC, LDL_SM_KEY_NWK, &iv);
     }
 }
@@ -121,20 +114,17 @@ void LDL_OPS_deriveJoinKeys(struct ldl_mac *self)
 {
     LDL_PEDANTIC(self != NULL)
 
-    struct ldl_block iv;
-    uint8_t *ptr;
+    struct ldl_block iv = {0};
+    struct ldl_stream s;
 
-    ptr = iv.value;
+    LDL_Stream_init(&s, &iv, sizeof(iv));
 
-    (void)memset(&iv, 0, sizeof(iv));
-
-    /* ptr[0] below */
-    (void)putEUI(&ptr[1U], self->devEUI);
-
-    ptr[0] = 5U;
+    (void)LDL_Stream_putU8(&s, 5);
+    (void)LDL_Stream_putEUI(&s, self->devEUI);
     self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_JSENC, LDL_SM_KEY_NWK, &iv);
 
-    ptr[0] = 6U;
+    LDL_Stream_rewind(&s);
+    (void)LDL_Stream_putU8(&s, 6);
     self->sm_interface->update_session_key(self->sm, LDL_SM_KEY_JSINT, LDL_SM_KEY_NWK, &iv);
 }
 #endif
@@ -258,25 +248,25 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
 #if defined(LDL_ENABLE_L2_1_1)
                         if(f->optNeg){
 
-                            struct ldl_block hdr;
-                            uint8_t pos;
+                            struct ldl_block hdr = {0};
+                            struct ldl_stream s;
 
-                            pos = 0U;
+                            LDL_Stream_init(&s, &hdr, sizeof(hdr));
 
                             switch(self->op){
                             default:
                             case LDL_OP_JOINING:
-                                pos += putU8(&hdr.value[pos], 0xffU);
+                                (void)LDL_Stream_putU8(&s, 0xff);
                                 break;
                             case LDL_OP_REJOINING:
-                                pos += putU8(&hdr.value[pos], 2U);
+                                (void)LDL_Stream_putU8(&s, 2);
                                 break;
                             }
 
-                            pos += putEUI(&hdr.value[pos], self->joinEUI);
-                            pos += putU16(&hdr.value[pos], self->ctx.devNonce);
+                            (void)LDL_Stream_putEUI(&s, self->joinEUI);
+                            (void)LDL_Stream_putU16(&s, self->ctx.devNonce);
 
-                            mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_JSINT, &hdr, pos, in, len - U8(sizeof(mic)));
+                            mic = self->sm_interface->mic(self->sm, LDL_SM_KEY_JSINT, &hdr, LDL_Stream_tell(&s), in, len - U8(sizeof(mic)));
 
                             if(f->mic == mic){
 
@@ -404,32 +394,34 @@ bool LDL_OPS_receiveFrame(struct ldl_mac *self, struct ldl_frame_down *f, uint8_
 
 static void initA(struct ldl_block *a, uint32_t c, uint32_t devAddr, bool up, uint32_t counter, uint8_t i)
 {
-    uint8_t pos = 0U;
-    uint8_t *ptr = a->value;
+    struct ldl_stream s;
 
-    pos += putU8(&ptr[pos], 1U);
-    pos += putU32(&ptr[pos], c);
-    pos += putU8(&ptr[pos], up ? 0U : 1U);
-    pos += putU32(&ptr[pos], devAddr);
-    pos += putU32(&ptr[pos], counter);
-    pos += putU8(&ptr[pos], 0U);
-    (void)putU8(&ptr[pos], i);
+    LDL_Stream_init(&s, a, sizeof(*a));
+
+    (void)LDL_Stream_putU8(&s, 1);
+    (void)LDL_Stream_putU32(&s, c);
+    (void)LDL_Stream_putU8(&s, up ? 0U : 1U);
+    (void)LDL_Stream_putU32(&s, devAddr);
+    (void)LDL_Stream_putU32(&s, counter);
+    (void)LDL_Stream_putU8(&s, 0);
+    (void)LDL_Stream_putU8(&s, i);
 }
 
 static void initB(struct ldl_block *b, uint16_t confirmCounter, uint8_t rate, uint8_t chIndex, bool up, uint32_t devAddr, uint32_t upCounter, uint8_t len)
 {
-    uint8_t pos = 0U;
-    uint8_t *ptr = b->value;
+    struct ldl_stream s;
 
-    pos += putU8(&ptr[pos], 0x49U);
-    pos += putU16(&ptr[pos], confirmCounter);
-    pos += putU8(&ptr[pos], rate);
-    pos += putU8(&ptr[pos], chIndex);
-    pos += putU8(&ptr[pos], up ? 0U : 1U);
-    pos += putU32(&ptr[pos], devAddr);
-    pos += putU32(&ptr[pos], upCounter);
-    pos += putU8(&ptr[pos], 0U);
-    (void)putU8(&ptr[pos], len);
+    LDL_Stream_init(&s, b, sizeof(*b));
+
+    (void)LDL_Stream_putU8(&s, 0x49);
+    (void)LDL_Stream_putU16(&s, confirmCounter);
+    (void)LDL_Stream_putU8(&s, rate);
+    (void)LDL_Stream_putU8(&s, chIndex);
+    (void)LDL_Stream_putU8(&s, up ? 0U : 1U);
+    (void)LDL_Stream_putU32(&s, devAddr);
+    (void)LDL_Stream_putU32(&s, upCounter);
+    (void)LDL_Stream_putU8(&s, 0);
+    (void)LDL_Stream_putU8(&s, len);
 }
 
 static uint32_t deriveDownCounter(struct ldl_mac *self, uint8_t port, uint16_t counter)
@@ -448,52 +440,4 @@ static uint32_t deriveDownCounter(struct ldl_mac *self, uint8_t port, uint16_t c
     }
 
     return mine;
-}
-
-static uint8_t putEUI(uint8_t *buf, const uint8_t *value)
-{
-    buf[0] = value[7];
-    buf[1] = value[6];
-    buf[2] = value[5];
-    buf[3] = value[4];
-    buf[4] = value[3];
-    buf[5] = value[2];
-    buf[6] = value[1];
-    buf[7] = value[0];
-
-    return 8U;
-}
-
-static uint8_t putU8(uint8_t *buf, uint8_t value)
-{
-    buf[0] = value;
-
-    return 1U;
-}
-
-static uint8_t putU16(uint8_t *buf, uint16_t value)
-{
-    buf[0] = U8(value);
-    buf[1] = U8(value >> 8);
-
-    return 2U;
-}
-
-static uint8_t putU24(uint8_t *buf, uint32_t value)
-{
-    buf[0] = U8(value);
-    buf[1] = U8(value >> 8);
-    buf[2] = U8(value >> 16);
-
-    return 3U;
-}
-
-static uint8_t putU32(uint8_t *buf, uint32_t value)
-{
-    buf[0] = U8(value);
-    buf[1] = U8(value >> 8);
-    buf[2] = U8(value >> 16);
-    buf[3] = U8(value >> 24);
-
-    return 4U;
 }

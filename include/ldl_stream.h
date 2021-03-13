@@ -48,6 +48,7 @@ bool LDL_Stream_peek(const struct ldl_stream *self, void *out);
 bool LDL_Stream_seekSet(struct ldl_stream *self, uint8_t offset);
 bool LDL_Stream_seekCur(struct ldl_stream *self, int16_t offset);
 bool LDL_Stream_error(struct ldl_stream *self);
+void LDL_Stream_rewind(struct ldl_stream *self);
 
 bool LDL_Stream_putU8(struct ldl_stream *self, uint8_t value);
 bool LDL_Stream_putU16(struct ldl_stream *self, uint16_t value);

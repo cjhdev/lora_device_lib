@@ -143,6 +143,13 @@ bool LDL_Stream_seekSet(struct ldl_stream *self, uint8_t offset)
     return retval;
 }
 
+void LDL_Stream_rewind(struct ldl_stream *self)
+{
+    LDL_PEDANTIC(self != NULL)
+
+    self->pos = 0;
+}
+
 bool LDL_Stream_seekCur(struct ldl_stream *self, int16_t offset)
 {
     LDL_PEDANTIC(self != NULL)
