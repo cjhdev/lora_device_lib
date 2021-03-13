@@ -41,7 +41,8 @@ module LDL
       :dev_addr,
       :net_id,
       :join_nonce,
-      :next_dev_nonce
+      :next_dev_nonce,
+      :session
 
     def_delegators :@sm,
       :nwk_key,
@@ -59,6 +60,9 @@ module LDL
       opts[:join_eui] ||= SecureRandom.bytes(8)
       opts[:nwk_key] ||= SecureRandom.bytes(16)
       opts[:app_key] ||= SecureRandom.bytes(16)
+
+      @clock = clock
+      @broker = broker
 
       @radio =  Radio.new(broker, clock, **opts)
       @sm = SM.new(broker, clock, **opts)

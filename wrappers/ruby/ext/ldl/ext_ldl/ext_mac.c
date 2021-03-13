@@ -67,6 +67,7 @@ static VALUE get_join_nonce(VALUE self);
 static VALUE get_next_dev_nonce(VALUE self);
 static VALUE get_dev_addr(VALUE self);
 static VALUE get_net_id(VALUE self);
+static VALUE get_session(VALUE self);
 
 static uint32_t system_ticks(void *app);
 static uint32_t system_rand(void *app);
@@ -120,6 +121,7 @@ void ext_mac_init(void)
     rb_define_method(cExtMAC, "join_nonce", get_join_nonce, 0);
     rb_define_method(cExtMAC, "net_id", get_net_id, 0);
     rb_define_method(cExtMAC, "dev_addr", get_dev_addr, 0);
+    rb_define_method(cExtMAC, "session", get_session, 0);
 
     rb_define_method(cExtMAC, "entropy", entropy, 0);
     rb_define_method(cExtMAC, "otaa", otaa, 0);
@@ -198,6 +200,7 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
     VALUE logger;
     VALUE clock;
     VALUE join_nonce;
+    VALUE session;
 
     Data_Get_Struct(self, struct ldl_mac, mac);
 
@@ -209,6 +212,7 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
     join_eui = rb_hash_aref(options, ID2SYM(rb_intern("join_eui")));
     dev_eui = rb_hash_aref(options, ID2SYM(rb_intern("dev_eui")));
     region = rb_hash_aref(options, ID2SYM(rb_intern("region")));
+    session = rb_hash_aref(options, ID2SYM(rb_intern("session")));
 
     otaa_dither = rb_hash_aref(options, ID2SYM(rb_intern("otaa_dither")));
 
@@ -267,6 +271,7 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
     rb_iv_set(self, "@name", name);
     rb_iv_set(self, "@log_header", name);
     rb_iv_set(self, "@region", region);
+    rb_iv_set(self, "@session", session);
 
     arg.ticks = system_ticks;
     arg.rand = system_rand;
@@ -279,6 +284,18 @@ static VALUE initialize(int argc, VALUE *argv, VALUE self)
 
     arg.sm = (struct ldl_sm *)sm;
     arg.sm_interface = &ext_sm_interface;
+
+    if(session != Qnil){
+
+        if(RSTRING_LEN(session) == sizeof(struct ldl_mac_session)){
+
+            arg.session = (const struct ldl_mac_session *)RSTRING_PTR(session);
+        }
+        else{
+
+            LDL_ERROR("session wrong size")
+        }
+    }
 
     arg.joinEUI = RSTRING_PTR(join_eui);
     arg.devEUI = RSTRING_PTR(dev_eui);
@@ -469,6 +486,7 @@ static VALUE forget(VALUE self)
 
     rb_iv_set(self, "@net_id", Qnil);
     rb_iv_set(self, "@dev_addr", Qnil);
+    rb_iv_set(self, "@session", Qnil);
 
     return self;
 }
@@ -631,6 +649,7 @@ static void response(void *receiver, enum ldl_mac_response_type type, const unio
         break;
     case LDL_MAC_SESSION_UPDATED:
         event = ID2SYM(rb_intern("session_updated"));
+        rb_iv_set(self, "@session", rb_str_new((const char *)arg->session_updated.session, sizeof(*arg->session_updated.session)));
         break;
     case LDL_MAC_DEVICE_TIME:
         event = ID2SYM(rb_intern("device_time"));
@@ -815,4 +834,9 @@ static VALUE get_dev_addr(VALUE self)
 static VALUE get_net_id(VALUE self)
 {
     return rb_iv_get(self, "@net_id");
+}
+
+static VALUE get_session(VALUE self)
+{
+    return rb_iv_get(self, "@session");
 }

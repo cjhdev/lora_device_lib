@@ -21,7 +21,8 @@ module LDL
       :next_dev_nonce,
       :join_nonce,
       :net_id,
-      :dev_addr
+      :dev_addr,
+      :session
 
     def initialize(broker, clock, sm, radio, **opts)
 
