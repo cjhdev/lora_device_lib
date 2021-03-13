@@ -204,22 +204,36 @@ void LDL_MAC_init(struct ldl_mac *self, enum ldl_region region, const struct ldl
         (void)memcpy(self->joinEUI, arg->joinEUI, sizeof(self->joinEUI));
     }
 
-    if((arg->session != NULL) && (arg->session->magic == sessionMagicNumber) && (arg->session->region == region)){
+    initSession(self, region);
 
-        (void)memcpy(&self->ctx, arg->session, sizeof(self->ctx));
+    if(arg->session != NULL){
 
-        /* re-derive keys from:
-         *
-         * - root keys
-         * - self->joinEUI
-         * - self->session
-         *
-         *  */
-        LDL_OPS_deriveKeys(self);
-    }
-    else{
+        if(arg->session->magic == sessionMagicNumber){
 
-        initSession(self, region);
+            if(arg->session->region == region){
+
+                (void)memcpy(&self->ctx, arg->session, sizeof(self->ctx));
+
+                /* re-derive keys from:
+                 *
+                 * - root keys
+                 * - self->joinEUI
+                 * - self->session
+                 *
+                 *  */
+                LDL_OPS_deriveKeys(self);
+
+                LDL_DEBUG("session restored")
+            }
+            else{
+
+                LDL_ERROR("session rejected: region mismatch")
+            }
+        }
+        else{
+
+            LDL_ERROR("session rejected: unexpected magic number")
+        }
     }
 
     self->band[LDL_BAND_GLOBAL] = msToTime(U32(LDL_STARTUP_DELAY));

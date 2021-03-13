@@ -197,12 +197,11 @@ To implement persistent sessions the application must:
 - be able to cache session state passed with the LDL_MAC_SESSION_UPDATED event
 - be able to restore session state prior to calling LDL_MAC_init()
 - be able to pass a pointer to the restored session state to LDL_MAC_init()
-- ensure the integrity of state and root keys
 
 Note that:
 
-- session state does not contain sensitive information
-- session state is best treated as opaque data
+- session state does not contain the keys (i.e. nwkKey and/or appKey)
+- session state and keys are used together to derive the session keys
 - loading invalid/corrupt session state may result in undefined behaviour
 
 LDL does not implement migration of session state between versions. This means if you update
