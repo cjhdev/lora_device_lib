@@ -54,8 +54,6 @@ namespace LDL {
 
             } run_state;
 
-            DigitalOut signal;
-
             struct ldl_mac mac;
             Radio& radio;
             SM& sm;

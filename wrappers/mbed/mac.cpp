@@ -29,7 +29,6 @@ using namespace LDL;
 /* constructors *******************************************************/
 
 MAC::MAC(Store &store, SM &sm, Radio &radio) :
-    signal(A0, 0),
     radio(radio),
     sm(sm),
     store(store)

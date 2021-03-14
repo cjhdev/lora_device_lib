@@ -1,5 +1,10 @@
 #include "mbed_ldl.h"
 
+#include "hw/cmwx1zzabz.h"
+#include "hw/sx1272mb2xas.h"
+#include "hw/sx126xmb2xas.h"
+#include "hw/nucleo_wl55jc.h"
+
 const uint8_t app_key[] = MBED_CONF_APP_APP_KEY;
 const uint8_t nwk_key[] = MBED_CONF_APP_NWK_KEY;
 const uint8_t dev_eui[] = MBED_CONF_APP_DEV_EUI;
