@@ -1943,6 +1943,8 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
 
                             LDL_OPS_micDataFrame(self, self->buffer, self->bufferLen);
 
+                            pushSessionUpdate(self);
+
                             if(self->state == LDL_STATE_IDLE){
 
                                 self->state = LDL_STATE_WAIT_TX;
@@ -3359,7 +3361,6 @@ static bool inputPending(const struct ldl_mac *self)
 {
     return self->inputs.state;
 }
-
 
 static void fillJoinBuffer(struct ldl_mac *self, uint16_t devNonce)
 {
