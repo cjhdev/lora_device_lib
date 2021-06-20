@@ -5,6 +5,16 @@ Note that versions are only "released" when there is a git tag with the same nam
 If you have checked out master, the top version listed here may be a
 work in progress.
 
+## 0.5.6
+
+- removed incomplete AVR example
+- added missing interrupt line integration to doxygen and chip interface examples
+- updated contribution guidelines
+- updated porting guidelines
+- changed MBED wrapper to not include platform specific code where it shouldn't
+- added missing session update event
+- use ldl_stream.c functions in ldl_ops.c
+
 ## 0.5.5
 
 - fixed bug where DevNonce was not being incremented for each join request frame sent.

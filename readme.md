@@ -14,15 +14,14 @@ for best results and read [history.md](history.md) if updating from an old versi
 - [MBED bare-metal profile](examples/mbed/bare_metal)
 - [generic mainloop](examples/doxygen/example.c)
 - [generic chip interface](examples/chip_interface)
-- [avr-gcc](examples/avr)
 - [ruby virtual hardware](examples/ruby)
 
 ## Features
 
 - Small memory footprint
 - L2 Support
-    - 1.0.3
-    - 1.0.4
+    - 1.0.3 (recommended)
+    - 1.0.4 (recommended)
     - 1.1
 - Class A
 - OTAA

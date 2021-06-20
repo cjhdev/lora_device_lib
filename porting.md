@@ -8,7 +8,8 @@ Porting Guide
     - LDL_SYSTEM_ENTER_CRITICAL() and LDL_SYSTEM_LEAVE_CRITICAL() must be defined
     - the ISR must have a higher priority than the non-interrupt thread of execution
     - bear in mind that interrupt-safe interfaces never block and return as quickly as possible
-- Check in the interface documentation
+- Check the interface documentation
+- Porting is difficult
 
 ## Basic Steps
 
@@ -16,7 +17,7 @@ Porting Guide
 
     Define LDL_LL_VERSION as one of:
 
-    - LDL_LL_VERSION_1_0_3
+    - LDL_LL_VERSION_1_0_3 (recommended)
     - LDL_LL_VERSION_1_0_4 (recommended)
     - LDL_LL_VERSION_1_1
 
@@ -49,6 +50,8 @@ Porting Guide
     - LDL_ENABLE_WL55
 
 7. Implement the chip interface to reach radio chip
+
+    - remember to call LDL_Radio_handleInterrupt() from DIO rising edge interrupt
 
 8. Initialise in correct order
 

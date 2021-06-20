@@ -311,8 +311,6 @@ enum ldl_mac_status LDL_MAC_otaa(struct ldl_mac *self)
 
         if(self->devNonce <= U32(UINT16_MAX)){
 
-            forgetNetwork(self);
-
             self->trials = 0;
 
             self->day = U32(60) * U32(60) * U32(24) * timeTPS;
@@ -368,8 +366,6 @@ enum ldl_mac_status LDL_MAC_abp(struct ldl_mac *self, uint32_t devAddr)
         retval = LDL_STATUS_JOINED;
     }
     else if(self->op == LDL_OP_NONE){
-
-        forgetNetwork(self);
 
         self->ctx.joined = true;
         self->ctx.devAddr = devAddr;

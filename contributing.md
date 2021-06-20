@@ -9,15 +9,17 @@ Raise an issue, and if you have a fix, make a pull request.
 
 ### Documentation Improvements
 
-Make a pull request.
+Raise an issue if it's complicated.
+
+Make a pull request if it's simple.
 
 ### Feature Requests and Proposals
 
 Raise an issue.
 
-### Questions
+### Questions / Clarifications
 
-Start a discussion.
+Raise an issue.
 
 ### Feature Contributions
 
