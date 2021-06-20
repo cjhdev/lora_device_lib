@@ -208,4 +208,12 @@ unsigned int system_rand(void *app)
     return rand();
 }
 
+void dio0_rising_edge_isr(void)
+{
+    LDL_Radio_handleInterrupt(&radio, 0);
+}
 
+void dio1_rising_edge_isr(void)
+{
+    LDL_Radio_handleInterrupt(&radio, 1);
+}
