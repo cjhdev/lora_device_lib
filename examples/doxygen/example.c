@@ -42,7 +42,7 @@ extern void enable_interrupts(void);
 void app_handler(void *app, enum ldl_mac_response_type type, const union ldl_mac_response_arg *arg);
 
 uint32_t system_ticks(void *app);
-unsigned int system_rand(void *app);
+uint32_t system_rand(void *app);
 
 int main(void)
 {
@@ -201,11 +201,11 @@ uint32_t system_ticks(void *app)
     return 0;
 }
 
-unsigned int system_rand(void *app)
+uint32_t system_rand(void *app)
 {
     (void)app;
 
-    return rand();
+    return (uint32_t)rand();
 }
 
 void dio0_rising_edge_isr(void)
