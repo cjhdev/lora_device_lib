@@ -350,7 +350,7 @@ bool LDL_Region_getChannel(enum ldl_region region, uint8_t chIndex, uint32_t *fr
         }
         else if(chIndex < 72U){
 
-            *freq = U32(903000000) + ( U32(200000) * U32(chIndex - U32(64)));
+            *freq = U32(903000000) + ( U32(1600000) * U32(chIndex - U32(64)));
             *minRate = 4U;
             *maxRate = 4U;
         }
@@ -373,7 +373,7 @@ bool LDL_Region_getChannel(enum ldl_region region, uint8_t chIndex, uint32_t *fr
         }
         else if(chIndex < 72U){
 
-            *freq = U32(915900000) + ( U32(200000) * (U32(chIndex) - U32(64)));
+            *freq = U32(915900000) + ( U32(1600000) * (U32(chIndex) - U32(64)));
             *minRate = 6U;
             *maxRate = 6U;
         }
