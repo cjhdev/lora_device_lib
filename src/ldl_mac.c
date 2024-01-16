@@ -101,7 +101,7 @@ static uint8_t requiredRate(uint8_t desired, uint8_t min, uint8_t max);
 static void selectJoinChannelAndRate(struct ldl_mac *self, struct ldl_mac_tx *tx);
 static void registerTime(struct ldl_mac *self, const struct ldl_mac_tx *tx);
 static bool getChannel(const struct ldl_mac *self, uint8_t chIndex, uint32_t *freq, uint8_t *minRate, uint8_t *maxRate);
-static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint32_t limit, uint8_t desired_rate);
+static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint32_t limit);
 static void initSession(struct ldl_mac *self, enum ldl_region region);
 static void forgetNetwork(struct ldl_mac *self);
 static bool setChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, uint8_t minRate, uint8_t maxRate);
@@ -2618,7 +2618,7 @@ static bool selectChannel(const struct ldl_mac *self, uint8_t desired_rate, uint
     /* count number of available channels for this rate */
     for(i=0; i < LDL_Region_numChannels(self->ctx.region); i++){
 
-        if(isAvailable(self, i, limit, desired_rate)){
+        if(isAvailable(self, i, limit)){
 
             if(i == self->tx.chIndex){
 
@@ -2674,7 +2674,7 @@ static bool selectChannel(const struct ldl_mac *self, uint8_t desired_rate, uint
     return retval;
 }
 
-static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint32_t limit, uint8_t desired_rate)
+static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint32_t limit)
 {
     bool retval = false;
     uint32_t freq;
@@ -2686,7 +2686,7 @@ static bool isAvailable(const struct ldl_mac *self, uint8_t chIndex, uint32_t li
 
         if(getChannel(self, chIndex, &freq, &minRate, &maxRate)){
 
-            if((freq > 0U) && (desired_rate >= minRate && desired_rate <= maxRate)){
+            if(freq > 0U){
 
                 if(LDL_Region_getBand(self->ctx.region, freq, &band)){
 
