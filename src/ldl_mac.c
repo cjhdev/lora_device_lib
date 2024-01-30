@@ -762,7 +762,7 @@ bool LDL_MAC_addChannel(struct ldl_mac *self, uint8_t chIndex, uint32_t freq, ui
 {
     LDL_PEDANTIC(self != NULL)
 
-    LDL_DEBUG("chIndex=%u freq=%" PRIu32 " minRate=%u maxRate=%u", chIndex, freq, minRate, maxRate)
+    LDL_DEBUG("add chIndex=%u freq=%" PRIu32 " minRate=%u maxRate=%u", chIndex, freq, minRate, maxRate)
 
     return setChannel(self, chIndex, freq, minRate, maxRate);
 }
@@ -771,7 +771,7 @@ bool LDL_MAC_maskChannel(struct ldl_mac *self, uint8_t chIndex)
 {
     LDL_PEDANTIC(self != NULL)
 
-    LDL_DEBUG("chIndex=%u", chIndex)
+    LDL_DEBUG("mask chIndex=%u", chIndex)
 
     return maskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->ctx.region, chIndex);
 }
@@ -780,7 +780,7 @@ bool LDL_MAC_unmaskChannel(struct ldl_mac *self, uint8_t chIndex)
 {
     LDL_PEDANTIC(self != NULL)
 
-    LDL_DEBUG("chIndex=%u", chIndex)
+    LDL_DEBUG("unmask chIndex=%u", chIndex)
 
     return unmaskChannel(self->ctx.chMask, sizeof(self->ctx.chMask), self->ctx.region, chIndex);
 }
@@ -1816,7 +1816,7 @@ static enum ldl_mac_status externalDataCommand(struct ldl_mac *self, bool confir
                                 LDL_MAC_putLinkADRAns(&s, &self->ctx.link_adr_ans);
                                 clearPendingCommand(self, LDL_CMD_LINK_ADR);
 
-                                LDL_DEBUG("adding link_adr_ans: powerOK=%s dataRateOK=%s channelMaskOK=%s",
+                                LDL_DEBUG("adding link_adr_ans: dataRateOK=%s powerOK=%s channelMaskOK=%s",
                                     self->ctx.link_adr_ans.dataRateOK ? "true" : "false",
                                     self->ctx.link_adr_ans.powerOK ? "true" : "false",
                                     self->ctx.link_adr_ans.channelMaskOK ? "true" : "false"
